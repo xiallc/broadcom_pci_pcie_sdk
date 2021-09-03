@@ -50,6 +50,7 @@
 
 #include "ChipFunc.h"
 #include "Eep_8111.h"
+#include "SuppFunc.h"       // For PlxLogPrintf
 
 
 

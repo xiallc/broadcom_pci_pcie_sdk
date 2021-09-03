@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Avago Technologies
+ * Copyright 2013-2019 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -53,6 +53,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/timeb.h>
 #include "CmdLine.h"
 #include "Monitor.h"
 #include "MonCmds.h"
@@ -70,7 +71,7 @@
  * Description:  Clear the console
  *
  *********************************************************/
-BOOLEAN Cmd_ConsClear( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_ConsClear( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     Cons_clear();
     return TRUE;
@@ -86,7 +87,7 @@ BOOLEAN Cmd_ConsClear( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Display monitor version information
  *
  *********************************************************/
-BOOLEAN Cmd_Version( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Version( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     U8              VersionMajor;
     U8              VersionMinor;
@@ -96,7 +97,8 @@ BOOLEAN Cmd_Version( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
 
     Cons_printf(
-        "PLX Console Monitor, v%d.%d%d [%s]\n\n",
+        "PLX Console Monitor (%d-bit), v%d.%d%d [%s]\n\n",
+        (sizeof(PLX_UINT_PTR) * 8),
         MONITOR_VERSION_MAJOR,
         MONITOR_VERSION_MINOR,
         MONITOR_VERSION_REVISION,
@@ -111,20 +113,12 @@ BOOLEAN Cmd_Version( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         );
 
     Cons_printf(
-        "PLX API   : v%d.%d%d",
+        "PLX API   : v%d.%d%d %s\n",
         VersionMajor & ~(1 << 7),
         VersionMinor,
-        VersionRevision
+        VersionRevision,
+        (VersionMajor & (1 << 7)) ? "(Demo)" : ""
         );
-
-    if (VersionMajor & (1 << 7))
-    {
-        Cons_printf(" (Demo)\n");
-    }
-    else
-    {
-        Cons_printf("\n");
-    }
 
     // Display driver version
     if (pDevice == NULL)
@@ -200,7 +194,7 @@ BOOLEAN Cmd_Version( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Implements the monitor help command
  *
  *********************************************************/
-BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Help( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     // Enable throttle output
     ConsoleIoThrottleSet(TRUE);
@@ -220,13 +214,14 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     Cons_printf(" i2c       Probe for devices using I2C\n");
     Cons_printf(" mdio      Probe for devices using MDIO\n");
     Cons_printf(" sdb       Probe for devices using SDB\n");
-    Cons_printf(" set_chip  Force current device to specific chip type\n");
+    Cons_printf(" setchip   Force current device to specific chip type\n");
 
     Cons_printf("\n");
     Cons_printf("       ------------- PCI/PCIe Info --------------\n");
-    Cons_printf(" pci_cap   Display PCI/PCIe device extended capability list\n");
+    Cons_printf(" pcicap    Display PCI/PCIe device extended capability list\n");
     Cons_printf(" portinfo  Display PCI Express port properties\n");
-    Cons_printf(" scan      Scan for all possible PCI devices\n");
+    Cons_printf(" scan      Scan for all possible PCI/PCIe devices\n");
+    Cons_printf(" nvme      Display properties of the selected NVMe device\n");
 
     Cons_printf("\n");
     Cons_printf("       -----------  Register Access  ------------\n");
@@ -243,8 +238,15 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     Cons_printf("\n");
     Cons_printf("       ------------  EEPROM Access  -------------\n");
     Cons_printf(" eep       Display or modify EEPROM values\n");
-    Cons_printf(" eep_load  Load EEPROM values from a file\n");
-    Cons_printf(" eep_save  Save EEPROM values to a file\n");
+    Cons_printf(" eepload   Load EEPROM values from a file\n");
+    Cons_printf(" eepsave   Save EEPROM values to a file\n");
+
+    Cons_printf("\n");
+    Cons_printf("       -----------  SPI Flash Access  -----------\n");
+    Cons_printf(" spirw     Read/write single DW in flash\n");
+    Cons_printf(" spierase  Erase the entire flash or sectors\n");
+    Cons_printf(" spiload   Program flash from a file\n");
+    Cons_printf(" spisave   Save flash contents to a file\n");
 
     Cons_printf("\n");
     Cons_printf("       ------------  Memory Access  -------------\n");
@@ -272,7 +274,7 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     Cons_printf(" set       Add, update, or delete a user variable\n");
     Cons_printf(" buff      Display DMA buffer properties\n");
     Cons_printf(" reset     Reset the selected device (if supported)\n");
-    Cons_printf(" sleep     Delay for a specified amount of time (in milliseconds)\n");
+    Cons_printf(" sleep     Delay for a specified amount of time (in ms)\n");
 
     Cons_printf("\n");
 
@@ -292,7 +294,7 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Sleeps for specified timeout
  *
  *********************************************************/
-BOOLEAN Cmd_Sleep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Sleep( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLXCM_ARG *pArg;
 
@@ -328,7 +330,7 @@ BOOLEAN Cmd_Sleep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Display or modify the screen/terminal size
  *
  *********************************************************/
-BOOLEAN Cmd_Screen( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Screen( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLXCM_ARG *pArg;
 
@@ -375,7 +377,7 @@ BOOLEAN Cmd_Screen( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Display or modify the currnet throttle toggle
  *
  *********************************************************/
-BOOLEAN Cmd_Throttle( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Throttle( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLXCM_ARG *pArg;
 
@@ -431,7 +433,7 @@ BOOLEAN Cmd_Throttle( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Changes the screen size
  *
  *********************************************************/
-BOOLEAN Cmd_History( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_History( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     U16             i;
     BOOLEAN         bSelectCmd;
@@ -517,12 +519,12 @@ BOOLEAN Cmd_History( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Resets a PLX device
  *
  *********************************************************/
-BOOLEAN Cmd_Reset( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Reset( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLX_STATUS status;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -560,7 +562,7 @@ BOOLEAN Cmd_Reset( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_Scan( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Scan( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     char        ClassString[100];
     U8          slot;
@@ -572,6 +574,13 @@ BOOLEAN Cmd_Scan( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     PLX_STATUS  status;
     DEVICE_NODE TmpNode;
 
+
+    // Verify at least 1 PCI driver was detected
+    if (Gbl_PciDriverFound == FALSE)
+    {
+        Cons_printf("Error: No PCIe SDK PCI driver detected to perform a bus scan\n");
+        return TRUE;
+    }
 
     DevicesFound = 0;
 
@@ -682,7 +691,7 @@ BOOLEAN Cmd_Scan( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     {
         // Clear the character
         Cons_getch();
-        Cons_printf("-Halted- ");
+        Cons_printf("-- USER ABORT -- ");
     }
     Cons_printf("%d devices found\n\n", DevicesFound);
 
@@ -702,14 +711,13 @@ BOOLEAN Cmd_Scan( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Sets a device to new chip type
  *
  *********************************************************/
-BOOLEAN Cmd_SetChip( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_SetChip( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
-    PLXCM_ARG   *pArg;
-    PLX_STATUS   status;
-    DEVICE_NODE *pNode;
+    PLXCM_ARG  *pArg;
+    PLX_STATUS  status;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -720,7 +728,7 @@ BOOLEAN Cmd_SetChip( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     if (pArg == NULL)
     {
         Cons_printf(
-            "Usage: set_chip <PlxChipType>\n"
+            "Usage: setchip <PlxChipType>\n"
             "\n"
             "       PlxChipType:\n"
             "            0 = reset type & autodetect\n"
@@ -738,13 +746,6 @@ BOOLEAN Cmd_SetChip( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     else
     {
         Cons_printf("Set new chip type to: %04X\n", (U32)pArg->ArgIntHex);
-    }
-
-    // Get the corresponding device node
-    pNode = DeviceNodeGetByKey( &pDevice->Key );
-    if (pNode == NULL)
-    {
-        return FALSE;
     }
 
     // Set new chip type
@@ -786,11 +787,11 @@ BOOLEAN Cmd_SetChip( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Display or select a device
  *
  *********************************************************/
-BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Dev( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     char         DeviceText[100];
     PLXCM_ARG   *pArg;
-    DEVICE_NODE *pNode;
+    DEVICE_NODE *pTmpNode;
 
 
     // Get argument
@@ -813,8 +814,8 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     // Attempt to select desired device
-    pNode = DeviceSelectByIndex( (U16)pArg->ArgIntHex );
-    if (pNode == NULL)
+    pTmpNode = DeviceSelectByIndex( (U16)pArg->ArgIntHex );
+    if (pTmpNode == NULL)
     {
         Cons_printf("Error: Invalid device selection\n");
         return FALSE;
@@ -822,28 +823,28 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     Cons_printf(
         "Selected: [D%d %02X:%02X.%X] %04X_%04X",
-        pNode->Key.domain,
-        pNode->Key.bus,
-        pNode->Key.slot,
-        pNode->Key.function,
-        pNode->Key.DeviceId,
-        pNode->Key.VendorId
+        pTmpNode->Key.domain,
+        pTmpNode->Key.bus,
+        pTmpNode->Key.slot,
+        pTmpNode->Key.function,
+        pTmpNode->Key.DeviceId,
+        pTmpNode->Key.VendorId
         );
 
-    if (pNode->Key.PlxChip != 0)
+    if (pTmpNode->Key.PlxChip != 0)
     {
-        if ((pNode->Key.PlxChip == 0x9050) &&
-            (pNode->Key.PlxRevision == 0x2))
+        if ((pTmpNode->Key.PlxChip == 0x9050) &&
+            (pTmpNode->Key.PlxRevision == 0x2))
         {
             Cons_printf(" [9052]");
         }
         else
         {
-            Cons_printf(" [%04X]", pNode->Key.PlxChip );
+            Cons_printf(" [%04X]", pTmpNode->Key.PlxChip );
         }
     }
 
-    Device_GetClassString( pNode, DeviceText );
+    Device_GetClassString( pTmpNode, DeviceText );
     Cons_printf( " - %s\n", DeviceText );
 
     return TRUE;
@@ -859,7 +860,7 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Attempts to connect to a device over I2C
  *
  *********************************************************/
-BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_I2cConnect( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
 #if defined(PLX_DOS)
 
@@ -970,8 +971,8 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Check if user canceled
     if (i & (1 << 15))
     {
-        Cons_printf(" -- User aborted scan --   ");
-        i &= ~(U8)(1 << 15);
+        Cons_printf("     -- USER ABORT --\n");
+        i &= ~(U16)(1 << 15);
     }
 
     if (i == 0)
@@ -1014,7 +1015,7 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Attempts to connect to a device over I2C
  *
  *********************************************************/
-BOOLEAN Cmd_MdioConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_MdioConnect( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
 #if defined(PLX_DOS)
 
@@ -1103,8 +1104,8 @@ BOOLEAN Cmd_MdioConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Check if user canceled
     if (i & (1 << 15))
     {
-        Cons_printf(" -- User aborted scan --   ");
-        i &= ~(U8)(1 << 15);
+        Cons_printf("     -- USER ABORT --\n");
+        i &= ~(U16)(1 << 15);
     }
 
     if (i == 0)
@@ -1147,7 +1148,7 @@ BOOLEAN Cmd_MdioConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Attempts to connect to a device over SDB
  *
  *********************************************************/
-BOOLEAN Cmd_SdbConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_SdbConnect( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
 #if defined(PLX_DOS)
 
@@ -1260,7 +1261,7 @@ BOOLEAN Cmd_SdbConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         PlxPci_DeviceClose( pDevice );
     }
 
-    Cons_printf("Scan for SDB devices (ESC to halt)...\n");
+    Cons_printf("Scan for SDB devices on COM%d (ESC to halt)...\n", ModeProp.Sdb.Port);
 
     // Build device list
     i = DeviceListCreate( PLX_API_MODE_SDB, &ModeProp );
@@ -1268,8 +1269,8 @@ BOOLEAN Cmd_SdbConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Check if user canceled
     if (i & (1 << 15))
     {
-        Cons_printf(" -- User aborted scan --   ");
-        i &= ~(U8)(1 << 7);
+        Cons_printf("     -- USER ABORT --\n");
+        i &= ~(U16)(1 << 15);
     }
 
     if (i == 0)
@@ -1312,28 +1313,20 @@ BOOLEAN Cmd_SdbConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Lists PCI capabilities of selected device
  *
  *********************************************************/
-BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_PciCapList( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
-    char         szCapability[100];
-    U16          Offset_Cap;
-    U16          CapID;
-    U8           CapVer;
-    U32          RegValue;
-    U32          RegDevVenId;
-    BOOLEAN      bPciExpress;
-    DEVICE_NODE *pNode;
+    char    szCapability[100];
+    U16     Offset_Cap;
+    U16     CapID;
+    U8      CapVer;
+    U32     RegValue;
+    U32     RegDevVenId;
+    BOOLEAN bPciExpress;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
-        return FALSE;
-    }
-
-    pNode = DeviceNodeGetByKey( &pDevice->Key );
-
-    if (pNode == NULL)
-    {
         return FALSE;
     }
 
@@ -1566,6 +1559,18 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         strcpy( szCapability, "Native PCIe Enclosure Management (NPEM)" );
                         break;
 
+                    case PCIE_CAP_ID_PHYS_LAYER_32GT:
+                        strcpy( szCapability, "Physical Layer 32 GT/s" );
+                        break;
+
+                    case PCIE_CAP_ID_ALTERNATE_PROTOCOL:
+                        strcpy( szCapability, "Alternate Protocol" );
+                        break;
+
+                    case PCIE_CAP_ID_SYS_FW_INTERMEDIARY:
+                        strcpy( szCapability, "System Firmware Intermediary (SFI)" );
+                        break;
+
                     default:
                         strcpy( szCapability, "?Unknown?" );
                         break;
@@ -1592,7 +1597,8 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         break;
 
                     case PCI_CAP_ID_MSI:
-                        strcpy( szCapability, "Message Signaled Interrupt (MSI)" );
+                        sprintf( szCapability, "Message Signaled Interrupt (%d-bit MSI)",
+                                 (RegValue & ((U32)1 << 23)) ? 64 : 32 );
                         break;
 
                     case PCI_CAP_ID_HOT_SWAP:
@@ -1653,6 +1659,10 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
                     case PCI_CAP_ID_ENHANCED_ALLOCATION:
                         strcpy( szCapability, "Enhanced Allocation" );
+                        break;
+
+                    case PCI_CAP_ID_FLATTENING_PORTAL_BRIDGE:
+                        strcpy( szCapability, "Flattening Portal Bridge" );
                         break;
 
                     default:
@@ -1718,13 +1728,13 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Displays port properties
  *
  *********************************************************/
-BOOLEAN Cmd_PortProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_PortProp( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLX_STATUS    status;
     PLX_PORT_PROP PortProp;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -1836,13 +1846,13 @@ BOOLEAN Cmd_PortProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Displays Multi-host properties
  *
  *********************************************************/
-BOOLEAN Cmd_MH_Prop( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_MH_Prop( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLX_STATUS          status;
     PLX_MULTI_HOST_PROP MHProp;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -1916,24 +1926,16 @@ BOOLEAN Cmd_MH_Prop( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Displays NVMe properties
  *
  *********************************************************/
-BOOLEAN Cmd_NvmeProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_NvmeProp( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
-    U8          *pBarVa;
-    U32          regVal;
-    U32          pciCmdStat;
-    DEVICE_NODE *pNode;
+    U8  *pBarVa;
+    U32  regVal;
+    U32  pciCmdStat;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
-        return FALSE;
-    }
-
-    // Get device node
-    pNode = DeviceNodeGetByKey( &pDevice->Key );
-    if (pNode == NULL)
-    {
         return FALSE;
     }
 
@@ -2011,7 +2013,7 @@ BOOLEAN Cmd_NvmeProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_VarDisplay( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_VarDisplay( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     U8         index;
     size_t     NumSpaces;
@@ -2105,7 +2107,7 @@ BOOLEAN Cmd_VarDisplay( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_VarSet( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_VarSet( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     BOOLEAN    bError;
     PLXCM_ARG *pArgVar;
@@ -2221,14 +2223,14 @@ _Exit_Cmd_VarSet:
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_ShowBuffer( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLXCM_VAR        *pVar;
     PLXCM_ARG        *pArg;
     PLX_PHYSICAL_MEM  PciBuffer;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -2307,7 +2309,7 @@ BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_MemRead( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     int         i;
     int         x;
@@ -2422,7 +2424,7 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 SpacesToInsert = (U8)(((size * 2) + 1) * (16 / size));
 
                 Cons_printf(
-                    "%s%08x: ",
+                    "%s%08X: ",
                     (sizeof(PLX_UINT_PTR) == sizeof(U64)) ? ".." : "",
                     (PLX_UINT_PTR)pCurrAddr
                     );
@@ -2432,17 +2434,17 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             {
                 case sizeof(U8):
                     CurrValue = PlxCm_MemRead_8(pCurrAddr);
-                    Cons_printf("%02x ", (U8)CurrValue);
+                    Cons_printf("%02X ", (U8)CurrValue);
                     break;
 
                 case sizeof(U16):
                     CurrValue = PlxCm_MemRead_16(pCurrAddr);
-                    Cons_printf("%04x ", (U16)CurrValue);
+                    Cons_printf("%04X ", (U16)CurrValue);
                     break;
 
                 case sizeof(U32):
                     CurrValue = PlxCm_MemRead_32(pCurrAddr);
-                    Cons_printf("%08x ", CurrValue);
+                    Cons_printf("%08X ", CurrValue);
                     break;
             }
 
@@ -2510,7 +2512,7 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 {
                     if (Cons_getch() == CONS_KEY_ESCAPE)
                     {
-                        Cons_printf(" - user abort\n");
+                        Cons_printf(" -- USER ABORT --\n");
                         break;
                     }
                 }
@@ -2535,7 +2537,7 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_MemWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_MemWrite( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     U8         i;
     U8         size;
@@ -2662,7 +2664,7 @@ BOOLEAN Cmd_MemWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_IoRead( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     int         i;
     int         x;
@@ -2680,7 +2682,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     PLX_STATUS  status;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -2767,7 +2769,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             // Set initial spaces to insert
             SpacesToInsert = (U8)(((size * 2) + 1) * (16 / size));
 
-            Cons_printf("%08x: ", CurrAddr);
+            Cons_printf("%08X: ", CurrAddr);
         }
 
         switch (size)
@@ -2781,7 +2783,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         sizeof(U8),
                         BitSize8
                         );
-                Cons_printf( "%02x ", (U8)CurrValue );
+                Cons_printf( "%02X ", (U8)CurrValue );
                 break;
 
             case sizeof(U16):
@@ -2793,7 +2795,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         sizeof(U16),
                         BitSize16
                         );
-                Cons_printf( "%04x ", (U16)CurrValue );
+                Cons_printf( "%04X ", (U16)CurrValue );
                 break;
 
             case sizeof(U32):
@@ -2805,7 +2807,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         sizeof(U32),
                         BitSize32
                         );
-                Cons_printf( "%08x ", CurrValue );
+                Cons_printf( "%08X ", CurrValue );
                 break;
 
             default:
@@ -2887,7 +2889,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             {
                 if (Cons_getch() == CONS_KEY_ESCAPE)
                 {
-                    Cons_printf(" - user abort\n");
+                    Cons_printf(" -- USER ABORT --\n");
                     break;
                 }
             }
@@ -2910,7 +2912,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_IoWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_IoWrite( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     U8          i;
     U8          size;
@@ -2920,7 +2922,7 @@ BOOLEAN Cmd_IoWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     PLX_STATUS  status;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -3071,7 +3073,7 @@ BOOLEAN Cmd_IoWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Implements the PCI register command
  *
  *********************************************************/
-BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_RegPci( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     char         *pStr;
     U8            i;
@@ -3080,11 +3082,10 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     BOOLEAN       bRead;
     PLXCM_ARG    *pArg;
     PLX_STATUS    status;
-    DEVICE_NODE  *pNode;
     REGISTER_SET *RegSet;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -3108,7 +3109,7 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
         if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) || (pArg->ArgIntHex & 0x3) )
         {
-            Cons_printf("Error: '%s' is not a valid 4B aliged register offset\n", pArg->ArgString);
+            Cons_printf("Error: '%s' is not a valid 4B aligned register offset\n", pArg->ArgString);
             return FALSE;
         }
 
@@ -3157,13 +3158,6 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             break;
 
         default:
-            pNode = DeviceNodeGetByKey( &pDevice->Key );
-
-            if (pNode == NULL)
-            {
-                return FALSE;
-            }
-
             // Check Header Type
             if (pNode->PciHeaderType == PCI_HDR_TYPE_1)
             {
@@ -3215,7 +3209,7 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         if (bRead)
         {
             value = PlxPci_PciRegisterReadFast( pDevice, offset, &status );
-            Cons_printf( " %03x: ", offset );
+            Cons_printf( " %03X: ", offset );
 
             if (status != PLX_STATUS_OK)
             {
@@ -3223,7 +3217,7 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             }
             else
             {
-                Cons_printf("%08x", value);
+                Cons_printf("%08X", value);
 
                 // Store last value in return code
                 Gbl_LastRetVal = value;
@@ -3292,7 +3286,7 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Implements the register commands
  *
  *********************************************************/
-BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_RegPlx( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     char         *pStr;
     U8            i;
@@ -3307,7 +3301,7 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     REGISTER_SET *RegSet;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -3587,14 +3581,14 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 value = PlxPci_PlxMappedRegisterRead( pDevice, offset, &status );
             }
 
-            Cons_printf( " %03x: ", offset );
+            Cons_printf( " %03X: ", offset );
             if (status != PLX_STATUS_OK)
             {
                 Cons_printf("????????\n");
             }
             else
             {
-                Cons_printf( "%08x", value );
+                Cons_printf( "%08X", value );
 
                 // Store last value in return code
                 Gbl_LastRetVal = value;
@@ -3670,7 +3664,7 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Dumps PLX registers
  *
  *********************************************************/
-BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_RegDump( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     int         i;
     U32         CurrValue = 0;
@@ -3685,7 +3679,7 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     PLX_STATUS  status;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -3813,7 +3807,7 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             Gbl_LastRetVal = CurrValue;
 
             // Display the value
-            Cons_printf("%08x ", CurrValue);
+            Cons_printf("%08X ", CurrValue);
 
             i          += sizeof(U32);
             OffsetCurr += sizeof(U32);
@@ -3848,7 +3842,7 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 {
                     if (Cons_getch() == CONS_KEY_ESCAPE)
                     {
-                        Cons_printf(" - user abort\n");
+                        Cons_printf(" -- USER ABORT --\n");
                         break;
                     }
                 }
@@ -3873,7 +3867,7 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Implements the EEPROM commands
  *
  *********************************************************/
-BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Eep( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     char         *pStr;
     U8            i;
@@ -3885,11 +3879,10 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     BOOLEAN       bRead;
     PLXCM_ARG    *pArg;
     PLX_STATUS    status;
-    DEVICE_NODE  *pNode;
     REGISTER_SET *RegSet;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -4025,16 +4018,8 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         }
     }
 
-    // Get corresponding node
-    pNode = DeviceNodeGetByKey( &pDevice->Key );
-
-    if (pNode == NULL)
-    {
-        return FALSE;
-    }
-
     // Check if an EEPROM is present
-    if (pNode->bEepromVerified == FALSE)
+    if ((pNode->DevFlags & PEX_DEV_FLAG_EEP_VERIFIED) == FALSE)
     {
         if (PlxPci_EepromPresent(
                 pDevice,
@@ -4065,7 +4050,7 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         }
 
         // Verified EEPROM is present or ignore
-        pNode->bEepromVerified = TRUE;
+        pNode->DevFlags |= PEX_DEV_FLAG_EEP_VERIFIED;
     }
 
     // Process some 8000 devices differently
@@ -4092,7 +4077,7 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             case 0x8600:
             case 0x8700:
             case 0x9700:
-                return Cmd_Eep8000( pDevice, pCmd );
+                return Cmd_Eep8000( pNode, pDevice, pCmd );
         }
     }
 
@@ -4139,7 +4124,7 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             else
             {
                 PlxPci_EepromReadByOffset( pDevice, offset, &value_32 );
-                Cons_printf( " %03x: %08x", offset, value_32 );
+                Cons_printf( " %03X: %08X", offset, value_32 );
 
                 // Store last value in return code
                 Gbl_LastRetVal = value_32;
@@ -4198,7 +4183,7 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:  Implements the EEPROM commands
  *
  *********************************************************/
-BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_Eep8000( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     S16 count;
     S16 ByteCount;
@@ -4510,7 +4495,7 @@ BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  * Description:
  *
  *********************************************************/
-BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+BOOLEAN Cmd_EepFile( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     U8         i;
     U8         EepPortSize;
@@ -4524,7 +4509,7 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     PLXCM_ARG *pArgFile;
 
 
-    if (pDevice == NULL)
+    if ( (pDevice == NULL) || (pNode == NULL) )
     {
         Cons_printf("Error: No device selected\n");
         return FALSE;
@@ -4546,8 +4531,9 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         {
             bBypassVerify = TRUE;
         }
-        else if ((pArg->ArgString[1] != '\0') && (pArg->ArgString[0] == '-'))
+        else if (pArg->ArgString[0] == '-')
         {
+            // Final check - unknown parameter
             Cons_printf("WARNING: Ignoring invalid parameter - '%s'\n", pArg->ArgString);
         }
         else
@@ -4726,7 +4712,7 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
         case 0:
         default:
-            Cons_printf("ERROR: Only PLX devices are supported\n");
+            Cons_printf("ERROR: EEPROM access not supported for this device\n");
             return FALSE;
     }
 
@@ -4756,6 +4742,875 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             EepPortSize,
             bCrc,
             bEndianSwap
+            );
+    }
+
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_SpiRW
+ *
+ * Description:  Implements the EEPROM commands
+ *
+ *********************************************************/
+BOOLEAN Cmd_SpiRW( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+    U8           idx;
+    U8           bRead;
+    U8           chipSel;
+    U8           bDisplayHelp;
+    U32          data;
+    U32          offset;
+    PLXCM_ARG   *pArg;
+    PLX_STATUS   status;
+    PEX_SPI_OBJ  spiProp;
+
+
+    if ( (pDevice == NULL) || (pNode == NULL) )
+    {
+        Cons_printf("Error: No device selected\n");
+        return FALSE;
+    }
+
+    // Verify supported chip
+    if (pDevice->Key.PlxFamily != PLX_FAMILY_ATLAS)
+    {
+        Cons_printf(
+            "Error: SPI access is not supported for %04X device\n",
+            pDevice->Key.PlxChip
+            );
+        return FALSE;
+    }
+
+    // Verify not synthetic device
+    if (pNode->DevFlags & PEX_DEV_FLAG_IS_SYNTH)
+    {
+        Cons_printf("Error: Operation not supported though synthetic devices\n");
+        return FALSE;
+    }
+
+    // Display help if no params
+    bDisplayHelp = (pCmd->NumArgs == 0);
+
+    // Set to invalid value to indicate not specified
+    offset = 0xFFFFFFFF;
+    data   = 0;
+
+    // Default chip select
+    chipSel = 0;
+
+    // Default to a read operation
+    bRead = TRUE;
+
+    // Get parameters
+    idx = 0;
+    while (idx < pCmd->NumArgs)
+    {
+        // Get next param
+        pArg = CmdLine_ArgGet( pCmd, idx );
+
+        if ( (Plx_strcasecmp( pArg->ArgString, "/?" ) == 0) ||
+             (Plx_strcasecmp( pArg->ArgString, "?" ) == 0) )
+        {
+            bDisplayHelp = TRUE;
+            break;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/cs" ) == 0)
+        {
+            // Next param must be chip select
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing chip select parameter\n");
+                return FALSE;
+            }
+
+            // Get & verify value
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) || // Hex value
+                 (pArg->ArgIntHex > 5) )                  // Set a max CS
+            {
+                Cons_printf("Error: '%s' is not a valid chip select value\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            chipSel = (U8)pArg->ArgIntHex;
+        }
+        else
+        {
+            // If offset not specified yet, param must be offset
+            if (offset == (U32)0xFFFFFFFF)
+            {
+                // Verify offet
+                if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) || // Hex value
+                     (pArg->ArgIntHex & 0x3) )                // 32b aligned
+                {
+                    Cons_printf("Error: '%s' is not a valid offset\n", pArg->ArgString);
+                    return FALSE;
+                }
+                offset = (U32)pArg->ArgIntHex;
+            }
+            else
+            {
+                // Additional param must be data value
+                if (pArg->ArgType != PLXCM_ARG_TYPE_INT)    // Hex value
+                {
+                    Cons_printf("Error: '%s' is not a valid data value\n", pArg->ArgString);
+                    return FALSE;
+                }
+                data = (U32)pArg->ArgIntHex;
+
+                // Flag write operation
+                bRead = FALSE;
+            }
+        }
+
+        // Jump to next parameter
+        idx++;
+    }
+
+    if (bDisplayHelp)
+    {
+        Cons_printf(
+            "spirw  - Read or write a single 32-bit value from/to flash\n"
+            "\n"
+            "Usage: spirw <offset> [data] [/cs <ChipSel>]\n"
+            "\n"
+            "    offset     : Offset to read or write from/to. Must be 4B aligned.\n"
+            "    data       : 32-bit value to write. Read operation if not supplied.\n"
+            "    /cs ChipSel: Specify the flash chip select. Default is 0.\n"
+            "\n"
+            "Examples: 'spirw 104 DEADBEEF' - Write 32b value to offset 104h\n"
+            "          'spirw 2000+40'      - Read 32b from offset 2040h\n"
+            "\n"
+            );
+        return FALSE;
+    }
+
+    // Fill in SPI object
+    if (PlxPci_SpiFlashPropGet( pDevice, chipSel, &spiProp ) != PLX_STATUS_OK)
+    {
+        Cons_printf("Error: Unable to get SPI properties for chip select %d\n", chipSel);
+        return FALSE;
+    }
+
+    // Access device
+    if (bRead)
+    {
+        data = PlxPci_SpiFlashReadByOffset( pDevice, &spiProp, offset, &status );
+        Cons_printf("%03X: ", offset);
+        if (status == PLX_STATUS_OK)
+        {
+            Cons_printf("%08X\n", data);
+        }
+        else
+        {
+            Cons_printf("Error: Flash read failed (status=%d)\n", status);
+        }
+    }
+    else
+    {
+        status = PlxPci_SpiFlashWriteByOffset( pDevice, &spiProp, offset, data );
+        if (status != PLX_STATUS_OK)
+        {
+            Cons_printf("Error: Flash write failed (status=%d)\n", status);
+        }
+    }
+
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_SpiErase
+ *
+ * Description:  Implements the SPI erase command
+ *
+ *********************************************************/
+BOOLEAN Cmd_SpiErase( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+    char          progState[] = { '-', '\\', '|', '/' };
+    U8            idx;
+    U8            bAbort;
+    U8            progIdx;
+    U8            chipSel;
+    U8            nvFlags;
+    U8            bFullErase;
+    U8            bDisplayHelp;
+    U32           regReset;
+    U32           endAddr;
+    U32           eraseSize;
+    U32           sectorSize;
+    U32           startOffset;
+    PLXCM_ARG    *pArg;
+    PLX_STATUS    status;
+    PEX_SPI_OBJ   spiProp;
+    struct timeb  end;
+    struct timeb  start;
+
+
+    if ( (pDevice == NULL) || (pNode == NULL) )
+    {
+        Cons_printf("Error: No device selected\n");
+        return FALSE;
+    }
+
+    // Verify supported chip
+    if (pDevice->Key.PlxFamily != PLX_FAMILY_ATLAS)
+    {
+        Cons_printf(
+            "Error: SPI access is not supported for %04X device\n",
+            pDevice->Key.PlxChip
+            );
+        return FALSE;
+    }
+
+    // Verify not synthetic device
+    if (pNode->DevFlags & PEX_DEV_FLAG_IS_SYNTH)
+    {
+        Cons_printf("Error: Operation not supported though synthetic devices\n");
+        return FALSE;
+    }
+
+    // Note start time
+    ftime( &start );
+
+    // Clear initial flag options
+    nvFlags = PEX_NV_FLAG_NONE;
+
+    // Default to put CPU in reset
+    nvFlags |= PEX_NV_FLAG_CPU_IN_RESET;
+
+    // Default options
+    chipSel     = 0;
+    bAbort      = FALSE;
+    startOffset = 0;
+    endAddr     = 0;
+    eraseSize   = 0;
+    sectorSize  = 0;
+    bFullErase  = FALSE;
+
+    // Display help if no params
+    bDisplayHelp = (pCmd->NumArgs == 0);
+
+    // Get parameters
+    idx = 0;
+    while (idx < pCmd->NumArgs)
+    {
+        // Get next param
+        pArg = CmdLine_ArgGet( pCmd, idx );
+
+        if ( (Plx_strcasecmp( pArg->ArgString, "/?" ) == 0) ||
+             (Plx_strcasecmp( pArg->ArgString, "?" ) == 0) )
+        {
+            bDisplayHelp = TRUE;
+            break;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/nr" ) == 0)
+        {
+            nvFlags &= ~PEX_NV_FLAG_CPU_IN_RESET;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/f" ) == 0)
+        {
+            if ( (startOffset != 0) || (eraseSize != 0) )
+            {
+                Cons_printf("Error: Cannot specify full & partial erase simultaneously\n");
+                return FALSE;
+            }
+
+            // Set to erase entire flash
+            bFullErase = TRUE;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/o" ) == 0)
+        {
+            if (bFullErase)
+            {
+                Cons_printf("Error: Cannot specify an offset when erasing entire flash\n");
+                return FALSE;
+            }
+
+            // Next param must be starting offset
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing start offset parameter\n");
+                return FALSE;
+            }
+
+            // Get & verify offset
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) ||   // Hex value
+                 (pArg->ArgIntHex & 0x3) )                  // Not 32b aligned
+            {
+                Cons_printf("Error: '%s' is not a valid offset\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            startOffset = (U32)pArg->ArgIntHex;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/s" ) == 0)
+        {
+            if (bFullErase)
+            {
+                Cons_printf("Error: Cannot specify a size when erasing entire flash\n");
+                return FALSE;
+            }
+
+            // Next param must be erase size
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing byte count\n");
+                return FALSE;
+            }
+
+            // Get & verify erase size
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) ||   // Hex value
+                 (pArg->ArgIntHex & 0x3) )                  // Not 32b aligned
+            {
+                Cons_printf("Error: '%s' is not a valid byte count\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            eraseSize = (U32)pArg->ArgIntHex;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/cs" ) == 0)
+        {
+            // Next param must be chip select
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing chip select parameter\n");
+                return FALSE;
+            }
+
+            // Get & verify value
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) || // Hex value
+                 (pArg->ArgIntHex > 5) )                  // Set a max CS
+            {
+                Cons_printf("Error: '%s' is not a valid chip select value\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            chipSel = (U8)pArg->ArgIntHex;
+        }
+        else
+        {
+            Cons_printf("WARNING: Ignoring invalid parameter - '%s'\n", pArg->ArgString);
+        }
+
+        // Jump to next parameter
+        idx++;
+    }
+
+    if (bDisplayHelp)
+    {
+        Cons_printf(
+            "spierase  - Erase entire flash or a specified region\n"
+            "\n"
+            "Usage: spierase </f | [/o <offset>] /s <size>> [/cs <ChipSel>] [/nr]\n"
+            "\n"
+            "    /f         : Erase entire flash\n"
+            "    /o offset  : Specify the starting offset to erase (default=0)\n"
+            "    /s size    : Byte count to erase (entire sector will be erased)\n"
+            "    /cs ChipSel: Specify the flash chip select (default=0)\n"
+            "    /nr        : Do not put embedded CPU in reset\n"
+            "\n"
+            "Examples: 'spierase /f'            - Erase entire flash\n"
+            "          'spierase /o 0 /s 80000' - Erase sectors 0 & 1 (256K each)\n"
+            "\n"
+            );
+        return TRUE;
+    }
+
+    // Verify a size provided for partial erase
+    if ( (bFullErase == FALSE) && (eraseSize == 0) && (pCmd->NumArgs > 0) )
+    {
+        Cons_printf("Error: Erase operation not specified\n");
+        return FALSE;
+    }
+
+    // Fill in SPI object
+    if (PlxPci_SpiFlashPropGet( pDevice, chipSel, &spiProp ) != PLX_STATUS_OK)
+    {
+        Cons_printf("Error: Unable to get SPI properties for chip select %d\n", chipSel);
+        return FALSE;
+    }
+
+    Cons_printf("Put CPU in reset.................. ");
+    regReset = 0;
+    if (nvFlags & PEX_NV_FLAG_CPU_IN_RESET)
+    {
+        // Not supported in PCIe direct access mode
+        if (pDevice->Key.ApiMode == PLX_API_MODE_PCI)
+        {
+            Cons_printf("<N/A in PCIe direct access mode>\n");
+            nvFlags &= ~PEX_NV_FLAG_CPU_IN_RESET;
+        }
+        else
+        {
+            // Put CPU in reset (60000008h[1]=1)
+            regReset =
+                PlxPci_PlxMappedRegisterRead(
+                    pDevice,
+                    PEX_REG_HOST_DIAG,
+                    NULL
+                    );
+            PlxPci_PlxMappedRegisterWrite(
+                pDevice,
+                PEX_REG_HOST_DIAG,
+                regReset | PEX_HOST_DIAG_CPU_RST_MASK
+                );
+            Cons_printf("Ok (use '/nr' to disable)\n");
+        }
+    }
+    else
+    {
+        Cons_printf("DISABLED\n");
+    }
+
+    // If partial erase, align addresses to sector boundaries
+    if (bFullErase == FALSE)
+    {
+        // Get sector size in bytes
+        sectorSize = ((U32)1 << spiProp.SectorSize);
+
+        // Determine end address
+        endAddr = startOffset + eraseSize;
+
+        // Align start address to start of sector
+        startOffset = PEX_P2_ROUND_DOWN( startOffset, sectorSize );
+    }
+
+    // Perform erase operation
+    while (bFullErase || (startOffset < endAddr))
+    {
+        if (bFullErase)
+        {
+            Cons_printf("Issue BULK ERASE command.......... ");
+            if (PlxPci_SpiFlashErase(
+                    pDevice,
+                    &spiProp,
+                    SPI_FLASH_ERASE_ALL,
+                    FALSE       // Don't wait for completion
+                    ) != PLX_STATUS_OK)
+            {
+                Cons_printf("Error: Unable to issue command\n");
+                return FALSE;
+            }
+            Cons_printf("Ok\n");
+        }
+        else
+        {
+            Cons_printf("Issue ERASE SECTOR command........ ");
+            if (PlxPci_SpiFlashErase(
+                    pDevice,
+                    &spiProp,
+                    startOffset,
+                    FALSE       // Don't wait for completion
+                    ) != PLX_STATUS_OK)
+            {
+                Cons_printf("Error: Unable to issue command\n");
+                return FALSE;
+            }
+            Cons_printf(
+                "Ok (sector %d: %06Xh-%06Xh)\n",
+                (startOffset / sectorSize),
+                startOffset, startOffset + sectorSize - 1
+                );
+
+            // Adjust for next sector
+            startOffset += sectorSize;
+        }
+
+        Cons_printf("Wait for completion (ESC=halt).... ");
+        progIdx = 0;
+        do
+        {
+            // Check status
+            status = PlxPci_SpiFlashGetStatus( pDevice, &spiProp );
+            if (status == PLX_STATUS_OK)
+            {
+                // Next line only if no more sectors to erase
+                Cons_printf(
+                    "Ok%c",
+                    (bFullErase) ? '\n' : '\r'
+                    );
+                break;
+            }
+
+            if (status != PLX_STATUS_IN_PROGRESS)
+            {
+                Cons_printf("Error: Unable to get flash status (status=%Xh\n", status);
+                break;
+            }
+
+            // Check for user abort
+            if ( Cons_kbhit() && (Cons_getch() == 27) )
+            {
+                Cons_printf("-- USER ABORT --\n");
+                bAbort = TRUE;
+                break;
+            }
+
+            // Display progress
+            Cons_printf("%c\b", progState[progIdx]);
+            Cons_fflush( stdout );
+            progIdx = (progIdx + 1) % sizeof(progState);
+
+            // Small delay between status checks
+            Plx_sleep( 300 );
+        }
+        while (1);
+
+        // Exit loop if full erase or user abort
+        if (bFullErase || bAbort)
+        {
+            break;
+        }
+    }
+
+    if (nvFlags & PEX_NV_FLAG_CPU_IN_RESET)
+    {
+        Cons_printf("Restore CPU reset state........... ");
+        // Restore CPU reset register (60000008h)
+        PlxPci_PlxMappedRegisterWrite(
+            pDevice,
+            PEX_REG_HOST_DIAG,
+            regReset
+            );
+        Cons_printf("Ok\n");
+    }
+
+    // Calculate elapsed time
+    ftime( &end );
+    Cons_printf(
+        " -- Complete (%.2f sec) -- %15s\n\n",
+        PLX_DIFF_TIMEB( end, start ), " "
+        );
+
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_SpiFile
+ *
+ * Description:
+ *
+ *********************************************************/
+BOOLEAN Cmd_SpiFile( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+    U8           idx;
+    U8           len;
+    U8           chipSel;
+    U8           bLoad;
+    U8           nvFlags;
+    U8           bUseMmRd;
+    U8           bDisplayHelp;
+    U32          startOffset;
+    U32          readSize;
+    PEX_SPI_OBJ  spiProp;
+    PLXCM_ARG   *pArg;
+    PLXCM_ARG   *pArgFile;
+
+
+    if ( (pDevice == NULL) || (pNode == NULL) )
+    {
+        Cons_printf("Error: No device selected\n");
+        return FALSE;
+    }
+
+    // Verify supported chip
+    if (pDevice->Key.PlxFamily != PLX_FAMILY_ATLAS)
+    {
+        Cons_printf(
+            "Error: SPI access is not supported for %04X device\n",
+            pDevice->Key.PlxChip
+            );
+        return FALSE;
+    }
+
+    // Verify not synthetic device
+    if (pNode->DevFlags & PEX_DEV_FLAG_IS_SYNTH)
+    {
+        Cons_printf("Error: Operation not supported though synthetic devices\n");
+        return FALSE;
+    }
+
+    // Determine operation type
+    bLoad = (Plx_strcasecmp( pCmd->szCmd, "spiload" ) == 0);
+
+    // Clear initial flag options
+    nvFlags = PEX_NV_FLAG_NONE;
+
+    // Default to put CPU in reset
+    nvFlags |= PEX_NV_FLAG_CPU_IN_RESET;
+
+    // Default to manual read
+    bUseMmRd = FALSE;
+
+    // Default to start offset of 0
+    startOffset = 0;
+
+    // Default to size of 0 for read
+    readSize = 0;
+
+    // Default to chip select 0
+    chipSel = 0;
+
+    // Display help if no params
+    bDisplayHelp = (pCmd->NumArgs == 0);
+
+    // Flag file name not set
+    pArgFile = NULL;
+
+    // Get parameters
+    idx = 0;
+    while (idx < pCmd->NumArgs)
+    {
+        // Get next param
+        pArg = CmdLine_ArgGet( pCmd, idx );
+
+        if ( (Plx_strcasecmp( pArg->ArgString, "/?" ) == 0) ||
+             (Plx_strcasecmp( pArg->ArgString, "?" ) == 0) )
+        {
+            bDisplayHelp = TRUE;
+            break;
+        }
+        else if (bLoad && (Plx_strcasecmp( pArg->ArgString, "/b" ) == 0))
+        {
+            nvFlags |= PEX_NV_FLAG_BYPASS_VERIFY;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/nr" ) == 0)
+        {
+            nvFlags &= ~PEX_NV_FLAG_CPU_IN_RESET;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/cs" ) == 0)
+        {
+            // Next param must be chip select
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing chip select parameter\n");
+                return FALSE;
+            }
+
+            // Get & verify offset
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) || // Hex value
+                 (pArg->ArgIntHex > 5) )                  // Set a max CS
+            {
+                Cons_printf("Error: '%s' is not a valid chip select value\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            chipSel = (U8)pArg->ArgIntHex;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/o" ) == 0)
+        {
+            // Next param must be starting offset
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing start offset parameter\n");
+                return FALSE;
+            }
+
+            // Get & verify offset
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) ||   // Hex value
+                 (pArg->ArgIntHex & 0x3) )                  // Not 32b aligned
+            {
+                Cons_printf("Error: '%s' is not a valid offset\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            startOffset = (U32)pArg->ArgIntHex;
+        }
+        else if ((bLoad == FALSE) && (Plx_strcasecmp( pArg->ArgString, "/s" ) == 0))
+        {
+            // Next param must be read size
+            idx++;
+            if (idx == pCmd->NumArgs)
+            {
+                Cons_printf("Error: Missing read byte count\n");
+                return FALSE;
+            }
+
+            // Get & verify read size
+            pArg = CmdLine_ArgGet( pCmd, idx );
+
+            if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) ||   // Hex value
+                 (pArg->ArgIntHex & 0x3) )                  // Not 32b aligned
+            {
+                Cons_printf("Error: '%s' is not a valid read byte count\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            readSize = (U32)pArg->ArgIntHex;
+        }
+        else if (Plx_strcasecmp( pArg->ArgString, "/mmr" ) == 0)
+        {
+            bUseMmRd = TRUE;
+        }
+        else if (pArg->ArgString[0] == '-')
+        {
+            // Final check - unknown parameter
+            Cons_printf("WARNING: Ignoring invalid parameter - '%s'\n", pArg->ArgString);
+        }
+        else
+        {
+            // Parameter is a file name
+            if (pArgFile != NULL)
+            {
+                Cons_printf("ERROR: File name already specified\n");
+                return FALSE;
+            }
+
+            // Get string length
+            len = (U8)strlen( pArg->ArgString );
+
+            // Remove surrounding quotes
+            if ( (pArg->ArgString[0] == '\'') || (pArg->ArgString[0] == '\"') )
+            {
+                // Assume start & end quotes
+                if (len <= 2)
+                {
+                    Cons_printf("ERROR: Invalid file name\n");
+                    return FALSE;
+                }
+
+                // Decrease length due to pending removal of quotes
+                len -= 2;
+
+                // Shift string over by 1 char & remove final [quote] character.
+                // memmove() is safe for buffer overlap
+                memmove( &pArg->ArgString[0], &pArg->ArgString[1], len );
+
+                // Terminate updated string
+                pArg->ArgString[len] = '\0';
+            }
+
+            // Store file parameter
+            pArgFile = pArg;
+        }
+
+        // Jump to next parameter
+        idx++;
+    }
+
+    if (bDisplayHelp)
+    {
+        if (bLoad)
+        {
+            Cons_printf(
+                "spiload  - Programs flash with contents from a file\n"
+                "\n"
+                "Usage: spiload <FileName> [/o offset] [/cs <ChipSel>] [/b] [-mmr] [/nr]\n"
+                "\n"
+                "    FileName   : Name of the file to load\n"
+                "    /o offset  : Specify the starting offset to program (default=0)\n"
+                "    /cs ChipSel: Specify the flash chip select (default=0)\n"
+                "    /b         : Skip data verification read-back\n"
+                "    /mmr       : Use mem-mapped reads for verify, if supported\n"
+                "    /nr        : Do not put embedded CPU in reset\n"
+                "\n"
+                "Examples: spiload C:\\MySbr.bin /o 400\n"
+                "          spiload C:\\SbrSp2.bin /o 0 /cs 1\n"
+                "\n"
+                );
+        }
+        else
+        {
+            Cons_printf(
+                "spisave  - Saves flash contents to a file\n"
+                "\n"
+                "Usage: spisave <FileName> </s size> [/o offset] [/cs <ChipSel>] [/mmr] [/nr]\n"
+                "\n"
+                "    FileName   : Name of the file to save\n"
+                "    /o offset  : Specify the starting offset to program (default=0)\n"
+                "    /s size    : Number of bytes to read (must be multiple of 4)\n"
+                "    /cs ChipSel: Specify the flash chip select (default=0)\n"
+                "    /mmr       : Use mem-mapped reads\n"
+                "    /nr        : Do not put embedded CPU in reset\n"
+                "\n"
+                "Examples: spisave C:\\MySbr.bin /o 400 /s 1000 /mmr\n"
+                "          spisave C:\\SbrSp2.bin /o 0 /s 2000 /cs 1\n"
+                "\n"
+                );
+        }
+        return TRUE;
+    }
+
+    // Verify file name provided
+    if (pArgFile == NULL)
+    {
+        Cons_printf("ERROR: File name not specified\n");
+        return FALSE;
+    }
+
+    // Verify size provided
+    if ( (bLoad == FALSE) && (readSize == 0) )
+    {
+        Cons_printf("ERROR: Read size not specified\n");
+        return FALSE;
+    }
+
+    // Fill in SPI object
+    if (PlxPci_SpiFlashPropGet( pDevice, chipSel, &spiProp ) != PLX_STATUS_OK)
+    {
+        Cons_printf("Error: Unable to get SPI properties for chip select %d\n", chipSel);
+        return FALSE;
+    }
+
+    // Enable mem-mapped for reads if supported
+    if (bUseMmRd)
+    {
+        spiProp.Flags |= PEX_SPI_FLAG_USE_MM_RD;
+    }
+
+    // Perform operation
+    if (bLoad)
+    {
+        // Load file into SPI
+        Plx_SpiFileLoad(
+            pDevice,
+            &spiProp,
+            pArgFile->ArgString,
+            startOffset,
+            nvFlags
+            );
+    }
+    else
+    {
+        // Save SPI to file
+        Plx_SpiFileSave(
+            pDevice,
+            &spiProp,
+            pArgFile->ArgString,
+            startOffset,
+            readSize,
+            nvFlags
             );
     }
 

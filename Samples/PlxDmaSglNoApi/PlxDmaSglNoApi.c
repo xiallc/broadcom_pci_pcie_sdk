@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -40,10 +40,6 @@
  * Description:
  *
  *      This sample demonstrates how to manually setup an SGL DMA transfer.
- *
- * Revision History:
- *
- *      10-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -267,9 +263,13 @@ main(
      * Setup DMA descriptors in PCI memory
      ******************************************************/
     if (bLegacyDma)
+    {
         status = SetupDmaDescriptors_9000( &Device, pDmaBuffer, &SglPciAddr_32 );
+    }
     else
+    {
         status = SetupDmaDescriptors_8000( &Device, pDmaBuffer, &SglPciAddr_64 );
+    }
 
     if (status != PLX_STATUS_OK)
     {
@@ -284,9 +284,13 @@ main(
      * Setup the DMA channel & transfer the SGL
      ******************************************************/
     if (bLegacyDma)
+    {
         status = PerformSglDmaTransfer_9000( &Device, pDmaBuffer, SglPciAddr_32 );
+    }
     else
+    {
         status = PerformSglDmaTransfer_8000( &Device, pDmaBuffer, SglPciAddr_64 );
+    }
 
     if (status != PLX_STATUS_OK)
     {
@@ -317,16 +321,13 @@ main(
      ***********************************/
 _Exit_App:
 
-    PlxPci_DeviceClose(
-        &Device
-        );
+    PlxPci_DeviceClose( &Device );
 
     _Pause;
 
     Cons_printf("\n\n");
 
     ConsoleEnd();
-
     exit(0);
 }
 
@@ -397,7 +398,9 @@ SelectDevice_DMA(
                         {
                             // DMA is always function 1 or higher
                             if (DevKey.function == 0)
+                            {
                                 bAddDevice = FALSE;
+                            }
                         }
                         else
                         {
@@ -431,9 +434,7 @@ SelectDevice_DMA(
             }
 
             // Close device
-            PlxPci_DeviceClose(
-                &Device
-                );
+            PlxPci_DeviceClose( &Device );
 
             if (bAddDevice)
             {
@@ -457,7 +458,9 @@ SelectDevice_DMA(
     while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
     Cons_printf(
         "\t\t   0. Cancel\n\n"
@@ -466,12 +469,17 @@ SelectDevice_DMA(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_DMA[i - 1];
@@ -514,7 +522,10 @@ SetupDmaDescriptors_9000(
         );
 
     Cons_printf("Please enter a valid local address --> ");
-    Cons_scanf("%x", &LocalAddress);
+    if (Cons_scanf("%x", &LocalAddress) <= 0)
+    {
+        // Added for compiler warning
+    }
     Cons_printf("\n");
 
 
@@ -606,7 +617,7 @@ SetupDmaDescriptors_9000(
             );
 
     Cons_printf("Ok\n");
-   
+
 
     // Provide PCI address of first descriptor
     *pSglPciAddress = (U32)PciBuffer.PhysicalAddr;
@@ -913,7 +924,7 @@ SetupDmaDescriptors_8000(
     *(U32*)(pSgl + 0xC) = PLX_LE_DATA_32( TmpValue );
 
     Cons_printf("Ok\n");
-   
+
 
     // Provide PCI address of first descriptor
     *pSglPciAddress = (U32)PciBuffer.PhysicalAddr;
@@ -988,11 +999,17 @@ PerformSglDmaTransfer_8000(
 
     // Make sure DMA prefetch doesn't exceed descriptor count & is a multiple of 4
     if (NumDescriptors < 4)
+    {
         RegValue = 1;
+    }
     else if (NumDescriptors >= 256)
+    {
         RegValue = 0;
+    }
     else
+    {
         RegValue = (NumDescriptors & (U8)~0x3);
+    }
     PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x34, RegValue );
 
     // Clear all DMA registers

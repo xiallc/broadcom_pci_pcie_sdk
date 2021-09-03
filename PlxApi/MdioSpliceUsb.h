@@ -2,7 +2,7 @@
 #define __MDIO_SPLICE_USB_H
 
 /*******************************************************************************
- * Copyright 2013-2018 Broadcom, Inc
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -38,15 +38,15 @@
  *
  * File Name:
  *
- *      MdioSpliceUsb.h
+ *     MdioSpliceUsb.h
  *
  * Description:
  *
- *      Header file for Splice MDIO USB interface functions
+ *     Header file for Splice MDIO USB interface functions
  *
  * Revision History:
  *
- *      03-01-18 : PLX SDK v8.00
+ *     03-01-18: PLX SDK v8.00
  *
  ******************************************************************************/
 

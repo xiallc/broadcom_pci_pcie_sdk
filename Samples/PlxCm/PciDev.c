@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <sys/timeb.h>
 #include "Monitor.h"
 #include "PciDev.h"
 #include "PciRegs.h"
@@ -88,13 +88,14 @@ struct _PCI_CLASS_CODES
             {0x01, 0x06, 0x01, "SATA controller (AHCI interface)"},
             {0x01, 0x06, 0x02, "Serial storage bus interface"},
             {0x01, 0x07, 0x00, "Serial Attached SCSI (SAS) controller"},
-            {0x01, 0x07, 0x01, "-- Obsolete device --"},
-            {0x01, 0x08, 0x00, "Non-Volatile Memory (Vendor-specific)"},
+            {0x01, 0x07, 0x01, "SAS storage bus"},
+            {0x01, 0x08, 0x00, "Non-Volatile Memory controller"},
             {0x01, 0x08, 0x01, "Non-Volatile Memory (NVMHCI)"},
-            {0x01, 0x08, 0x02, "NVMe Endpoint"},
+            {0x01, 0x08, 0x02, "NVMe endpoint"},
+            {0x01, 0x08, 0x03, "NVMe administrative controller"},
             {0x01, 0x09, 0x00, "Universal Flash Storage (Vend-spec)"},
             {0x01, 0x09, 0x01, "Universal Flash Storage (UFSHCI)"},
-            {0x01, 0x80, 0x00, "Other mass storage controller"},
+            {0x01, 0x80, 0x00, "Mass storage controller"},
 
         {0x02, 0xFF, 0xFF, "Network controller"},
             {0x02, 0x00, 0x00, "Ethernet controller"},
@@ -106,27 +107,27 @@ struct _PCI_CLASS_CODES
             {0x02, 0x06, 0xFF, "PCIMG 2.14 Multi-Computing"},
             {0x02, 0x07, 0x00, "InfiniBand controller"},
             {0x02, 0x08, 0x00, "Host fabric controller (Vend-spec)"},
-            {0x02, 0x80, 0x00, "Other network controller"},
+            {0x02, 0x80, 0x00, "Network controller"},
 
         {0x03, 0xFF, 0xFF, "Display controller"},
-            {0x03, 0x00, 0x00, "VGA-compatible display controller"},
+            {0x03, 0x00, 0x00, "VGA display controller"},
             {0x03, 0x00, 0x01, "8514-compatible display controller"},
             {0x03, 0x01, 0x00, "XGA display controller"},
             {0x03, 0x02, 0x00, "3D display controller"},
-            {0x03, 0x80, 0x00, "Other display controller"},
+            {0x03, 0x80, 0x00, "Display controller"},
 
         {0x04, 0xFF, 0xFF, "Multimedia device"},
-            {0x04, 0x00, 0x00, "Multimedia video device"},
-            {0x04, 0x01, 0x00, "Multimedia audio device"},
+            {0x04, 0x00, 0x00, "Multimedia video controller"},
+            {0x04, 0x01, 0x00, "Multimedia audio controller"},
             {0x04, 0x02, 0x00, "Computer telephony device"},
             {0x04, 0x03, 0x00, "HD Audio (HD-A) 1.0 device"},
-            {0x04, 0x03, 0x80, "HD Audio (HD-A) 1.0 with ven-spec IF"},
-            {0x04, 0x80, 0x00, "Other multimedia device"},
+            {0x04, 0x03, 0x80, "HD Audio (HD-A) 1.0 with vendor IF"},
+            {0x04, 0x80, 0x00, "Multimedia controller"},
 
         {0x05, 0xFF, 0xFF, "Memory controller"},
             {0x05, 0x00, 0x00, "RAM memory controller"},
             {0x05, 0x01, 0x00, "Flash memory controller"},
-            {0x05, 0x80, 0x00, "Other memory controller"},
+            {0x05, 0x80, 0x00, "Memory controller"},
 
         {0x06, 0xFF, 0xFF, "Bridge device"},
             {0x06, 0x00, 0x00, "Host bridge / Root Complex"},
@@ -134,7 +135,7 @@ struct _PCI_CLASS_CODES
             {0x06, 0x02, 0x00, "EISA bridge"},
             {0x06, 0x03, 0x00, "MCA bridge"},
             {0x06, 0x04, 0x00, "PCI-to-PCI bridge"},
-            {0x06, 0x04, 0x01, "PCI-to-PCI bridge (subtractive dec)"},
+            {0x06, 0x04, 0x01, "PCI-to-PCI bridge (sub decode)"},
             {0x06, 0x05, 0x00, "PCMCIA bridge"},
             {0x06, 0x06, 0x00, "NuBus bridge"},
             {0x06, 0x07, 0x00, "CardBus bridge"},
@@ -145,7 +146,7 @@ struct _PCI_CLASS_CODES
             {0x06, 0x0A, 0x00, "InfiniBand-to-PCI host bridge"},
             {0x06, 0x0B, 0x00, "Adv Switch to PCI host bridge (Cust)"},
             {0x06, 0x0B, 0x01, "Adv Switch to PCI bridge (ASI-SIG)"},
-            {0x06, 0x80, 0x00, "Other bridge device"},
+            {0x06, 0x80, 0x00, "Bridge device"},
 
         {0x07, 0xFF, 0xFF, "Simple communications controller"},
             {0x07, 0x00, 0x00, "Generic XT-compatible serial ctrlr"},
@@ -167,8 +168,8 @@ struct _PCI_CLASS_CODES
             {0x07, 0x03, 0x03, "Hayes-compatible modem (16650)"},
             {0x07, 0x03, 0x04, "Hayes-compatible modem (16750)"},
             {0x07, 0x04, 0x00, "GPIB (IEEE 488.1/2) controller"},
-            {0x07, 0x05, 0x00, "Smart Card"},
-            {0x07, 0x80, 0x00, "Other communications device"},
+            {0x07, 0x05, 0x00, "Smart Card controller"},
+            {0x07, 0x80, 0x00, "Communication controller"},
 
         {0x08, 0xFF, 0xFF, "Base system peripheral"},
             {0x08, 0x00, 0x00, "Generic 8259 PIC"},
@@ -181,14 +182,14 @@ struct _PCI_CLASS_CODES
             {0x08, 0x01, 0x02, "EISA DMA controller"},
             {0x08, 0x02, 0x00, "Generic 8254 system timer"},
             {0x08, 0x02, 0x01, "ISA system timer"},
-            {0x08, 0x02, 0x02, "EISA system timers (two timers)"},
-            {0x08, 0x02, 0x03, "High Performance Event Timer"},
+            {0x08, 0x02, 0x02, "EISA system timers"},
+            {0x08, 0x02, 0x03, "High Perf Event Timer (HPET)"},
             {0x08, 0x03, 0x00, "Generic RTC controller"},
             {0x08, 0x03, 0x01, "ISA RTC controller"},
             {0x08, 0x04, 0x00, "Generic PCI Hot-Plug controller"},
             {0x08, 0x05, 0x00, "SD Host Controller"},
             {0x08, 0x06, 0x00, "IOMMU"},
-            {0x08, 0x07, 0x00, "Root Complex Event Collector"},
+            {0x08, 0x07, 0x00, "PCIe Root Complex Event Collector"},
             {0x08, 0x80, 0x00, "Other system peripheral"},
 
         {0x09, 0xFF, 0xFF, "Input device"},
@@ -196,8 +197,8 @@ struct _PCI_CLASS_CODES
             {0x09, 0x01, 0x00, "Digitizer (pen)"},
             {0x09, 0x02, 0x00, "Mouse controller"},
             {0x09, 0x03, 0x00, "Scanner controller"},
-            {0x09, 0x04, 0x00, "Gameport controller (generic)"},
-            {0x09, 0x04, 0x10, "Gameport controller"},
+            {0x09, 0x04, 0x00, "Gameport controller"},
+            {0x09, 0x04, 0x10, "Gameport controller w/prog IF"},
             {0x09, 0x80, 0x00, "Other input controller"},
 
         {0x0A, 0xFF, 0xFF, "Docking station"},
@@ -212,7 +213,7 @@ struct _PCI_CLASS_CODES
             {0x0B, 0x20, 0x00, "PowerPC"},
             {0x0B, 0x30, 0x00, "MIPS"},
             {0x0B, 0x40, 0x00, "Co-processor"},
-            {0x0B, 0x80, 0x00, "Other processor"},
+            {0x0B, 0x80, 0x00, "Processor"},
 
         {0x0C, 0xFF, 0xFF, "Serial bus controller"},
             {0x0C, 0x00, 0x00, "IEEE 1394 controller (FireWire)"},
@@ -233,7 +234,8 @@ struct _PCI_CLASS_CODES
             {0x0C, 0x07, 0x02, "IPMI Block transfer interface"},
             {0x0C, 0x08, 0x00, "SERCOS Inerfact Standard (IEC 61491)"},
             {0x0C, 0x09, 0x00, "CANbus controller"},
-            {0x0C, 0x80, 0x00, "Other Serial Bus controller"},
+            {0x0C, 0x0A, 0x00, "MIPI I3C host controller interface"},
+            {0x0C, 0x80, 0x00, "Serial Bus controller"},
 
         {0x0D, 0xFF, 0xFF, "Wireless controller"},
             {0x0D, 0x00, 0x00, "iRDA-compatible wireless controller"},
@@ -246,7 +248,7 @@ struct _PCI_CLASS_CODES
             {0x0D, 0x21, 0x00, "Ethernet 802.11b wireless controller"},
             {0x0D, 0x40, 0x00, "Cellular controller/modem"},
             {0x0D, 0x41, 0x00, "Cellular ctrl/modem + Ethernet 802.11"},
-            {0x0D, 0x80, 0x00, "Other wireless controller"},
+            {0x0D, 0x80, 0x00, "Wireless controller"},
 
         {0x0E, 0xFF, 0xFF, "Intelligent I/O controller"},
             {0x0E, 0x00, 0xFF, "I2O Specification 1.0 controller"},
@@ -257,27 +259,30 @@ struct _PCI_CLASS_CODES
             {0x0F, 0x02, 0x00, "Audio satellite comm controller"},
             {0x0F, 0x03, 0x00, "Voice satellite comm controller"},
             {0x0F, 0x04, 0x00, "Data satellite comm controller"},
-            {0x0F, 0x80, 0x00, "Other satellite comm controller"},
+            {0x0F, 0x80, 0x00, "Satellite communication controller"},
 
         {0x10, 0xFF, 0xFF, "Encryption/Decryption controller"},
             {0x10, 0x00, 0x00, "Network & computing en/decryption"},
             {0x10, 0x10, 0x00, "Entertainment en/decryption"},
             {0x10, 0x80, 0x00, "Other en/decryption"},
 
-        {0x11, 0xFF, 0xFF, "Data acquisitn & signal processing ctrlr"},
+        {0x11, 0xFF, 0xFF, "Signal processing controller (DSP)"},
             {0x11, 0x00, 0x00, "DPIO module"},
             {0x11, 0x01, 0x00, "Perfomance counters"},
-            {0x11, 0x10, 0x00, "Communications synch test/measure"},
-            {0x11, 0x20, 0x00, "Management card"},
-            {0x11, 0x80, 0x00, "Other data acquisition or DSP"},
+            {0x11, 0x10, 0x00, "Communication synchronizer"},
+            {0x11, 0x20, 0x00, "Signal processing management"},
+            {0x11, 0x80, 0x00, "Signal processing controller (DSP)"},
 
         {0x12, 0xFF, 0xFF, "Processing accelerator"},
-            {0x12, 0x00, 0x00, "Processing accelerator (Vendor-spec)"},
+            {0x12, 0x00, 0x00, "Processing accelerator"},
+            {0x12, 0x01, 0x00, "AI interface acelerator"},
 
         {0x13, 0xFF, 0xFF, "Non-Essential Instrumentation"},
             {0x13, 0x00, 0x00, "Non-Essential Instr Fn (Vendor-spec)"},
 
-        {0xFF, 0xFF, 0xFF, "Undefined"}
+        {0x40, 0xFF, 0xFF, "Coprocessor"},
+
+        {0xFF, 0xFF, 0xFF, "Unassigned device class"}
     };
 
 
@@ -318,12 +323,9 @@ DeviceListCreate(
              (ApiMode == PLX_API_MODE_MDIO_SPLICE) ||
              (ApiMode == PLX_API_MODE_SDB) )
         {
-            if (Cons_kbhit())
+            if (Cons_kbhit() && (Cons_getch() == 27))
             {
-                if (Cons_getch() == 27)
-                {
-                    return DevCount | (U8)(1 << 15);
-                }
+                return DevCount | (U16)(1 << 15);
             }
         }
 
@@ -401,12 +403,24 @@ DeviceListCreate(
                         Cons_printf("Error: COM/TTY port %d not detected\n", pModeProp->Sdb.Port);
                         break;
 
+                    case PLX_STATUS_INVALID_ADDR:
+                        Cons_printf("Error: COM0 is not a valid port\n");
+                        break;
+
+                    case PLX_STATUS_INVALID_ACCESS:
+                        Cons_printf("Error: Verify COM/TTY port %d permissions & not in use\n", pModeProp->Sdb.Port);
+                        break;
+
                     case PLX_STATUS_INVALID_DATA:
                         Cons_printf("Error: No device detected over SDB\n");
                         break;
 
+                    case PLX_STATUS_INVALID_STATE:
+                        Cons_printf("Error: No response from device. Verify connection & device power.\n");
+                        break;
+
                     case PLX_STATUS_IN_USE:
-                        Cons_printf("Error: COM/TTY port %d in-use\n", pModeProp->Sdb.Port);
+                        Cons_printf("Error: COM/TTY port %d is in-use\n", pModeProp->Sdb.Port);
                         break;
 
                     case PLX_STATUS_INVALID_OBJECT:
@@ -477,26 +491,25 @@ DeviceListCreate(
                     Device_GetClassString( pNode, DeviceText );
 
                     // Display initial access-specific string
+                    Cons_printf(" Add: " );
                     if (ApiMode == PLX_API_MODE_I2C_AARDVARK)
                     {
-                        Cons_printf(" Add: %d-%02X", pNode->Key.ApiIndex, pNode->Key.DeviceNumber );
+                        Cons_printf("%d-%02X: ", pNode->Key.ApiIndex, pNode->Key.DeviceNumber );
                     }
                     else if (ApiMode == PLX_API_MODE_MDIO_SPLICE)
                     {
-                        Cons_printf(" Add: %d", pNode->Key.ApiIndex );
+                        Cons_printf("M%d: ", pNode->Key.ApiIndex );
                     }
                     else if (ApiMode == PLX_API_MODE_SDB)
                     {
-                        Cons_printf(" Add: COM%d", pNode->Key.ApiIndex );
+                        Cons_printf("C%d: ", pNode->Key.ApiIndex );
                     }
 
                     Cons_printf(
-                        ": %04X %02X P%d%s G%dx%d%s [D%d %02X:%02X.%X] - %s\n",
+                        "%04X %02X P%-3d G%dx%-2d [D%d %02X:%02X.%X] - %s\n",
                         pNode->Key.PlxChip, pNode->Key.PlxRevision,
                         pNode->PortProp.PortNumber,
-                        (pNode->PortProp.PortNumber < 10) ? " " : "",
                         pNode->PortProp.LinkSpeed, pNode->PortProp.LinkWidth,
-                        (pNode->PortProp.LinkWidth < 10) ? " " : "",
                         pNode->Key.domain, pNode->Key.bus, pNode->Key.slot, pNode->Key.function,
                         DeviceText
                         );
@@ -551,7 +564,7 @@ DeviceListDisplay(
 
     while (pNode != NULL)
     {
-        if (pNode->bSelected)
+        if (pNode->DevFlags & PEX_DEV_FLAG_IS_SELECTED)
         {
             Cons_printf(
                 "%s",
@@ -690,7 +703,8 @@ DeviceNodeAdd(
     PLX_DEVICE_KEY *pKey
     )
 {
-    BOOLEAN      bAddDevice;
+    U8           bAdd;
+    U8           bCmpBDF;
     DEVICE_NODE *pNode;
     DEVICE_NODE *pNodeCurr;
     DEVICE_NODE *pNodePrev;
@@ -704,7 +718,6 @@ DeviceNodeAdd(
 
     // Allocate a new node for the device list
     pNode = (DEVICE_NODE*)malloc(sizeof(DEVICE_NODE));
-
     if (pNode == NULL)
     {
         return NULL;
@@ -717,7 +730,7 @@ DeviceNodeAdd(
     pNode->Key = *pKey;
 
     // Mark the device as not selected
-    pNode->bSelected = FALSE;
+    pNode->DevFlags &= ~PEX_DEV_FLAG_IS_SELECTED;
 
     /*******************************************
      *
@@ -731,61 +744,82 @@ DeviceNodeAdd(
     // Traverse list & add device in proper order
     while (1)
     {
-        bAddDevice = FALSE;
+        bAdd    = FALSE;
+        bCmpBDF = FALSE;
 
         // Check for end-of-list
         if (pNodeCurr == NULL)
         {
-            bAddDevice = TRUE;
+            bAdd = TRUE;
         }
         else
         {
-            // For I2C/MDIO/SDB mode, skip adding device
-            // until end of list is reached
-
-            // Add for PCI mode
+            // Group by access mode
             if (pKey->ApiMode == pNodeCurr->Key.ApiMode)
             {
-                if ((pNodeCurr->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK) &&
-                    ((pKey->ApiIndex > pNodeCurr->Key.ApiIndex) ||
-                     (pKey->DeviceNumber > pNodeCurr->Key.DeviceNumber)))
+                if ( (pNodeCurr->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK) ||
+                     (pNodeCurr->Key.ApiMode == PLX_API_MODE_SDB) ||
+                     (pNodeCurr->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE) )
                 {
-                    // I2C device at higher port/address, add lower in list
-                }
-                else if ((pNodeCurr->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE) &&
-                         (pKey->ApiIndex > pNodeCurr->Key.ApiIndex))
-                {
-                    // MDIO device at higher port, add lower in list
-                }
-                else if ((pNodeCurr->Key.ApiMode == PLX_API_MODE_SDB) &&
-                         (pKey->ApiIndex > pNodeCurr->Key.ApiIndex))
-                {
-                    // SDB device at higher port, add lower in list
+                    if (pKey->ApiIndex < pNodeCurr->Key.ApiIndex)
+                    {
+                        // Current device at lower port, blindly add here
+                        bAdd = TRUE;
+                    }
+                    else if (pKey->ApiIndex == pNodeCurr->Key.ApiIndex)
+                    {
+                        // For I2C, additionally compare I2C address
+                        if (pNodeCurr->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK)
+                        {
+                            if (pKey->DeviceNumber < pNodeCurr->Key.DeviceNumber)
+                            {
+                                // I2C address less, blindly add here
+                                bAdd = TRUE;
+                            }
+                            else if  (pKey->DeviceNumber == pNodeCurr->Key.DeviceNumber)
+                            {
+                                // I2C devices at same connection, compare BDF
+                                bCmpBDF = TRUE;
+                            }
+                        }
+                        else
+                        {
+                            // SDB/MDIO devices at same connection, compare BDF
+                            bCmpBDF = TRUE;
+                        }
+                    }
                 }
                 else
+                {
+                    // For PCI mode, compare BDF
+                    bCmpBDF = TRUE;
+                }
+
+                // If same access, compare BDF
+                if ( (bAdd == FALSE) && (bCmpBDF == TRUE) )
                 {
                     // Compare domain, bus, slot, function numbers
                     if (pKey->domain < pNodeCurr->Key.domain)
                     {
-                        bAddDevice = TRUE;
+                        bAdd = TRUE;
                     }
                     else if (pKey->domain == pNodeCurr->Key.domain)
                     {
                         if (pKey->bus < pNodeCurr->Key.bus)
                         {
-                            bAddDevice = TRUE;
+                            bAdd = TRUE;
                         }
                         else if (pKey->bus == pNodeCurr->Key.bus)
                         {
                             if (pKey->slot < pNodeCurr->Key.slot)
                             {
-                                bAddDevice = TRUE;
+                                bAdd = TRUE;
                             }
                             else if (pKey->slot == pNodeCurr->Key.slot)
                             {
                                 if (pKey->function <= pNodeCurr->Key.function)
                                 {
-                                    bAddDevice = TRUE;
+                                    bAdd = TRUE;
                                 }
                             }
                         }
@@ -794,7 +828,7 @@ DeviceNodeAdd(
             }
         }
 
-        if (bAddDevice)
+        if (bAdd)
         {
             // Add node to list in current position
             if (pNodePrev == NULL)
@@ -1085,24 +1119,53 @@ Device_GetClassString(
 
             if (pNode->PortProp.PortType == PLX_PORT_UPSTREAM)
             {
-                if (pNode->Key.SubDeviceId == 0x100B)
+                if ( (pNode->Key.SubDeviceId == 0x100B) ||
+                     (pNode->Key.SubDeviceId == 0x4090) )   // HBA subystem dev ID
                 {
                     strcpy( pClassText, "Broadcom synthetic PCIe upstream" );
+                    pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
+                }
+                else if ( ((pNode->Key.SubDeviceId == 0x0002) ||   // Lenovo Andromeda sub dev ID
+                           (pNode->Key.SubDeviceId == 0x0003)) &&  // Lenovo HBA sub dev ID
+                          (pNode->Key.SubVendorId == PLX_PCI_VENDOR_ID_LENOVO) )
+                {
+                    strcpy( pClassText, "Lenovo synthetic PCIe upstream" );
+                    pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_HOST)
                 {
                     strcpy( pClassText, "Broadcom PCIe host port" );
                 }
+                else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_INT_MGMT)
+                {
+                    strcpy( pClassText, "Broadcom PCIe internal mgmt port" );
+                }
                 else
                 {
-                    strcpy( pClassText, "Broadcom PCIe upstream port" );
+                    if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                    {
+                        strcpy( pClassText, "Broadcom PCIe internal UP" );
+                    }
+                    else
+                    {
+                        strcpy( pClassText, "Broadcom PCIe upstream port" );
+                    }
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_DOWNSTREAM)
             {
-                if (pNode->Key.SubDeviceId == 0x100B)
+                if ( (pNode->Key.SubDeviceId == 0x100B) ||
+                     (pNode->Key.SubDeviceId == 0x4090) )   // HBA subystem dev ID
                 {
                     strcpy( pClassText, "Broadcom synthetic PCIe downstream" );
+                    pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
+                }
+                else if ( ((pNode->Key.SubDeviceId == 0x0002) ||   // Lenovo Andromeda sub dev ID
+                           (pNode->Key.SubDeviceId == 0x0003)) &&  // Lenovo HBA sub dev ID
+                          (pNode->Key.SubVendorId == PLX_PCI_VENDOR_ID_LENOVO) )
+                {
+                    strcpy( pClassText, "Lenovo synthetic PCIe downstream" );
+                    pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_FABRIC)
                 {
@@ -1110,16 +1173,24 @@ Device_GetClassString(
                 }
                 else
                 {
-                    strcpy( pClassText, "Broadcom PCIe downstream port" );
+                    if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                    {
+                        strcpy( pClassText, "Broadcom PCIe internal DS" );
+                    }
+                    else
+                    {
+                        strcpy( pClassText, "Broadcom PCIe downstream port" );
+                    }
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_ENDPOINT)
             {
-                if (pNode->PciClass == 0x068000)        // Bridge devices
+                if (PciClass == 0x068000)        // Bridge devices
                 {
                     if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_TWC)
                     {
                         strcpy( pClassText, "Broadcom synthetic TWC endpoint" );
+                        pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
                     {
@@ -1132,9 +1203,10 @@ Device_GetClassString(
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_NT)
                     {
                         strcpy( pClassText, "Broadcom synthetic NT 2.0 endpoint" );
+                        pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                     }
                 }
-                else if (pNode->PciClass == 0x088000)   // Peripheral devices
+                else if (PciClass == 0x088000)   // Peripheral devices
                 {
                     if (pNode->Key.PlxPortType == PLX_SPEC_PORT_GEP)
                     {
@@ -1142,7 +1214,15 @@ Device_GetClassString(
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_EN_EP)
                     {
-                        strcpy( pClassText, "Broadcom synthetic enabler endpoint" );
+                        if (pNode->Key.SubVendorId == PLX_PCI_VENDOR_ID_LENOVO)   // Lenovo HBA
+                        {
+                            strcpy( pClassText, "Lenovo synthetic enabler endpoint" );
+                        }
+                        else
+                        {
+                            strcpy( pClassText, "Broadcom synthetic enabler endpoint" );
+                        }
+                        pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_DMA)
                     {
@@ -1151,20 +1231,29 @@ Device_GetClassString(
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_GDMA)
                     {
                         strcpy( pClassText, "Broadcom synthetic gDMA endpoint" );
+                        pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
+                    }
+                    else if ( (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_MPT) &&
+                              (pNode->Key.SubVendorId == PLX_PCI_VENDOR_ID_LENOVO) )
+                    {
+                        // Andromeda uses Other bridge device class code for synthetic MPT
+                        strcpy( pClassText, "Lenovo synthetic MPT SES endpoint" );
+                        pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                     }
                 }
-                else if (pNode->PciClass == 0x028000)   // Network controllers
+                else if (PciClass == 0x028000)   // Network controllers
                 {
                     if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_NIC)
                     {
                         strcpy( pClassText, "Broadcom synthetic NIC endpoint" );
+                        pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                     }
                     else
                     {
                         strcpy( pClassText, "Broadcom PCIe ExpressNIC (NT)" );
                     }
                 }
-                else if (pNode->PciClass == 0x020000)
+                else if (PciClass == 0x020000)
                 {
                     strcpy( pClassText, "Broadcom PCIe network controller" );
                 }
@@ -1178,12 +1267,20 @@ Device_GetClassString(
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_MPT)
                 {
-                    strcpy( pClassText, "Broadcom synthetic MPT SES endpoint" );
+                    if (pNode->Key.SubVendorId == PLX_PCI_VENDOR_ID_LENOVO)   // Lenovo HBA
+                    {
+                        strcpy( pClassText, "Lenovo synthetic MPT SES endpoint" );
+                    }
+                    else
+                    {
+                        strcpy( pClassText, "Broadcom synthetic MPT SES endpoint" );
+                    }
+                    pNode->DevFlags |= PEX_DEV_FLAG_IS_SYNTH;
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT)
             {
-                if (pNode->PciClass == 0x0C03FE)
+                if (PciClass == 0x0C03FE)
                 {
                     strcpy( pClassText, "Broadcom USB controller" );
                 }
@@ -1194,7 +1291,7 @@ Device_GetClassString(
             }
             else
             {
-                strcpy( pClassText, "* Broadcom PCIe unknown port type *" );
+                strcpy( pClassText, "* Broadcom unknown port type *" );
             }
             break;
     }
@@ -1291,7 +1388,85 @@ Device_GetClassString(
     }
     while (PciClassCodes[Index_Current].BaseClass != 0xFF);
 
-    strcpy(
+    // For certain endpoints, insert vendor name if known
+    if ( (PciClass == 0x010802) ||    // NVMe
+         (PciClass == 0x020000) ||    // Ethernet controller
+         (PciClass == 0x030000) ||    // VGA
+         (PciClass == 0x030200) )     // GPU
+    {
+        if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_LSI)
+        {
+            strcpy( pClassText, "LSI" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_BROADCOM)
+        {
+            strcpy( pClassText, "Broadcom" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_AMD)
+        {
+            strcpy( pClassText, "AMD" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_INTEL)
+        {
+            strcpy( pClassText, "Intel" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_NVIDIA)
+        {
+            strcpy( pClassText, "NVidia" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_HITACHI)
+        {
+            strcpy( pClassText, "Hitachi" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_HUAWEI)
+        {
+            strcpy( pClassText, "Huawei" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_LENOVO)
+        {
+            strcpy( pClassText, "Lenovo" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_MARVELL)
+        {
+            strcpy( pClassText, "Marvell" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_MATROX)
+        {
+            strcpy( pClassText, "Matrox" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_MELLANOX)
+        {
+            strcpy( pClassText, "Mellanox" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_REALTEK)
+        {
+            strcpy( pClassText, "Realtek" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_SAMSUNG)
+        {
+            strcpy( pClassText, "Samsung" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_SEAGATE)
+        {
+            strcpy( pClassText, "Seagate" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_TOSHIBA)
+        {
+            strcpy( pClassText, "Toshiba" );
+        }
+        else if (pNode->Key.VendorId == PLX_PCI_VENDOR_ID_WESTERN_DIGITAL)
+        {
+            strcpy( pClassText, "WD" );
+        }
+
+        // If vendor found, add a space after
+        if (pClassText[0] != '\0')
+        {
+            strcat( pClassText, " " );
+        }
+    }
+
+    strcat(
         pClassText,
         PciClassCodes[Index_BestFit].StrClass
         );
@@ -1318,20 +1493,20 @@ Plx_EepromFileLoad(
     BOOLEAN            bEndianSwap
     )
 {
-    S8       rc;
-    U32      offset;
-    U32      Crc;
-    U32      value;
-    U32      Verify_Value;
-    U32      FileSize;
-    U32     *pBuffer;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    S8            rc;
+    U32           offset;
+    U32           Crc;
+    U32           value;
+    U32           Verify_Value;
+    U32           FileSize;
+    U32          *pBuffer;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     Cons_printf("Load EEPROM file....... ");
     Cons_fflush( stdout );
@@ -1390,7 +1565,7 @@ Plx_EepromFileLoad(
     Cons_printf(
         "Verify option.......... %s\n",
         bBypassVerify ? "DISABLED (Errors won't be detected)"
-          : "ENABLED (Use '-b' to disable)"
+          : "ENABLED (Use '/b' to disable)"
         );
 
     Cons_printf("Program EEPROM......... ");
@@ -1402,7 +1577,7 @@ Plx_EepromFileLoad(
         if ((offset & 0xF) == 0)
         {
             Cons_printf(
-                "%02d%%\b\b\b",
+                "%2d%%\b\b\b",
                 (U16)((offset * 100) / FileSize)
                 );
             Cons_fflush( stdout );
@@ -1445,26 +1620,28 @@ Plx_EepromFileLoad(
                 offset, value, Verify_Value
                 );
             rc = FALSE;
-            goto _Exit_File_Load;
+            break;
         }
     }
 
-    Cons_printf("Ok \n");
-
-    // Update CRC if requested
-    if (bCrc)
+    if (rc == TRUE)
     {
-        Cons_printf("Update CRC............. ");
-        Cons_fflush( stdout );
-        PlxPci_EepromCrcUpdate(
-            pDevice,
-            &Crc,
-            TRUE
-            );
-        Cons_printf("Ok (CRC=%08X)\n", (int)Crc);
+        Cons_printf("Ok \n");
+
+        // Update CRC if requested
+        if (bCrc)
+        {
+            Cons_printf("Update CRC............. ");
+            Cons_fflush( stdout );
+            PlxPci_EepromCrcUpdate(
+                pDevice,
+                &Crc,
+                TRUE
+                );
+            Cons_printf("Ok (CRC=%08X)\n", (int)Crc);
+        }
     }
 
-_Exit_File_Load:
     // Release the buffer
     if (pBuffer != NULL)
     {
@@ -1472,11 +1649,11 @@ _Exit_File_Load:
     }
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
-        " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        " -- Complete (%.2f sec) --\n\n",
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return rc;
@@ -1502,15 +1679,15 @@ Plx_EepromFileSave(
     BOOLEAN            bEndianSwap
     )
 {
-    U32      offset;
-    U32      value;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    U32           offset;
+    U32           value;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     // Open the file to write
     pFile = fopen( pFileName, "wb" );
@@ -1538,7 +1715,7 @@ Plx_EepromFileSave(
         if ((offset & 0xF) == 0)
         {
             Cons_printf(
-                "%02d%%\b\b\b",
+                "%2d%%\b\b\b",
                 (U16)((offset * 100) / EepSize)
                 );
             Cons_fflush( stdout );
@@ -1600,11 +1777,11 @@ Plx_EepromFileSave(
     Cons_printf("Ok (%d B)\n", (int)EepSize);
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
-        " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        " -- Complete (%.2f sec) --\n\n",
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return TRUE;
@@ -1628,22 +1805,22 @@ Plx8000_EepromFileLoad(
     BOOLEAN            bBypassVerify
     )
 {
-    U8       bCrcEn;
-    U8      *pBuffer;
-    U16      Verify_Value_16;
-    U32      value;
-    U32      Verify_Value;
-    U32      Crc;
-    U32      offset;
-    U32      FileSize;
-    U32      EepHeader;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    U8            bCrcEn;
+    U8           *pBuffer;
+    U16           Verify_Value_16;
+    U32           value;
+    U32           Verify_Value;
+    U32           Crc;
+    U32           offset;
+    U32           FileSize;
+    U32           EepHeader;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     pBuffer   = NULL;
     EepHeader = 0;
@@ -1697,7 +1874,7 @@ Plx8000_EepromFileLoad(
     Cons_printf(
         "Verify option...... %s\n",
         bBypassVerify ? "DISABLED (Errors won't be detected)"
-          : "ENABLED (Use '-b' to disable)"
+          : "ENABLED (Use '/b' to disable)"
         );
 
     Cons_printf("Program EEPROM..... ");
@@ -1710,7 +1887,7 @@ Plx8000_EepromFileLoad(
         {
             // Display current status
             Cons_printf(
-                "%02ld%%\b\b\b",
+                "%2ld%%\b\b\b",
                 ((offset * 100) / FileSize)
                 );
             Cons_fflush( stdout );
@@ -1812,11 +1989,11 @@ _Exit_File_Load_8000:
     }
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
-        " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        " -- Complete (%.2f sec) --\n\n",
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return TRUE;
@@ -1840,22 +2017,20 @@ Plx8000_EepromFileSave(
     BOOLEAN            bCrc
     )
 {
-    U8      *pBuffer;
-    U16      value16;
-    U32      value;
-    U32      offset;
-    U32      EepSize;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    U8           *pBuffer;
+    U16           value16;
+    U32           value;
+    U32           offset;
+    U32           EepSize;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     Cons_printf("Get EEPROM data size.. ");
-
-    pBuffer = NULL;
 
     if (ByteCount != 0)
     {
@@ -1901,7 +2076,7 @@ Plx8000_EepromFileSave(
             // Add mem data
             EepSize += value16;
         }
-   }
+    }
 
     Cons_printf(
         "Ok (%dB%s)\n",
@@ -1916,6 +2091,7 @@ Plx8000_EepromFileSave(
     pBuffer = malloc( EepSize );
     if (pBuffer == NULL)
     {
+        Cons_printf("Error: Buffer allocation failure (%dB)\n", ByteCount);
         return FALSE;
     }
 
@@ -1927,7 +2103,7 @@ Plx8000_EepromFileSave(
         {
             // Display current status
             Cons_printf(
-                "%02ld%%\b\b\b",
+                "%2ld%%\b\b\b",
                 ((offset * 100) / EepSize)
                 );
             Cons_fflush( stdout );
@@ -1968,20 +2144,539 @@ Plx8000_EepromFileSave(
     fclose( pFile );
 
     // Release the buffer
-    if (pBuffer != NULL)
-    {
-        free( pBuffer );
-    }
+    free( pBuffer );
 
     Cons_printf( "Ok (%s)\n", pFileName );
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
-        " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        " -- Complete (%.2f sec) --\n\n",
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return TRUE;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  Plx_SpiFileLoad
+ *
+ * Description:  Loads the contents of a file into the SPI
+ *
+ ******************************************************************************/
+BOOLEAN
+Plx_SpiFileLoad(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    char              *PtrFileName,
+    U32                StartOffset,
+    U8                 NvFlags
+    )
+{
+    S8            rc;
+    U8           *ptrBuffer;
+    U8            verifyBuff[SPI_MAX_BLOCK_SIZE];
+    U16           idx;
+    U32           offset;
+    U32           txBytes;
+    U32           rxVal;
+    U32           txVal;
+    U32           regReset;
+    U32           fileSize;
+    FILE         *ptrFile;
+    double        elapsed;
+    double        xferRate;
+    PLX_STATUS    status;
+    struct timeb  end;
+    struct timeb  start;
+
+
+    // Note start time
+    ftime( &start );
+
+    Cons_printf("Load image file............ ");
+    Cons_fflush( stdout );
+
+    // Open the file to read
+    ptrFile = fopen( PtrFileName, "rb" );
+    if (ptrFile == NULL)
+    {
+        Cons_printf("ERROR: Unable to load \"%s\"\n", PtrFileName);
+        return FALSE;
+    }
+
+    // Move to end-of-file
+    fseek( ptrFile, 0, SEEK_END );
+
+    // Determine file size & ensure it is DW-aligned
+    fileSize = ftell( ptrFile );
+    fileSize = PEX_P2_ROUND_UP( fileSize, sizeof(U32) );
+
+    // Move back to start of file
+    fseek( ptrFile, 0, SEEK_SET );
+
+    // Allocate a buffer for the data
+    ptrBuffer = malloc( fileSize );
+    if (ptrBuffer == NULL)
+    {
+        Cons_printf("Error: Buffer allocation failure (%dB)\n", fileSize);
+        fclose( ptrFile );
+        return FALSE;
+    }
+
+    // Read data from file
+    if (fread(
+            ptrBuffer,      // Buffer for data
+            sizeof(U8),     // Item size
+            fileSize,       // Buffer size
+            ptrFile         // File pointer
+            ) != fileSize)
+    {
+        Cons_printf("Error: Unable to read from file\n");
+        fclose( ptrFile );
+        return FALSE;
+    }
+
+    // Close the file
+    fclose( ptrFile );
+
+    Cons_printf(
+        "Ok (%d%c)\n",
+        fileSize > (1 << 20) ? (fileSize >> 20) :
+           fileSize > (1 << 10) ? (fileSize >> 10) : fileSize,
+        fileSize > (1 << 20) ? 'M' :
+           fileSize > (1 << 10) ? 'K' : 'B'
+        );
+
+    // Default to successful operation
+    rc = TRUE;
+
+    Cons_printf(
+        "Verify option.............. %s\n",
+        (NvFlags & PEX_NV_FLAG_BYPASS_VERIFY) ?
+          "DISABLED (Errors won't be detected)" :
+          "ENABLED (Use '/b' to disable)"
+        );
+
+    Cons_printf("Put CPU in reset........... ");
+    regReset = 0;
+    if (NvFlags & PEX_NV_FLAG_CPU_IN_RESET)
+    {
+        // Not supported in PCIe direct access mode
+        if (PtrDev->Key.ApiMode == PLX_API_MODE_PCI)
+        {
+            Cons_printf("<N/A in PCIe direct access mode>\n");
+            NvFlags &= ~PEX_NV_FLAG_CPU_IN_RESET;
+        }
+        else
+        {
+            // Put CPU in reset (60000008h[1]=1)
+            regReset =
+                PlxPci_PlxMappedRegisterRead(
+                    PtrDev,
+                    PEX_REG_HOST_DIAG,
+                    NULL
+                    );
+            PlxPci_PlxMappedRegisterWrite(
+                PtrDev,
+                PEX_REG_HOST_DIAG,
+                regReset | PEX_HOST_DIAG_CPU_RST_MASK
+                );
+            Cons_printf("Ok (use '/nr' to disable)\n");
+        }
+    }
+    else
+    {
+        Cons_printf("DISABLED\n");
+    }
+
+    Cons_printf(
+        "Flash address range........ %06Xh -> %06Xh\n",
+        StartOffset, StartOffset + fileSize - 1
+        );
+
+    Cons_printf("Program flash (ESC=halt)... ");
+
+    // Write buffer into flash
+    offset = 0;
+    while ( (rc == TRUE) && (offset < fileSize) )
+    {
+        // Periodically update status
+        if ((offset & 0xF) == 0)
+        {
+            // Display current status
+            Cons_printf(
+                "%2ld%% (%06Xh)",
+                ((offset * 100) / fileSize), StartOffset + offset
+                );
+
+            if ( Cons_kbhit() && (Cons_getch() == 27) )
+            {
+                Cons_printf("  -- USER ABORT --\n");
+                rc = FALSE;
+                break;
+            }
+
+            Cons_printf("\b\b\b\b\b\b\b\b\b\b\b\b\b");
+            if ((StartOffset + offset) >= 0x1000000)
+            {
+                Cons_printf("\b");
+            }
+            Cons_fflush( stdout );
+        }
+
+        // Determine size of next block
+        txBytes = PEX_MIN( SPI_MAX_BLOCK_SIZE, (fileSize - offset) );
+
+        // Write next data
+        status =
+            PlxPci_SpiFlashWriteBuffer(
+                PtrDev,
+                PtrSpi,
+                StartOffset + offset,
+                &ptrBuffer[offset],
+                txBytes
+                );
+        if (status != PLX_STATUS_OK)
+        {
+            Cons_printf(
+                "\n\tError: SPI block write failed (offset:%02X status=%Xh)\n",
+                (StartOffset + offset), status
+                );
+            rc = FALSE;
+            break;
+        }
+
+        // Verify data if option enabled
+        if ((NvFlags & PEX_NV_FLAG_BYPASS_VERIFY) == 0)
+        {
+            // Read back block
+            status =
+                PlxPci_SpiFlashReadBuffer(
+                    PtrDev,
+                    PtrSpi,
+                    StartOffset + offset,
+                    verifyBuff,
+                    txBytes
+                    );
+            if (status != PLX_STATUS_OK)
+            {
+                Cons_printf(
+                    "\n\tError: SPI block read for verification failed (offset:%02X status=%Xh)\n",
+                    (StartOffset + offset), status
+                    );
+                rc = FALSE;
+                break;
+            }
+
+            // Compare data blocks
+            for (idx = 0; idx < txBytes; idx += sizeof(U32))
+            {
+                txVal = *(U32*)(ptrBuffer + offset + idx);
+                rxVal = *(U32*)(verifyBuff + idx);
+
+                if (txVal != rxVal)
+                {
+                    Cons_printf(
+                        "\n\tERROR: offset:%02X  wrote:%08X  read:%08X\n",
+                        StartOffset + offset + idx, txVal, rxVal
+                        );
+                    rc = FALSE;
+                    break;
+                }
+            }
+        }
+
+        // Adjust for next transfer
+        offset += txBytes;
+    }
+
+    if (rc == TRUE)
+    {
+        Cons_printf("Ok             \n");
+    }
+
+    if (NvFlags & PEX_NV_FLAG_CPU_IN_RESET)
+    {
+        Cons_printf("Restore CPU reset state.... ");
+        // Restore CPU reset register (60000008h)
+        PlxPci_PlxMappedRegisterWrite(
+            PtrDev,
+            PEX_REG_HOST_DIAG,
+            regReset
+            );
+        Cons_printf("Ok\n");
+    }
+
+    // Release the buffer
+    free( ptrBuffer );
+
+    // Calculate elapsed time
+    ftime( &end );
+    elapsed = PLX_DIFF_TIMEB( end, start );
+
+    if (elapsed < 1)
+    {
+        xferRate = offset;
+    }
+    else
+    {
+        xferRate = ((double)offset / elapsed);
+    }
+
+    Cons_printf(" -- Complete (%.2f sec  ", elapsed);
+    if (xferRate > 1024)
+    {
+        Cons_printf("%.1f KB/s", (xferRate / 1024));
+    }
+    else
+    {
+        Cons_printf("%d B/s", (U32)xferRate);
+    }
+    Cons_printf(") --\n\n", (xferRate / 1024));
+
+    return rc;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  Plx_SpiFileSave
+ *
+ * Description:  Saves the contents of the SPI to a file
+ *
+ ******************************************************************************/
+BOOLEAN
+Plx_SpiFileSave(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    char              *PtrFileName,
+    U32                StartOffset,
+    U32                ByteCount,
+    U8                 NvFlags
+    )
+{
+    U8            rc;
+    U8           *ptrBuffer;
+    U32           offset;
+    U32           rxBytes;
+    U32           regReset;
+    FILE         *ptrFile;
+    double        elapsed;
+    double        xferRate;
+    PLX_STATUS    status;
+    struct timeb  end;
+    struct timeb  start;
+
+
+    if (ByteCount == 0)
+    {
+        Cons_printf("Error: Read byte count is 0B\n");
+        return FALSE;
+    }
+
+    // Note start time
+    ftime( &start );
+
+    // Round byte count up to next DW boundary
+    ByteCount = (ByteCount + 3) & ~(U32)0x3;
+
+    Cons_printf("Prepare buffer............. ");
+
+    // Allocate a buffer for the data
+    ptrBuffer = malloc( ByteCount );
+    if (ptrBuffer == NULL)
+    {
+        Cons_printf("Error: Buffer allocation failure (%dB)\n", ByteCount);
+        return FALSE;
+    }
+    Cons_printf(
+        "Ok (%d%c)\n",
+        ByteCount > (1 << 20) ? (ByteCount >> 20) :
+           ByteCount > (1 << 10) ? (ByteCount >> 10) : ByteCount,
+        ByteCount > (1 << 20) ? 'M' :
+           ByteCount > (1 << 10) ? 'K' : 'B'
+        );
+
+    // Default to successful operation
+    rc = TRUE;
+
+    Cons_printf("Put CPU in reset........... ");
+    regReset = 0;
+    if (NvFlags & PEX_NV_FLAG_CPU_IN_RESET)
+    {
+        // Not supported in PCIe direct access mode
+        if (PtrDev->Key.ApiMode == PLX_API_MODE_PCI)
+        {
+            Cons_printf("<N/A in PCIe direct access mode>\n");
+            NvFlags &= ~PEX_NV_FLAG_CPU_IN_RESET;
+        }
+        else
+        {
+            // Put CPU in reset (60000008h[1]=1)
+            regReset =
+                PlxPci_PlxMappedRegisterRead(
+                    PtrDev,
+                    PEX_REG_HOST_DIAG,
+                    NULL
+                    );
+            PlxPci_PlxMappedRegisterWrite(
+                PtrDev,
+                PEX_REG_HOST_DIAG,
+                regReset | PEX_HOST_DIAG_CPU_RST_MASK
+                );
+            Cons_printf("Ok (use '/nr' to disable)\n");
+        }
+    }
+    else
+    {
+        Cons_printf("DISABLED\n");
+    }
+
+    Cons_printf(
+        "Flash address range........ %06Xh -> %06Xh\n",
+        StartOffset, StartOffset + ByteCount - 1
+        );
+
+    Cons_printf("Read flash (ESC=halt)...... ");
+    Cons_fflush( stdout );
+
+    // Read buffer from flash
+    offset = 0;
+    while (offset < ByteCount)
+    {
+        // Periodically update status
+        if ((offset & 0xF) == 0)
+        {
+            // Display current status
+            Cons_printf(
+                "%2ld%% (%06Xh)",
+                ((offset * 100) / ByteCount), StartOffset + offset
+                );
+
+            if ( Cons_kbhit() && (Cons_getch() == 27) )
+            {
+                Cons_printf("  -- USER ABORT --\n");
+                rc = FALSE;
+                break;
+            }
+
+            Cons_printf("\b\b\b\b\b\b\b\b\b\b\b\b\b");
+            if ((StartOffset + offset) >= 0x1000000)
+            {
+                Cons_printf("\b");
+            }
+            Cons_fflush( stdout );
+        }
+
+        // Determine size of next block
+        rxBytes = PEX_MIN( SPI_MAX_BLOCK_SIZE, (ByteCount - offset) );
+
+        // Get next data
+        status =
+            PlxPci_SpiFlashReadBuffer(
+                PtrDev,
+                PtrSpi,
+                StartOffset + offset,
+                &ptrBuffer[offset],
+                rxBytes
+                );
+        if (status != PLX_STATUS_OK)
+        {
+            Cons_printf(
+                "Error: SPI block read failed (offset:%02X status=%Xh)\n",
+                (StartOffset + offset), status
+                );
+            rc = FALSE;
+            break;
+        }
+
+        // Adjust for next transfer
+        offset += rxBytes;
+    }
+
+    if (rc == TRUE)
+    {
+        Cons_printf("Ok             \n");
+
+        Cons_printf("Write data to file......... ");
+        Cons_fflush(stdout);
+
+        // Open the file to write
+        ptrFile = fopen( PtrFileName, "wb" );
+        if (ptrFile == NULL)
+        {
+            Cons_printf("Error: Unable to create file\n");
+            rc = FALSE;
+        }
+        else
+        {
+            // Write buffer to file
+            if (fwrite(
+                    ptrBuffer,      // Buffer to write
+                    sizeof(U8),     // Item size
+                    ByteCount,      // Buffer size
+                    ptrFile         // File pointer
+                    ) != ByteCount)
+            {
+                Cons_printf("Error: Unable to write to file\n");
+                rc = FALSE;
+            }
+            else
+            {
+                Cons_printf( "Ok (%s)\n", PtrFileName );
+            }
+
+            // Close the file
+            fclose( ptrFile );
+        }
+    }
+
+    // Release the buffer
+    free( ptrBuffer );
+
+    if (NvFlags & PEX_NV_FLAG_CPU_IN_RESET)
+    {
+        Cons_printf("Release CPU reset.......... ");
+        // Restore CPU reset register (60000008h)
+        PlxPci_PlxMappedRegisterWrite(
+            PtrDev,
+            PEX_REG_HOST_DIAG,
+            regReset
+            );
+        Cons_printf("Ok\n");
+    }
+
+    // Calculate elapsed time
+    ftime( &end );
+    elapsed = PLX_DIFF_TIMEB( end, start );
+
+    if (elapsed < 1)
+    {
+        xferRate = offset;
+    }
+    else
+    {
+        xferRate = ((double)offset / elapsed);
+    }
+
+    Cons_printf(" -- Complete (%.2f sec  ", elapsed);
+    if (xferRate > 1024)
+    {
+        Cons_printf("%.1f KB/s", (xferRate / 1024));
+    }
+    else
+    {
+        Cons_printf("%d B/s", (U32)xferRate);
+    }
+    Cons_printf(") --\n\n", (xferRate / 1024));
+
+    return rc;
 }

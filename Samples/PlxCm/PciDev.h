@@ -2,7 +2,7 @@
 #define _PCI_DEVICE_H
 
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -93,20 +93,29 @@
 #define MATCH_INTERFACE_GENERIC   ((U16)1 << 4)
 #define MATCH_INTERFACE           MATCH_INTERFACE_EXACT | MATCH_INTERFACE_GENERIC
 
-// Function number passed to driver in upper 3-bits of slot
-#define PCI_DEVFN(slot, fn)       ((char)((((char)(fn)) << 5) | ((char)(slot) & 0x1f)))
+// Max bytes to read/write for each SPI flash block operation
+#define SPI_MAX_BLOCK_SIZE        512
 
 
+// Device flags
+typedef enum _PEX_DEV_FLAGS
+{
+    PEX_DEV_FLAG_NONE           = 0,        // No flags
+    PEX_DEV_FLAG_IS_SYNTH       = (1 << 1), // Device is synthetic
+    PEX_DEV_FLAG_IS_SELECTED    = (1 << 2), // Device currently selected
+    PEX_DEV_FLAG_EEP_VERIFIED   = (1 << 3)  // Track if EEPROM has been verified
+} PEX_DEV_FLAGS;
+
+// Device node properties
 typedef struct _DEVICE_NODE
 {
     PLX_DEVICE_KEY       Key;
-    U8                   PciHeaderType;                 // PCI header type
-    U32                  PciClass;                      // PCI Class code
-    PLX_PORT_PROP        PortProp;                      // Port properties
-    BOOLEAN              bSelected;                     // Flag to specify if device is selected
-    BOOLEAN              bEepromVerified;               // Flag to track if EEPROM has been verified
-    PLX_UINT_PTR         Va_PciBar[6];                  // Virtual addresses of PCI BAR spaces
-    struct _DEVICE_NODE *pNext;                         // Pointer to next node in device list
+    U8                   PciHeaderType;     // PCI header type
+    U32                  PciClass;          // PCI Class code
+    PLX_PORT_PROP        PortProp;          // Port properties
+    U8                   DevFlags;          // Device flags
+    PLX_UINT_PTR         Va_PciBar[6];      // Virtual addresses of PCI BAR spaces
+    struct _DEVICE_NODE *pNext;             // Pointer to next node in device list
 } DEVICE_NODE;
 
 
@@ -198,6 +207,25 @@ Plx8000_EepromFileSave(
     char              *pFileName,
     U32                ByteCount,
     BOOLEAN            bCrc
+    );
+
+BOOLEAN
+Plx_SpiFileLoad(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    char              *PtrFileName,
+    U32                StartOffset,
+    U8                 NvFlags
+    );
+
+BOOLEAN
+Plx_SpiFileSave(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    char              *PtrFileName,
+    U32                StartOffset,
+    U32                ByteCount,
+    U8                 NvFlags
     );
 
 

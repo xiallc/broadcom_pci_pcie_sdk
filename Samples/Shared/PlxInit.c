@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc.
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -44,7 +44,7 @@
  *
  * Revision History:
  *
- *      02-01-14 : PLX SDK v7.20
+ *      11-01-19 : PLX SDK v8.10
  *
  ******************************************************************************/
 
@@ -126,11 +126,7 @@ SelectDevice(
         memset(&DevKey, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY));
 
         // Check if device exists
-        status =
-            PlxPci_DeviceFind(
-                &DevKey,
-                (U16)i
-                );
+        status = PlxPci_DeviceFind( &DevKey, (U16)i );
 
         if (status == PLX_STATUS_OK)
         {
@@ -138,7 +134,7 @@ SelectDevice(
             bAddDevice = TRUE;
 
             // Verify device is not already in list
-            for (j=0; j < NumDevices; j++)
+            for (j = 0; j < NumDevices; j++)
             {
                 // Do not add device if already in list
                 if ((DevKey.bus      == DevList[j].bus) &&
@@ -171,19 +167,26 @@ SelectDevice(
 
     // Check devices exist
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
     Cons_printf("\t\t     0. Cancel\n\n");
 
     do
     {
         Cons_printf("\t   Device selection --> ");
-        Cons_scanf("%hd", &i);
+        if (Cons_scanf("%hd", &i) <= 0)
+        {
+            // Add for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     Cons_printf("\n");
 
@@ -216,7 +219,9 @@ PlxSdkErrorText(
     while (ApiErrors[i].code != PLX_STATUS_RSVD_LAST_ERROR)
     {
         if (ApiErrors[i].code == code)
+        {
             return ApiErrors[i].text;
+        }
 
         i++;
     }

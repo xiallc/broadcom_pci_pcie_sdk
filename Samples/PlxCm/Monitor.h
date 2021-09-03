@@ -2,7 +2,7 @@
 #define _MONITOR_H
 
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -65,9 +65,9 @@
 /*************************************
  *          Definitions
  ************************************/
-#define MONITOR_VERSION_MAJOR       3       // Version information
-#define MONITOR_VERSION_MINOR       0
-#define MONITOR_VERSION_REVISION    0
+#define MONITOR_VERSION_MAJOR       8       // Version information
+#define MONITOR_VERSION_MINOR       2
+#define MONITOR_VERSION_REVISION    3
 
 #define MONITOR_PROMPT              ">"     // The monitor prompt string
 
@@ -79,6 +79,19 @@
 #endif
 
 
+// Host diagnostic register for putting ARM CPU in reset
+#define PEX_REG_HOST_DIAG           0x60000008
+#define PEX_HOST_DIAG_CPU_RST_MASK  ((U32)1 << 1)
+
+// Non-Volatile (EEPROM/SPI) programming flags
+typedef enum _PEX_NV_FLAGS
+{
+    PEX_NV_FLAG_NONE            = 0,        // No flags
+    PEX_NV_FLAG_CPU_IN_RESET    = (1 << 1), // Put CPU in reset during operation
+    PEX_NV_FLAG_BYPASS_VERIFY   = (1 << 2)  // Do not verify write values
+} PEX_NV_FLAGS;
+
+
 
 
 /*************************************
@@ -86,6 +99,7 @@
  ************************************/
 extern PLX_LIST_ENTRY Gbl_ListCmds;
 extern U64            Gbl_LastRetVal;
+extern U8             Gbl_PciDriverFound;
 
 
 
@@ -106,6 +120,7 @@ Monitor(
 
 PLXCM_COMMAND*
 ProcessCommand(
+    DEVICE_NODE       *pNode,
     PLX_DEVICE_OBJECT *pDevice,
     char              *buffer
     );

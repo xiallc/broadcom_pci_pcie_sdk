@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      01-01-18 : PLX SDK v8.00
+ *      11-01-19 : PLX SDK v8.10
  *
  ******************************************************************************/
 
@@ -771,11 +771,11 @@ PlxDeviceListBuild(
                 RegValue = PlxRegisterRead( pDevice, 0x90, NULL, FALSE );
                 if (RegValue & (1 << 11))
                 {
-                    pDevice->Key.DeviceMode = PLX_PORT_ENDPOINT;
+                    pDevice->Key.DeviceMode = PLX_CHIP_MODE_STANDARD;
                 }
                 else
                 {
-                    pDevice->Key.DeviceMode = PLX_PORT_LEGACY_ENDPOINT;
+                    pDevice->Key.DeviceMode = PLX_CHIP_MODE_LEGACY_ADAPTER;
                 }
             }
 
@@ -1085,13 +1085,13 @@ PlxDeterminePlxPortType(
         pDevice->Key.PlxPortType = PLX_SPEC_PORT_SYNTH_EN_EP;
     }
     else if ( ((pDevice->Key.DeviceId & 0xFF00) == 0xC000) &&
-              ((pDevice->Key.SubDeviceId == 0x00B2) ||
-               (pDevice->Key.SubDeviceId == 0x0032)) )  // Incorrect ID on FPGA
+              (pDevice->Key.SubDeviceId == 0x00B2) )
     {
         // MPT EP without SES support
         pDevice->Key.PlxPortType = PLX_SPEC_PORT_MPT_NO_SES;
     }
-    else if (pDevice->Key.DeviceId == 0x00B2)
+    else if ( (pDevice->Key.DeviceId == 0x00B2) ||
+              (pDevice->Key.DeviceId == 0x02B0) )   // Andromeda synth MPT
     {
         // Search for a PCI vendor-specific capability
         RegPci =

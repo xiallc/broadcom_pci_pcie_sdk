@@ -1,7 +1,7 @@
 /*=========================================================================
 | Aardvark Interface Library
 |--------------------------------------------------------------------------
-| Copyright (c) 2002-2008 Total Phase, Inc.
+| Copyright (c) 2002-2019 Total Phase, Inc.
 | All rights reserved.
 | www.totalphase.com
 |
@@ -63,7 +63,7 @@
 /*=========================================================================
 | VERSION CHECK
  ========================================================================*/
-#define AA_CFILE_VERSION   0x050a   /* v5.10 */
+#define AA_CFILE_VERSION   0x0528   /* v5.40 */
 #define AA_REQ_SW_VERSION  0x050a   /* v5.10 */
 
 /*
@@ -83,15 +83,7 @@
 | DEFINES
  ========================================================================*/
 // Modified by PLX to avoid conflicts
-#if 0
-    #define API_NAME                     "aardvark"
-#else
-  #if defined(_WIN64) || (PLX_CPU_BITS == 64)
-    #define API_NAME                     "I2cAaUsb_x64"
-  #else
-    #define API_NAME                     "I2cAaUsb"
-  #endif
-#endif
+#define API_NAME                     "aardvark"
 #define API_DEBUG                    AA_DEBUG
 #define API_OK                       AA_OK
 #define API_UNABLE_TO_LOAD_LIBRARY   AA_UNABLE_TO_LOAD_LIBRARY
@@ -259,10 +251,10 @@ static void *_loadFunction (const char *name, int *result) {
             return 0;
         }
 
-        version = (void *)dlsym(handle, "c_version");
+        version = (void *)dlsym(handle, "aa_c_version");
         if (version == 0) {
 #if API_DEBUG
-            fprintf(stderr, "Unable to bind c_version() in %s\n",
+            fprintf(stderr, "Unable to bind aa_c_version() in %s\n",
                     SO_NAME);
             fprintf(stderr, "%s\n", dlerror());
 #endif

@@ -205,10 +205,10 @@ else
     else
         # Note special 8000-series drivers only for endpoints & not switches
         if [ "$Param1" = "8000n" ]; then
-            echo "   -- NOTE: 8000_NT driver is only for PLX switch Non-Transparent(NT) ports --"
+            echo "      \-- NOTE: 8000_NT driver is only for PLX switch Non-Transparent(NT) ports --"
         fi
         if [ "$Param1" = "8000d" ]; then
-            echo "   -- NOTE: 8000_DMA driver is only for PLX switches with DMA functions --"
+            echo "      \-- NOTE: 8000_DMA driver is only for PLX switches with DMA functions --"
         fi
     fi
     echo

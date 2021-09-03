@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -68,6 +68,7 @@ static DEVICE_NODE       *Gbl_pNodeCurrent;
 static PLX_DEVICE_OBJECT  Gbl_DeviceObj;
 static FILE              *Gbl_pScriptFile = NULL;
 
+U8  Gbl_PciDriverFound;     // Flag whether at least 1 PCI driver detected
 U64 Gbl_LastRetVal = 0;     // Last return value from a command
 
 // Setup the function table
@@ -83,7 +84,7 @@ static FN_TABLE Gbl_FnTable[] =
     { CMD_HISTORY   , FALSE, "history/h/!"             , Cmd_History     },
     { CMD_RESET     , FALSE, "reset"                   , Cmd_Reset       },
     { CMD_SCAN      , FALSE, "scan"                    , Cmd_Scan        },
-    { CMD_SET_CHIP  , FALSE, "setchip/set_chip"        , Cmd_SetChip     },
+    { CMD_SET_CHIP  , FALSE, "setchip"                 , Cmd_SetChip     },
     { CMD_DEV       , FALSE, "dev"                     , Cmd_Dev         },
     { CMD_I2C       , FALSE, "i2c"                     , Cmd_I2cConnect  },
     { CMD_MDIO      , FALSE, "mdio"                    , Cmd_MdioConnect },
@@ -102,7 +103,10 @@ static FN_TABLE Gbl_FnTable[] =
     { CMD_REG_PLX   ,  TRUE, "reg/mmr/lcr/rtr/dma/mqr" , Cmd_RegPlx      },
     { CMD_REG_DUMP  ,  TRUE, "dp/dr"                   , Cmd_RegDump     },
     { CMD_EEP       ,  TRUE, "eep"                     , Cmd_Eep         },
-    { CMD_EEP_FILE  , FALSE, "eep_load/eep_save"       , Cmd_EepFile     },
+    { CMD_EEP_FILE  , FALSE, "eepload/eepsave"         , Cmd_EepFile     },
+    { CMD_SPI_RW    ,  TRUE, "spirw"                   , Cmd_SpiRW       },
+    { CMD_SPI_ERASE ,  TRUE, "spierase"                , Cmd_SpiErase    },
+    { CMD_SPI_FILE  ,  TRUE, "spiload/spisave"         , Cmd_SpiFile     },
     { CMD_NVME_PROP , FALSE, "nvmeprop/nvme"           , Cmd_NvmeProp    },
     { CMD_FINAL     , FALSE, "", NULL }    // Must be last entry
 };
@@ -344,7 +348,7 @@ Monitor(
         CommonBufferMap( &Gbl_DeviceObj );
 
         // Mark device as selected
-        Gbl_pNodeCurrent->bSelected = TRUE;
+        Gbl_pNodeCurrent->DevFlags |= PEX_DEV_FLAG_IS_SELECTED;
     }
 
     Cons_clear();
@@ -354,14 +358,17 @@ Monitor(
 
     if (Gbl_pNodeCurrent == NULL)
     {
+        Gbl_PciDriverFound = FALSE;
         Cons_printf("\n* Use i2c/mdio/sdb to connect over I2C/MDIO/SDB or 'q' to exit *\n\n");
     }
     else
     {
+        Gbl_PciDriverFound = TRUE;
         Cons_printf(
             "\n"
-            "PLX Console Monitor, v%d.%d%d [%s]\n"
-            "Copyright (c) PLX Technology, Inc.\n\n",
+            "PLX Console Monitor (%d-bit), v%d.%d%d [%s]\n"
+            "Copyright (c) Broadcom, Inc.\n\n",
+            (sizeof(PLX_UINT_PTR) * 8),
             MONITOR_VERSION_MAJOR,
             MONITOR_VERSION_MINOR,
             MONITOR_VERSION_REVISION,
@@ -411,7 +418,7 @@ Monitor(
         else
         {
             // Copy command into buffer
-            strcpy( buffer, Gbl_pPostedCmd->szCmdLine );
+            strncpy( buffer, Gbl_pPostedCmd->szCmdLine, MAX_CMDLN_LEN );
 
             // Reset posted command
             Gbl_pPostedCmd = NULL;
@@ -443,7 +450,7 @@ Monitor(
                     }
 
                     // Process the command
-                    pCmd = ProcessCommand( pDevice, buffer );
+                    pCmd = ProcessCommand( Gbl_pNodeCurrent, pDevice, buffer );
 
                     // Update 'RetVal' system variable to latest value
                     sprintf( buffer, "%08lX", (unsigned long)Gbl_LastRetVal );
@@ -524,7 +531,7 @@ Monitor(
                 }
 
                 // Delay for a bit to wait for additional keys
-                Plx_sleep(10);
+                Plx_sleep(1);
 
                 // Process ESC only of no other key is pending
                 if (Cons_kbhit() == FALSE)
@@ -537,11 +544,11 @@ Monitor(
                     }
 
                     // Clear the command-line
+                    memset( buffer, '\0', i );
                     while (i)
                     {
                         Cons_printf("\b \b");
                         i--;
-                        buffer[i] = '\0';
                     }
 
                     // Reset command pointer
@@ -713,21 +720,19 @@ Monitor(
                 if (bFlag)
                 {
                     // Go to end of line
-                    while (buffer[i] != '\0')
+                    if (buffer[i] != '\0')
                     {
-                        Cons_printf("%c", buffer[i]);
-                        i++;
+                        Cons_printf("%s", &buffer[i]);
+                        i = (U16)strlen( buffer );
                     }
 
                     // Clear the command-line
+                    memset( buffer, '\0', i );
                     while (i)
                     {
                         Cons_printf("\b \b");
                         i--;
                     }
-
-                    // Clear buffer
-                    memset( buffer, '\0', MAX_CMDLN_LEN );
 
                     if (pCmd != NULL)
                     {
@@ -770,7 +775,9 @@ _Monitor_StandardKey:
                         {
                             Cons_printf("%s", (buffer + i));
                             while (count--)
+                            {
                                 Cons_printf("\b");
+                            }
                         }
                     }
                 }
@@ -792,6 +799,7 @@ _Monitor_StandardKey:
  *********************************************************/
 PLXCM_COMMAND*
 ProcessCommand(
+    DEVICE_NODE       *pNode,
     PLX_DEVICE_OBJECT *pDevice,
     char              *buffer
     )
@@ -801,7 +809,6 @@ ProcessCommand(
 
     // Add command to list if not already
     pCmd = CmdLine_CmdAdd( buffer, Gbl_FnTable );
-
     if (pCmd == NULL)
     {
         return NULL;
@@ -827,7 +834,7 @@ ProcessCommand(
         }
 
         // Call the command
-        pCmd->pCmdRoutine( pDevice, pCmd );
+        pCmd->pCmdRoutine( pNode, pDevice, pCmd );
     }
 
     return pCmd;
@@ -872,7 +879,7 @@ DeviceSelectByIndex(
             return pNode;
         }
 
-        Gbl_pNodeCurrent->bSelected = FALSE;
+        Gbl_pNodeCurrent->DevFlags &= ~PEX_DEV_FLAG_IS_SELECTED;
         PciSpacesUnmap( &Gbl_DeviceObj );
         CommonBufferUnmap( &Gbl_DeviceObj );
 
@@ -892,7 +899,7 @@ DeviceSelectByIndex(
     // Get Common buffer properties
     CommonBufferMap( &Gbl_DeviceObj );
 
-    pNode->bSelected = TRUE;
+    pNode->DevFlags |= PEX_DEV_FLAG_IS_SELECTED;
 
     return pNode;
 }

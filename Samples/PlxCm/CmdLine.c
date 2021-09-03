@@ -676,6 +676,15 @@ CmdLine_CmdParse(
     // Get the command
     pBuffer = pCmd->szCmdLine;
     CmdLine_GetNextToken( &pBuffer, pCmd->szCmd, FALSE );
+    // If the command is "spiload" or "spisave", the immediate next argument is file name.
+    // Do not check for '+', '-', '=' and '!' characters in file name. Allow file name as it is.
+    if (
+	 (Plx_strcasecmp( pCmd->szCmd, "spiload" ) == 0) ||
+    	 (Plx_strcasecmp( pCmd->szCmd, "spisave" ) == 0) 
+       )
+    {
+        CmdLine_GetNextToken( &pBuffer, strArg, FALSE );
+    }
 
     // Lookup the command & set function pointer
     if (pCmd->pCmdRoutine == NULL)

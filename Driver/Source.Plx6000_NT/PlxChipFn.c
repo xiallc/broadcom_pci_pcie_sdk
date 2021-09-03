@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *     11-01-19: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -189,6 +189,9 @@ PlxChipTypeDetect(
             DebugPrintf(("ERROR - Unable to determine chip type\n"));
             return PLX_STATUS_INVALID_OBJECT;
     }
+
+    // Set Chip ID to match chip type
+    pdx->Key.ChipID = pdx->Key.PlxChip;
 
     DebugPrintf((
         "Device %04X_%04X = %04X rev %02X\n",

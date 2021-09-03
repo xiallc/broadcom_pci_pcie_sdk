@@ -2,7 +2,7 @@
 #define __PLX_API_DEBUG_H
 
 /*******************************************************************************
- * Copyright 2013-2018 Avago Technologies
+ * Copyright 2013-2019 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *     03-01-18 : PLX SDK v8.00
+ *     09-01-19: PLX SDK v8.10
  *
  ******************************************************************************/
 
@@ -86,7 +86,7 @@ extern "C" {
 #if defined(WIN32)
     #define PLX_DBG_DEST_DEBUGGER           // Default Win DLL to debugger
 #elif defined(PLX_LINUX)
-    #define PLX_DBG_DEST_FILE               // Default Linux API to file
+    #define PLX_DBG_DEST_CONSOLE            // Default Linux API to console
 #elif defined(PLX_DOS)
     #define PLX_DBG_DEST_FILE               // Default DOS API to file
 #else
@@ -97,7 +97,7 @@ extern "C" {
 // Debug definitions
 #if defined(PLX_DBG_DEST_FILE)
     #define _PlxDbgFunc                     PlxApi_DebugPrintf
-    #define PLX_LOG_FILE                    "\\PlxApi.Log"        // Log file for debug output
+    #define PLX_LOG_FILE                    "PlxApi.Log"        // Log file for debug output
 #elif defined(PLX_DBG_DEST_DEBUGGER)
     #if defined(WIN32)
         #define _PlxDbgFunc                 PlxApi_DebugPrintf
@@ -111,14 +111,16 @@ extern "C" {
 #if defined(PLX_DEBUG)
     #define DebugPrintf(arg)                _Debug_Print_Macro(arg)
     #define DebugPrintf_Cont(arg)           _PlxDbgFunc arg
+    #define ErrorPrintf(arg)                _Debug_Print_Macro(arg)
+    #define ErrorPrintf_Cont(arg)           _PlxDbgFunc arg
 #else
     #define DebugPrintf(arg)                do { } while(0)
     #define DebugPrintf_Cont(arg)           do { } while(0)
+    #define ErrorPrintf(arg)                do { } while(0)
+    #define ErrorPrintf_Cont(arg)           do { } while(0)
 #endif
 #define InfoPrintf(arg)                     _Debug_Print_Macro(arg)
 #define InfoPrintf_Cont(arg)                _PlxDbgFunc arg
-#define ErrorPrintf(arg)                    _Debug_Print_Macro(arg)
-#define ErrorPrintf_Cont(arg)               _PlxDbgFunc arg
 
 #define _Debug_Print_Macro(arg)  \
     do                           \

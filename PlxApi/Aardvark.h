@@ -1,7 +1,7 @@
 /*=========================================================================
 | Aardvark Interface Library
 |--------------------------------------------------------------------------
-| Copyright (c) 2002-2008 Total Phase, Inc.
+| Copyright (c) 2002-2019 Total Phase, Inc.
 | All rights reserved.
 | www.totalphase.com
 |
@@ -87,6 +87,9 @@ typedef signed   __int64  s64;
 
 #endif /* __MSC_VER */
 
+typedef float   f32;
+typedef double  f64;
+
 #endif /* TOTALPHASE_DATA_TYPES */
 
 
@@ -100,7 +103,7 @@ typedef signed   __int64  s64;
 /*=========================================================================
 | VERSION
  ========================================================================*/
-#define AA_HEADER_VERSION  0x050a   /* v5.10 */
+#define AA_HEADER_VERSION  0x0528   /* v5.40 */
 
 
 /*=========================================================================

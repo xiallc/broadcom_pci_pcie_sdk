@@ -2069,7 +2069,7 @@ PlxPciPerformanceMonitorControl(
 
             // Offset changes for MIRA in legacy EP mode
             if ((pdx->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-                (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT))
+                (pdx->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER))
             {
                 Offset_Control = 0x1568;
             }
@@ -2140,7 +2140,7 @@ PlxPciPerformanceMonitorControl(
              *   29: Disable Update-FC CPL DLLP counter
              ************************************************************/
             // In MIRA legacy EP mode, PCIe registers start at 1000h
-            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+            if (pdx->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER)
             {
                 offset = 0x1664;
             }
@@ -2303,7 +2303,7 @@ PlxPciPerformanceResetCounters(
 
             // Offset changes for MIRA in legacy EP mode
             if ((pdx->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-                (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT))
+                (pdx->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER))
             {
                 Offset_Control = 0x1568;
             }
@@ -2385,7 +2385,7 @@ PlxPciPerformanceResetCounters(
  *   RAW   = USB endpoint raw byte count
  *   PKT   = USB endpoint packet count
  *
- *           Deneb & Cygnus                  Draco                     Sirius
+ *          Deneb & Cygnus                  Draco                     Sirius
  *      --------------------------   ----------------------    ----------------------
  *          14 counters/port          14 counters/port          13 counters/port
  *           4 ports/station           6 ports/station          16 ports/station
@@ -2665,7 +2665,7 @@ PlxPciPerformanceGetCounters(
             StnPortCount    = 4;
 
             // In MIRA legacy EP mode, PCIe registers start at 1000h
-            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+            if (pdx->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER)
             {
                 Offset_RamCtrl += 0x1000;
                 Offset_Fifo    += 0x1000;

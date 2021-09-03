@@ -2,7 +2,7 @@
 #define __PLX_H
 
 /*******************************************************************************
- * Copyright 2013-2019 Avago Technologies
+ * Copyright 2013-2020 Broadcom, Inc.
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *      08-01-19 : PCI/PCIe SDK v8.00
+ *     11-17-20 : PCI/PCIe SDK v8.23
  *
  ******************************************************************************/
 
@@ -63,11 +63,11 @@ extern "C" {
 **********************************************/
 // SDK Version information
 #define PLX_SDK_VERSION_MAJOR            8
-#define PLX_SDK_VERSION_MINOR            00
-#define PLX_SDK_VERSION_STRING           "8.00"
+#define PLX_SDK_VERSION_MINOR            23
+#define PLX_SDK_VERSION_STRING           "8.23"
 #define PLX_SDK_PRODUCT_NAME_STRING      "Broadcom PCI/PCIe SDK"
 #define PLX_SDK_COMPANY_NAME_STRING      "Broadcom Ltd."
-#define PLX_SDK_COPYRIGHT_STRING         "\251 Broadcom 2018"
+#define PLX_SDK_COPYRIGHT_STRING         "\251 Broadcom 2020"
 
 // Device object validity codes
 #define PLX_TAG_VALID                    0x5F504C58     // "_PLX" in Hex
@@ -86,6 +86,10 @@ extern "C" {
 
 // Define a large value for a signal to the driver
 #define FIND_AMOUNT_MATCHED              80001
+
+// Max ports
+#define PEX_MAX_PORT                     128
+#define PEX_PORT_REGS_SIZE               (4 * 1024)
 
 // Used for performance counter calculations
 #define PERF_MAX_PORTS                   96                             // Max # ports in a switch
@@ -108,12 +112,6 @@ extern "C" {
 
 #define EndianSwap16(value)              ( ((((value) >>  0) & 0xffff) << 16) | \
                                            ((((value) >> 16) & 0xffff) <<  0) )
-
-// PCIe ReqID support macros - Deprecated & to be removed in future
-#define Plx_PciToReqId(bus,slot,fn)      PCIE_REQID_BUILD( (bus), (slot), (fn) )
-#define Plx_ReqId_Bus(ReqId)             PCIE_REQID_BUS( (ReqId) )
-#define Plx_ReqId_Slot(ReqId)            PCIE_REQID_DEV( (ReqId) )
-#define Plx_ReqId_Fn(ReqId)              PCIE_REQID_FN( (ReqId) )
 
 
 

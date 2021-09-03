@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2019 Broadcom, Inc.
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -41,10 +41,6 @@
  *
  *      Demonstrates using the PLX API to perform DMA transfers & measure performance
  *
- * Revision History:
- *
- *      03-01-13 : PLX SDK v7.00
- *
  ******************************************************************************/
 
 
@@ -71,9 +67,9 @@
 #define UPDATE_DISPLAY_SEC              4                                       // Number of seconds between display updates
 #define PlxReg(Va, reg)                 (*(volatile U32 *)(((U8*)Va) + (reg)))  // Macro to access PLX Chip registers
 
- 
- 
- 
+
+
+
 /**********************************************
  *               Functions
  *********************************************/
@@ -193,6 +189,7 @@ _Exit_App:
 
     Cons_printf("\n\n");
 
+    ConsoleEnd();
     return 0;
 }
 
@@ -256,7 +253,9 @@ SelectDevice_DMA(
                         {
                             // DMA is always function 1 or higher
                             if (DevKey.function == 0)
+                            {
                                 bAddDevice = FALSE;
+                            }
                         }
                         else
                         {
@@ -290,9 +289,7 @@ SelectDevice_DMA(
             }
 
             // Close device
-            PlxPci_DeviceClose(
-                &Device
-                );
+            PlxPci_DeviceClose( &Device );
 
             if (bAddDevice)
             {
@@ -316,7 +313,9 @@ SelectDevice_DMA(
     while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
     Cons_printf(
         "\t\t   0. Cancel\n\n"
@@ -325,12 +324,17 @@ SelectDevice_DMA(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_DMA[i - 1];
@@ -373,7 +377,11 @@ PerformDma_8000(
 
     Cons_printf("\n\n");
     Cons_printf("Please select a DMA channel (0-3)   --> ");
-    Cons_scanf("%hd", &UserInput);
+    if (Cons_scanf("%hd", &UserInput) <= 0)
+    {
+        // Added for compiler warning
+    }
+
 
     if (UserInput >= 4)
     {
@@ -392,9 +400,13 @@ PerformDma_8000(
     Cons_printf("%c\n\n", UserInput);
 
     if (UserInput == 'i' || UserInput == 'I')
+    {
         bInterrupts = TRUE;
+    }
     else
+    {
         bInterrupts = FALSE;
+    }
 
 
     /**************************************************************
@@ -529,7 +541,9 @@ PerformDma_8000(
 
     // If polling, disable DMA interrupt
     if (bInterrupts == FALSE)
+    {
         DmaParams.bIgnoreBlockInt = TRUE;
+    }
 
     LoopCount = 0;
 
@@ -572,7 +586,9 @@ PerformDma_8000(
                 if (Cons_kbhit())
                 {
                     if (Cons_getch() == 27)
+                    {
                         goto _ExitDmaTest;
+                    }
                 }
 
                 // Get new start time
@@ -633,7 +649,9 @@ PerformDma_8000(
                 PollCount--;
 
                 if ((PlxReg(VaBar0, OffsetDmaCmd) & (1 << 30)) == 0)
+                {
                     break;
+                }
             }
             while (PollCount != 0);
 

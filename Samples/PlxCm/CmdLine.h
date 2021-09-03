@@ -48,6 +48,7 @@
 
 
 #include "PlxTypes.h"
+#include "PciDev.h"
 #if defined(PLX_MSWINDOWS)
     #include "..\\Shared\\PlxLists.h"
 #else
@@ -67,12 +68,13 @@
 #define CMD_FINAL                   0       // To mark final command in function table
 
 
-// Added to avoid compile error
+// Added to avoid GCC compile error
 typedef struct _PLXCM_COMMAND *PTR_PLXCM_COMMAND;
 
 typedef
 BOOLEAN
 (CMD_ROUTINE)(
+    DEVICE_NODE           *pNode,
     PLX_DEVICE_OBJECT     *pDevice,
     struct _PLXCM_COMMAND *pCmd
     );

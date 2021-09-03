@@ -2,7 +2,7 @@
 #define __PEX_API_H
 
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *     02-01-13 : PLX SDK v7.00
+ *     09-01-19 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -75,7 +75,7 @@ extern "C" {
 
 
 /******************************************
- *      PLX Device Selection Functions
+ *      Device Selection Functions
  *****************************************/
 PLX_STATUS EXPORT
 PlxPci_DeviceOpen(
@@ -160,9 +160,9 @@ PlxPci_ChipTypeSet(
 
 PLX_STATUS EXPORT
 PlxPci_ChipGetPortMask(
-    U16  PlxChip,
-    U8   PlxRevision,
-    U64 *pPortMask
+    U32            ChipID,
+    U8             Revision,
+    PEX_CHIP_FEAT *PtrFeat
     );
 
 PLX_STATUS EXPORT
@@ -236,7 +236,7 @@ PlxPci_PciRegisterWrite_BypassOS(
 
 
 /******************************************
- * PLX-specific Register Access Functions
+ * Device-specific Register Functions
  *****************************************/
 U32 EXPORT
 PlxPci_PlxRegisterRead(
@@ -506,6 +506,65 @@ PlxPci_EepromWriteByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
     U32                offset,
     U16                value
+    );
+
+
+/******************************************
+ *     SPI Flash Functions
+ *****************************************/
+PLX_STATUS EXPORT
+PlxPci_SpiFlashPropGet(
+    PLX_DEVICE_OBJECT *PtrDev,
+    U8                 ChipSel,
+    PEX_SPI_OBJ       *PtrSpi
+    );
+
+PLX_STATUS EXPORT
+PlxPci_SpiFlashErase(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                 BoolWaitComplete
+    );
+
+PLX_STATUS EXPORT
+PlxPci_SpiFlashReadBuffer(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                *PtrRxBuff,
+    U32                SizeRx
+    );
+
+U32 EXPORT
+PlxPci_SpiFlashReadByOffset(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                Offset,
+    PLX_STATUS        *PtrStatus
+    );
+
+PLX_STATUS EXPORT
+PlxPci_SpiFlashWriteBuffer(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                *PtrTxBuff,
+    U32                SizeTx
+    );
+
+PLX_STATUS EXPORT
+PlxPci_SpiFlashWriteByOffset(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                Offset,
+    U32                Data
+    );
+
+PLX_STATUS EXPORT
+PlxPci_SpiFlashGetStatus(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi
     );
 
 

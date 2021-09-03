@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -41,10 +41,6 @@
  *
  *      This sample demonstrates basic communication across an NT port between
  *      with NT link plugged/unplugged detection.
- *
- * Revision History:
- *
- *      07-01-14 : PLX SDK v7.20
  *
  ******************************************************************************/
 
@@ -438,9 +434,13 @@ main(
 
     // Set mailbox to write
     if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
+    {
         value = 6;
+    }
     else
+    {
         value = 3;
+    }
 
     // Post buffer address
     PlxPci_PlxMailboxWrite(
@@ -483,9 +483,13 @@ main(
 
     // Set mailbox to read
     if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
+    {
         value = 3;
+    }
     else
+    {
         value = 6;
+    }
 
     // Get buffer address
     PhysAddr =
@@ -512,7 +516,7 @@ main(
      ************************************************************/
     Cons_printf("Setup NT translation: ");
 
-    // Convert BAR size to range 
+    // Convert BAR size to range
     size = ~((U32)BarProp.Size - 1);
 
     // Calculate BAR offset
@@ -530,7 +534,9 @@ main(
 
     // Do not exceed PCI buffer size
     if (MaxSize > RemoteBuffSize)
+    {
         MaxSize = RemoteBuffSize;
+    }
 
     // Subtract a little just in case
     MaxSize -= (2 * sizeof(U32));
@@ -585,9 +591,13 @@ main(
 
     // Use slightly different priorities to skew Tx/Rx (larger = higher priority)
     if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
+    {
         TxPriority = 50;
+    }
     else
+    {
         TxPriority = 1000;
+    }
 
     do
     {
@@ -602,7 +612,9 @@ main(
 
             // Make sure size doesn't exceed max
             if (size > MaxSize)
+            {
                 size = MaxSize;
+            }
 
             // Post message size
             PlxBarMem_32(BarVa, BarOffset + 4) = size;
@@ -679,9 +691,13 @@ main(
                     RegBar = PlxPci_PlxRegisterRead( &Device, 0x1000 + 0x78, NULL );
 
                     if (((RegBar >> 20) & 0x3F) == 0)
+                    {
                         bLinkDown = TRUE;
+                    }
                     else
+                    {
                         bLinkDown = FALSE;
+                    }
                 }
                 else
                 {
@@ -689,9 +705,13 @@ main(
                     RegBar = PlxPci_PciRegisterReadFast( &Device, 0x18, NULL );
 
                     if (RegBar == (U32)-1)
+                    {
                         bLinkDown = TRUE;
+                    }
                     else
+                    {
                         bLinkDown = FALSE;
+                    }
                 }
 
                 if (bLinkDown)
@@ -839,7 +859,9 @@ SelectDevice_NT(
             bAddDevice = TRUE;
 
             if (DevKey.PlxPortType == PLX_SPEC_PORT_UNKNOWN)
+            {
                 bAddDevice = FALSE;
+            }
 
             if (bAddDevice)
             {
@@ -887,9 +909,7 @@ SelectDevice_NT(
             }
 
             // Close device
-            PlxPci_DeviceClose(
-                &Device
-                );
+            PlxPci_DeviceClose( &Device );
 
             if (bAddDevice)
             {
@@ -914,7 +934,9 @@ SelectDevice_NT(
     while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
     Cons_printf(
         "\t\t   0. Cancel\n\n"
@@ -923,13 +945,17 @@ SelectDevice_NT(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_NT[i - 1];
@@ -944,7 +970,7 @@ SelectDevice_NT(
  *
  * Function   :  WaitForConnection
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 S8
@@ -1010,12 +1036,9 @@ WaitForConnection(
                 );
 
         // Check for ESC key to cancel
-        if (Cons_kbhit())
+        if ( (Cons_kbhit()) && (Cons_getch() == CONS_KEY_ESCAPE) )
         {
-            if (Cons_getch() == 27)
-            {
-                LoopCount = -1;
-            }
+            LoopCount = -1;
         }
     }
     while ((LoopCount > 0) && (RegValue != NT_MSG_SYSTEM_READY));
@@ -1062,7 +1085,7 @@ WaitForConnection(
  *
  * Function   :  PlxPci_SetupNtTranslation
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 PLX_STATUS
@@ -1080,7 +1103,9 @@ PlxPci_SetupNtTranslation(
 
     // Only BAR 2 currently supported
     if (BarIndex != 2)
+    {
         return PLX_STATUS_UNSUPPORTED;
+    }
 
     if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
@@ -1147,7 +1172,7 @@ PlxPci_SetupNtTranslation(
  *
  * Function   :  PlxPciRegisterSaveRestore
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 PLX_STATUS
@@ -1163,7 +1188,7 @@ PlxPciRegisterSaveRestore(
     // Save NT-Link side PCI registers
     if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
-        for (offset=0; offset < 0x40; offset += sizeof(U32))
+        for (offset = 0; offset < 0x40; offset += sizeof(U32))
         {
             if (bRestore)
             {

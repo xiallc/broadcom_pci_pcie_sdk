@@ -46,13 +46,16 @@
  *
  * Revision:
  *
- *     01-01-19 : PCI/PCIe SDK v8.00
+ *     09-01-19: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
 
+#include "PlxTypes.h"
 #if defined(PLX_LINUX)
     #include <pthread.h>    // For mutex support
+    #include <unistd.h>     // For usleep()
+#elif defined(PLX_DOS)
     #include <unistd.h>     // For usleep()
 #endif
 
@@ -70,47 +73,56 @@ extern "C" {
 
 // For displaying connection mode in debug statements
 #define DbgGetApiModeStr( pDev ) \
-        ( ((pDev)->Key.ApiMode == PLX_API_MODE_SDB) ? "SDB" : \
+        ( ((pDev)->Key.ApiMode == PLX_API_MODE_PCI) ? "PCI" : \
+          ((pDev)->Key.ApiMode == PLX_API_MODE_SDB) ? "SDB" : \
           ((pDev)->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK) ? "I2C" : \
           ((pDev)->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE) ? "MDIO" : \
           "??" )
 
-// AXI addresses of some register locations used for probe & register access
+// Addresses used for probe, register, & flash accesses
 #define ATLAS_REGS_AXI_CCR_BASE_ADDR        0xFFF00000
 #define ATLAS_REGS_AXI_BASE_ADDR            0x60800000
+#define ATLAS_REGS_AXI_MAVERICK_BASE_ADDR   0x60000000
 #define _REG_CCR(offset)                    (ATLAS_REGS_AXI_CCR_BASE_ADDR + (offset))
+
+// Addresses dependent upon access mode
+#define ATLAS_REGS_PCI_PBAM_BASE_ADDR       0x001C0000
+#define ATLAS_REGS_AXI_PBAM_BASE_ADDR       0x2A0C0000
+#define ATLAS_SPI_CS0_AXI_BASE_ADDR         0x10000000
+#define ATLAS_SPI_CS0_PCI_BASE_ADDR         0x00300000
 
 // Atlas PEX registers start offset
 #if !defined(ATLAS_PEX_REGS_BASE_OFFSET)
     #define ATLAS_PEX_REGS_BASE_OFFSET      ATLAS_REGS_AXI_BASE_ADDR
 #endif
 
-#define PEX_MAX_PORT                        96
-#define PEX_PORT_REGS_SIZE                  (4 * 1024)
-
 // CCR registers
-#define PEX_REG_CCR_DEV_ID                  _REG_CCR( 0x0 )
-#define PMG_REG_CCR_PCIE_SW_MODE            _REG_CCR( 0xB0 )
-#define PMG_REG_CCR_PORT_TYPE0              _REG_CCR( 0x120 )
-#define PMG_REG_CCR_PCIE_CONFIG             _REG_CCR( 0x170 )
+#define ATLAS_REG_CCR_DEV_ID                _REG_CCR( 0x0 )
+#define ATLAS_REG_CCR_PCIE_SW_MODE          _REG_CCR( 0xB0 )
+#define ATLAS_REG_CCR_PORT_TYPE0            _REG_CCR( 0x120 )
+#define ATLAS_REG_CCR_PCIE_CONFIG           _REG_CCR( 0x170 )
 
 // Chip registers
-#define PEX_REG_PORT_CLOCK_EN_0             0x30C    // Port clock enable for 0-31
-#define PEX_REG_PORT_CLOCK_EN_1             0x310    // Port clock enable for 32-63
-#define PEX_REG_PORT_CLOCK_EN_2             0x314    // Port clock enable for 64-95
-#define PEX_REG_VS0_UPSTREAM                0x360    // Port upstream setting
-#define PEX_REG_IDX_AXI_ADDR                0x1F0100 // Index access AXI address
-#define PEX_REG_IDX_AXI_DATA                0x1F0104 // Index access data
-#define PEX_REG_IDX_AXI_CTRL                0x1F0108 // Index access control
+#define ATLAS_REG_PORT_CLOCK_EN_0           0x30C    // Port clock enable for 0-31
+#define ATLAS_REG_PORT_CLOCK_EN_1           0x310    // Port clock enable for 32-63
+#define ATLAS_REG_PORT_CLOCK_EN_2           0x314    // Port clock enable for 64-95
+#define ATLAS_REG_VS0_UPSTREAM              0x360    // Port upstream setting
+#define ATLAS_REG_IDX_AXI_ADDR              0x1F0100 // Index access AXI address
+#define ATLAS_REG_IDX_AXI_DATA              0x1F0104 // Index access data
+#define ATLAS_REG_IDX_AXI_CTRL              0x1F0108 // Index access control
 
 // Per port registers
-#define PEX_OFF_PORT_CAP_BUS                0x97C   // Port captured bus
+#define ATLAS_OFF_PORT_CAP_BUS              0x97C    // Port captured bus
 
-// CSR index method control
+// PEX CSR index method control
 #define PEX_IDX_CTRL_CMD_READ               (1 << 1) // READ command
 #define PEX_IDX_CTRL_CMD_WRITE              (1 << 0) // WRITE command
 #define PEX_IDX_CTRL_READ_VALID             (1 << 3) // Indicates READ completed
 #define PEX_IDX_CTRL_BUSY                   (1 << 2) // Indicates operation pending
+
+// Maverick
+#define ATLAS_REG_MAV_HOST_DIAG             0x08     // Maverick host diag reg
+#define ATLAS_MAV_HOST_DIAG_CPU_RESET_MASK  (1 << 1) // Hold CPU in reset
 
 
 
@@ -135,9 +147,13 @@ extern "C" {
     #define InterlockedIncrement( pVal )    ++(*(pVal))
     #define InterlockedDecrement( pVal )    --(*(pVal))
 
+#elif defined(PLX_DOS)
+
+    #define Plx_sleep(arg)                  usleep((arg) * 1000)
+
 #endif
 
-#if !defined(PLX_DOS)
+#if !defined(PLX_8000_REG_READ)
     // Macros for PLX chip register access
     #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxDir_PlxRegRead( (pDevice), (U16)(offset), NULL )
     #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxDir_PlxRegWrite( (pDevice), (U16)(offset), (value) )
@@ -184,7 +200,50 @@ PlxDir_PciBarProperties(
 
 
 /******************************************
- *   Performance Monitoring Functions
+ *     SPI Flash Functions
+ *****************************************/
+PLX_STATUS
+PlxDir_SpiFlashPropGet(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                 ChipSel,
+    PEX_SPI_OBJ       *PtrSpi
+    );
+
+PLX_STATUS
+PlxDir_SpiFlashErase(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                 BoolWaitComplete
+    );
+
+PLX_STATUS
+PlxDir_SpiFlashReadBuffer(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                *PtrRxBuff,
+    U32                SizeRx
+    );
+
+PLX_STATUS
+PlxDir_SpiFlashWriteBuffer(
+    PLX_DEVICE_OBJECT *PtrDevice,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                *PtrTxBuff,
+    U32                SizeTx
+    );
+
+PLX_STATUS
+PlxDir_SpiFlashGetStatus(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi
+    );
+
+
+/******************************************
+ *   Performance Monitor Functions
  *****************************************/
 PLX_STATUS
 PlxDir_PerformanceInitializeProperties(
@@ -235,7 +294,7 @@ PlxDir_ChipRevisionDetect(
 PLX_STATUS
 PlxDir_ChipFilterDisabledPorts(
     PLX_DEVICE_OBJECT *pDevice,
-    U64               *pPortMask
+    PEX_CHIP_FEAT     *PtrFeat
     );
 
 PLX_STATUS

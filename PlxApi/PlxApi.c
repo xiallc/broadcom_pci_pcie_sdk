@@ -43,7 +43,7 @@
  *
  * Revision:
  *
- *     09-01-19: PCI/PCIe SDK v8.00
+ *     09-01-19: PCI/PCIe SDK v8.10
  *
  *****************************************************************************/
 
@@ -88,6 +88,7 @@
 #include "PciRegs.h"
 #include "PlxApi.h"
 #include "PlxApiDebug.h"
+#include "PlxApiDirect.h"
 #include "PlxIoctl.h"
 #include "I2cAaUsb.h"
 #include "MdioSpliceUsb.h"
@@ -995,538 +996,857 @@ PlxPci_ChipTypeSet(
  *
  * Function   :  PlxPci_ChipGetPortMask
  *
- * Description:  Returns the PLX chip port mask
+ * Description:  Returns the chip port mask
  *
  *****************************************************************************/
 PLX_STATUS
 PlxPci_ChipGetPortMask(
-    U16  PlxChip,
-    U8   PlxRevision,
-    U64 *pPortMask
+    U32            ChipID,
+    U8             Revision,
+    PEX_CHIP_FEAT *PtrFeat
     )
 {
-    if (pPortMask == NULL)
+    if (PtrFeat == NULL)
     {
         return PLX_STATUS_NULL_PARAM;
     }
 
-    switch (PlxChip)
+    // Reset properties
+    RtlZeroMemory( PtrFeat, sizeof(PEX_CHIP_FEAT) );
+
+    // Fill in per-switch properties
+    switch (ChipID)
     {
         case 0x2380:
         case 0x3380:
         case 0x3382:
-            *pPortMask  = 0x00000007;  // 0-2,PCEI2USB,USB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_PCIE_TO_USB) |
-                          ((U64)1 << PLX_FLAG_PORT_USB);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x01;    // 0-2,PCEI2USB,USB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000007 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_PCIE_TO_USB );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_USB );
             break;
 
         case 0x8505:
-            *pPortMask  = 0x0000001F;  // 0-4
-            break;
-
-        case 0x8509:
-            *pPortMask  = 0x000000FF;  // 0-7
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 5;
+            PtrFeat->StnMask     = 0x01;    // 0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000001F );
             break;
 
         case 0x8508:
         case 0x8512:
         case 0x8517:
         case 0x8518:
-            *pPortMask  = 0x0000001F;  // 0-4,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 5;
+            PtrFeat->StnMask     = 0x01;    // 0-4,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000001F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            break;
+
+        case 0x8509:
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x01;    // 0-7
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000000FF );
             break;
 
         case 0x8516:
-            *pPortMask  = 0x0000000F;  // 0-3,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x01;    // 0-3,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000000F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8524:
-            *pPortMask  = 0x00000F03;  // 0,1,8-11,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0,1,8-11,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000F03 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8525:
-            *pPortMask  = 0x00000706;  // 1,2,8-10
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 1,2,8-10
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000706 );
             break;
 
         case 0x8532:
-            *pPortMask  = 0x00000F0F;  // 0-3,8-11,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-3,8-11,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000F0F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8533:
-            *pPortMask  = 0x00000707;  // 0-2,8-10
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-2,8-10
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000707 );
             break;
 
         case 0x8547:
-            *pPortMask  = 0x00001101;  // 0,8,12
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0,8,12
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00001101 );
             break;
 
         case 0x8548:
-            *pPortMask  = 0x00007707;  // 0-2,8-10,12-14
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0-2,8-10,12-14
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00007707 );
             break;
 
         case 0x8603:
-            *pPortMask  = 0x00000007;  // 0-2
-            break;
-
-        case 0x8605:
-            *pPortMask  = 0x0000000F;  // 0-3
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x01;    // 0-2
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000007 );
             break;
 
         case 0x8604:
-            *pPortMask  = 0x00000033;  // 0,1,4,5,NT,NTB(BA)
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
-            if (PlxRevision != 0xAA)
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0,1,4,5,NT,NTB(BA)
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000033 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            if (Revision != 0xAA)
             {
-                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+                PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
             }
             break;
 
+        case 0x8605:
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x01;    // 0-3
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000000F );
+            break;
+
         case 0x8606:
-            *pPortMask  = 0x000002B3;  // 0,1,4,5,7,9,NT,NTB(BA)
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
-            if (PlxRevision != 0xAA)
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0,1,4,5,7,9,NT,NTB(BA)
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000002B3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            if (Revision != 0xAA)
             {
-                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+                PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
             }
             break;
 
         case 0x8608:
-            *pPortMask  = 0x000003F3;  // 0,1,4-9,NT,NTB(BA)
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
-            if (PlxRevision != 0xAA)
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0,1,4-9,NT,NTB(BA)
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000003F3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            if (Revision != 0xAA)
             {
-                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+                PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
             }
             break;
 
         case 0x8609:
-            *pPortMask  = 0x000003F3;  // 0,1,4-9,DMA,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0,1,4-9,DMA,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000003F3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
             break;
 
         case 0x8612:
-            *pPortMask  = 0x00000033;  // 0,1,4,5,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x03;    // 0,1,4,5,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000033 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8613:
-            *pPortMask  = 0x00000007;  // 0-2,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0-2,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000007 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
             break;
 
         case 0x8614:
-            *pPortMask  = 0x000057F7;  // 0-2,4-10,12,14,NT,NTB(BA)
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
-            if (PlxRevision != 0xAA)
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0-2,4-10,12,14,NT,NTB(BA)
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000057F7 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            if (Revision != 0xAA)
             {
-                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+                PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
             }
             break;
 
         case 0x8615:
-            *pPortMask  = 0x000057F7;  // 0-2,4-10,12,14,DMA,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0-2,4-10,12,14,DMA,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000057F7 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
             break;
 
         case 0x8616:
-            *pPortMask  = 0x00000073;  // 0,1,4-6,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x03;    // 0,1,4-6,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000073 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8617:
-            *pPortMask  = 0x0000000F;  // 0-3,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0-3,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000000F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
             break;
 
         case 0x8618:
-            *pPortMask  = 0x0000FFFF;  // 0-15,NT,NTB(BA)
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
-            if (PlxRevision != 0xAA)
-                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0-15,NT,NTB(BA)
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000FFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            if (Revision != 0xAA)
+            {
+                PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+            }
             break;
 
         case 0x8619:
-            *pPortMask  = 0x0000FFFF;  // 0-15,DMA,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x01;    // 0-15,DMA,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000FFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
             break;
 
         case 0x8624:
-            *pPortMask  = 0x00000373;  // 0,1,4-6,8,9,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0,1,4-6,8,9,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000373 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8632:
-            *pPortMask  = 0x00000FFF;  // 0-11
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0-11
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000FFF );
             break;
 
         case 0x8647:
-            *pPortMask  = 0x00000111;  // 0,4,8
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0,4,8
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000111 );
             break;
 
         case 0x8648:
-            *pPortMask  = 0x00000FFF;  // 0-11,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
-            break;
-
-        case 0x8649:
-            *pPortMask  = 0x00FF000F;  // 0-3,16-23,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
-            break;
-
-        case 0x8664:
-            *pPortMask  = 0x00FF00FF;  // 0-7,16-23,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
-            break;
-
-        case 0x8680:
-            *pPortMask  = 0x00FF0FFF;  // 0-11,16-23,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0-11,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000FFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
             break;
 
         case 0x8625:
         case 0x8636:
         case 0x8696:
-            *pPortMask  = 0x00FFFFFF;  // 0-23,NT,NTB
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            PtrFeat->StnCount    = 6;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x3F;    // 0-23,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00FFFFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            break;
+
+        case 0x8649:
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x31;    // 0-3,16-23,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00FF000F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            break;
+
+        case 0x8664:
+            PtrFeat->StnCount    = 4;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x33;    // 0-7,16-23,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00FF00FF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+            break;
+
+        case 0x8680:
+            PtrFeat->StnCount    = 5;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x37;    // 0-11,16-23,NT,NTB
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00FF0FFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
             break;
 
         case 0x8700:
-            *pPortMask  = 0x0000000F;  // 0-3
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
-            break;
-
         case 0x8712:
-            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+        case 0x8716:
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x01;    // 0-3,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000000F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
             break;
 
         case 0x8713:
-            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT 0/1,DMA 0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
-            break;
-
-        case 0x8716:
-            *pPortMask  = 0x0000000F;  // 0-3,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
-            break;
-
-        case 0x8717:
-            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT 0/1,DMA 0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-5,8-13,NT 0/1,DMA 0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00003F3F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
             break;
 
         case 0x8714:
         case 0x8718:
-            *pPortMask  = 0x0000001F;  // 0-4,NT,ALUT 0-3
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 5;
+            PtrFeat->StnMask     = 0x01;    // 0-4,NT,ALUT 0-3
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000001F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            break;
+
+        case 0x8717:
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-5,8-13,NT 0/1,DMA 0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00003F3F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
             break;
 
         case 0x8723:
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-3,8-10,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000070F );
+            break;
+
         case 0x8724:
-            *pPortMask  = 0x0000070F;  // 0-3,8-10,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-3,8-10,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000070F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
             break;
 
         case 0x8725:
-            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT 0/1,DMA 0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-5,8-13,NT 0/1,DMA 0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00003F3F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
             break;
 
         case 0x8732:
-            *pPortMask  = 0x00000F0F;  // 0-3,8-11,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x03;    // 0-3,8-11,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000F0F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
             break;
 
         case 0x8733:
-            *pPortMask  = 0x003F3F3F;  // 0-5,8-13,16-21,NT 0/1,DMA 0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x07;    // 0-5,8-13,16-21,NT 0/1,DMA 0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x003F3F3F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
             break;
 
         case 0x8734:
-            *pPortMask  = 0x000000FF;  // 0-7,NT 0/1,ALUT 0-3,VS_S0-1
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x03;    // 0-7,NT 0/1,ALUT 0-3,VS_S0-1
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000000FF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
             break;
 
         case 0x8747:
-            *pPortMask  = 0x00030301;  // 0,8,9,16,17
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x07;    // 0,8,9,16,17
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00030301 );
             break;
 
         case 0x8748:
-            *pPortMask  = 0x000F0F0F;  // 0-3,8-11,16-19,NT
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x07;    // 0-3,8-11,16-19,NT
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000F0F0F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
             break;
 
         case 0x8749:
-            *pPortMask  = 0x003F3F3F;  // 0-5,8-13,16-21,NT 0/1,DMA 0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
-                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 8;
+            PtrFeat->StnMask     = 0x07;    // 0-5,8-13,16-21,NT 0/1,DMA 0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x003F3F3F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_DMA_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
             break;
 
         case 0x8750:
-            *pPortMask  = 0x00000FFF;  // 0-11,NT 0/1,ALUT 0-3,VS_S0-2
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0-11,NT 0/1,ALUT 0-3,VS_S0-2
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000FFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
             break;
 
         case 0x8764:
-            *pPortMask  = 0x0000FFFF;  // 0-15,NT 0/1,ALUT 0-3,VS_S0-3
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3);
+            PtrFeat->StnCount    = 4;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x0F;    // 0-15,NT 0/1,ALUT 0-3,VS_S0-3
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000FFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
             break;
 
         case 0x8780:
-            *pPortMask  = 0x000FFFFF;  // 0-19,NT 0/1,ALUT 0-3,VS_S0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4);
+            PtrFeat->StnCount    = 5;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x1F;    // 0-19,NT 0/1,ALUT 0-3,VS_S0-4
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0,  0x000FFFFF);
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
             break;
 
         case 0x8796:
-            *pPortMask  = 0x00FFFFFF;  // 0-23,NT 0/1,ALUT 0-3,VS_S0-5
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S5);
+            PtrFeat->StnCount    = 6;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x3F;    // 0-23,NT 0/1,ALUT 0-3,VS_S0-5
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00FFFFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
             break;
 
         case 0x9712:
         case 0x9716:
-            *pPortMask  = 0x0300001F;   // 0-4,GEP,GEP_P2P,NT,ALUT 0-3,GEP,S0
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0);
+            PtrFeat->StnCount    = 1;
+            PtrFeat->PortsPerStn = 5;
+            PtrFeat->StnMask     = 0x01;    // 0-4,NT,ALUT 0-3,S0,GEP,GEP_DS
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000001F );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, 24 ); // Port 24 for GEP
+            PEX_BITMASK_SET( PtrFeat->PortMask, 25 ); // Port 25 for GEP DS
             break;
 
         case 0x9733:
-            *pPortMask  = 0x030000FF;   // 0-7,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-1
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1);
+            PtrFeat->StnCount    = 2;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x03;    // 0-7,NT 0/1,ALUT 0-3,S0-1,GEP,GEP_DS
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000000FF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, 24 ); // Port 24 for GEP
+            PEX_BITMASK_SET( PtrFeat->PortMask, 25 ); // Port 25 for GEP DS
             break;
 
         case 0x9749:
-            *pPortMask  = 0x03007FFF;   // 0-14,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-2
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2);
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x07;    // 0-14,NT 0/1,ALUT 0-3,S0-2,GEP,GEP_DS
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00007FFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, 24 ); // Port 24 for GEP
+            PEX_BITMASK_SET( PtrFeat->PortMask, 25 ); // Port 25 for GEP DS
             break;
 
         case 0x9765:
-            *pPortMask  = 0x0300FFFF;   // 0-15,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-3
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3);
+            PtrFeat->StnCount    = 4;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x0F;    // 0-15,NT 0/1,ALUT 0-3,S0-3,GEP,GEP_DS
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x0000FFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, 24 ); // Port 24 for GEP
+            PEX_BITMASK_SET( PtrFeat->PortMask, 25 ); // Port 25 for GEP DS
             break;
 
         case 0x9781:
-            *pPortMask  = 0x030FFFFF;   // 0-19,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-4
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4);
+            PtrFeat->StnCount    = 5;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x1F;    // 0-19,NT 0/1,ALUT 0-3,S0-4,GEP,GEP_DS
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x000FFFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, 24 ); // Port 24 for GEP
+            PEX_BITMASK_SET( PtrFeat->PortMask, 25 ); // Port 25 for GEP DS
             break;
 
         case 0x9797:
-            *pPortMask  = 0x03FFFFFF;   // 0-25,NT 0/1,ALUT 0-3,GEP,S0-5
-            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP) |
-                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4) |
-                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S5);
+            PtrFeat->StnCount    = 6;
+            PtrFeat->PortsPerStn = 4;
+            PtrFeat->StnMask     = 0x3F;    // 0-25,NT 0/1,ALUT 0-3,S0-5,GEP,GEP_DS
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00FFFFFF );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ALUT_3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, 24 ); // Port 24 for GEP
+            PEX_BITMASK_SET( PtrFeat->PortMask, 25 ); // Port 25 for GEP DS
+            break;
+
+        case 0xA024:
+            // Station 0 & 1 (8 upper lanes (24-31)), 2 x2 ports
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x83;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0xFF00FFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00300000 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            break;
+
+        case 0xA032:
+            // Station 0 & 1, 2 x2 ports
+            PtrFeat->StnCount    = 3;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x83;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00300000 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            break;
+
+        case 0xA048:
+            // Station 0-2 2 x2 ports
+            PtrFeat->StnCount    = 4;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x87;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0x0000FFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00300000 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT1);
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT3 );
+            break;
+
+        case 0xA064:
+            // Station 0, 1, 3, 4, 2 x2 ports
+            PtrFeat->StnCount    = 5;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x9B;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0xFFFF0000 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x0000FFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00300000 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            break;
+
+        case 0xA080:
+            // Station 0-4 2 x2 ports
+            PtrFeat->StnCount    = 6;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x9F;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x0000FFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00300000 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            break;
+
+        case 0xA096:
+            // Station 0-5, 2 x2 ports
+            PtrFeat->StnCount    = 7;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0xBF;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0xFFFFFFFF );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00300000 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8  );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT1);
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT3 );
             break;
 
         default:
             // For unsupported chips, set default
-            *pPortMask = 0x00000001;
-            ErrorPrintf(("ERROR: Port mask not set for %04X\n", PlxChip));
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x00000001 );
+            ErrorPrintf(("ERROR: Port mask not set for %04X\n", ChipID));
             return PLX_STATUS_UNSUPPORTED;
     }
 
@@ -1813,7 +2133,7 @@ PlxPci_PciRegisterRead_BypassOS(
 
 
     // Verify offset
-    if (offset >= PCIE_CONFIG_SPACE_SIZE)
+    if ( (offset & 0x3) || (offset >= PCIE_CONFIG_SPACE_SIZE) )
     {
         if (pStatus != NULL)
         {
@@ -1885,7 +2205,7 @@ PlxPci_PciRegisterWrite_BypassOS(
 
 
     // Verify offset
-    if (offset >= PCIE_CONFIG_SPACE_SIZE)
+    if ( (offset & 0x3) || (offset >= PCIE_CONFIG_SPACE_SIZE) )
     {
         return PLX_STATUS_INVALID_OFFSET;
     }
@@ -2959,6 +3279,199 @@ PlxPci_EepromWriteByOffset_16(
         );
 
     return IoBuffer.ReturnCode;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashPropGet
+ *
+ * Description: Returns the SPI flash properties at specified chip select
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_SpiFlashPropGet(
+    PLX_DEVICE_OBJECT *PtrDev,
+    U8                 ChipSel,
+    PEX_SPI_OBJ       *PtrSpi
+    )
+{
+    // Verify device object
+    if (!IsObjectValid(PtrDev))
+    {
+        return PLX_STATUS_INVALID_OBJECT;
+    }
+
+    if (PtrSpi == NULL)
+    {
+        return PLX_STATUS_NULL_PARAM;
+    }
+
+    return PlxDir_SpiFlashPropGet( PtrDev, ChipSel, PtrSpi );
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashErase
+ *
+ * Description: Erase all or a portion of flash
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_SpiFlashErase(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                 BoolWaitComplete
+    )
+{
+    return PlxDir_SpiFlashErase( PtrDev, PtrSpi, StartOffset, BoolWaitComplete );
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashReadBuffer
+ *
+ * Description: Reads data from flash
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_SpiFlashReadBuffer(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                *PtrRxBuff,
+    U32                SizeRx
+    )
+{
+    // Verify objects
+    if ( !IsObjectValid(PtrDev) || !IsObjectValid(PtrSpi) )
+    {
+        return PLX_STATUS_INVALID_OBJECT;
+    }
+
+    return PlxDir_SpiFlashReadBuffer( PtrDev, PtrSpi, StartOffset, PtrRxBuff, SizeRx );
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashReadByOffset
+ *
+ * Description: Reads a 32b value from flash at the specified offset
+ *
+ *****************************************************************************/
+U32
+PlxPci_SpiFlashReadByOffset(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                Offset,
+    PLX_STATUS        *PtrStatus
+    )
+{
+    U32        regVal;
+    PLX_STATUS status;
+
+
+    status =
+        PlxPci_SpiFlashReadBuffer(
+            PtrDev,
+            PtrSpi,
+            Offset,
+            (U8*)&regVal,
+            sizeof(U32)
+            );
+
+    if (PtrStatus)
+    {
+        *PtrStatus = status;
+    }
+
+    return regVal;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashWriteBuffer
+ *
+ * Description: Write data to flash
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_SpiFlashWriteBuffer(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                StartOffset,
+    U8                *PtrTxBuff,
+    U32                SizeTx
+    )
+{
+    // Verify objects
+    if ( !IsObjectValid(PtrDev) || !IsObjectValid(PtrSpi) )
+    {
+        return PLX_STATUS_INVALID_OBJECT;
+    }
+
+    return PlxDir_SpiFlashWriteBuffer( PtrDev, PtrSpi, StartOffset, PtrTxBuff, SizeTx );
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashWriteByOffset
+ *
+ * Description: Writes a 32b value to flash at the specified offset
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_SpiFlashWriteByOffset(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi,
+    U32                Offset,
+    U32                Data
+    )
+{
+    return PlxPci_SpiFlashWriteBuffer(
+               PtrDev,
+               PtrSpi,
+               Offset,
+               (U8*)&Data,
+               sizeof(U32)
+               );
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   : PlxPci_SpiFlashGetStatus
+ *
+ * Description: Returns whether a flash write/erase operation is still in-progress
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_SpiFlashGetStatus(
+    PLX_DEVICE_OBJECT *PtrDev,
+    PEX_SPI_OBJ       *PtrSpi
+    )
+{
+    return PlxDir_SpiFlashGetStatus( PtrDev, PtrSpi );
 }
 
 
@@ -4504,10 +5017,7 @@ PlxPci_DmaTransferUserBuffer(
     }
 
     // Cancel event notification
-    PlxPci_NotificationCancel(
-        pDevice,
-        &Event
-        );
+    PlxPci_NotificationCancel( pDevice, &Event );
 
     return status;
 }

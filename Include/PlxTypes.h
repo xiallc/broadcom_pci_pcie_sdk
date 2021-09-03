@@ -2,7 +2,7 @@
 #define __PLX_TYPES_H
 
 /*******************************************************************************
- * Copyright 2019 Broadcom Inc.
+ * Copyright 2019-2020 Broadcom Inc.
  * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
@@ -47,7 +47,7 @@
  *
  * Revision:
  *
- *      01-01-19 : PCI/PCIe SDK v8.00
+ *      01-01-20 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -74,45 +74,48 @@ extern "C" {
  ******************************************/
 // Memory set and copy
 #if !defined(PLX_MSWINDOWS)
-    #define RtlZeroMemory(pDest, count)           memset((pDest), 0, (count))
-    #define RtlCopyMemory(pDest, pSrc, count)     memcpy((pDest), (pSrc), (count))
-    #define RtlFillMemory(pDest, count, value)    memset((pDest), (value), (count))
+    #define RtlZeroMemory(pDest, count)         memset((pDest), 0, (count))
+    #define RtlCopyMemory(pDest, pSrc, count)   memcpy((pDest), (pSrc), (count))
+    #define RtlFillMemory(pDest, count, value)  memset((pDest), (value), (count))
 #endif
 
+// Count number of bits of supplied data type
+#define PLX_BYTE_TO_BIT_COUNT( bytes )          ((bytes) * 8)
+
 // Convert pointer to an integer
-#define PLX_PTR_TO_INT( ptr )                     ((PLX_UINT_PTR)(ptr))
+#define PLX_PTR_TO_INT( ptr )                   ((PLX_UINT_PTR)(ptr))
 
 // Convert integer to a pointer
-#define PLX_INT_TO_PTR( intval )                  ((VOID*)(PLX_UINT_PTR)(intval))
+#define PLX_INT_TO_PTR( intval )                ((VOID*)(PLX_UINT_PTR)(intval))
 
 // Macros that guarantee correct endian format regardless of CPU platform
 #if defined(PLX_BIG_ENDIAN)
-    #define PLX_LE_DATA_32(value)                 EndianSwap32( (value) )
-    #define PLX_BE_DATA_32(value)                 (value)
+    #define PLX_LE_DATA_32(value)               EndianSwap32( (value) )
+    #define PLX_BE_DATA_32(value)               (value)
 #else
-    #define PLX_LE_DATA_32(value)                 (value)
-    #define PLX_BE_DATA_32(value)                 EndianSwap32( (value) )
+    #define PLX_LE_DATA_32(value)               (value)
+    #define PLX_BE_DATA_32(value)               EndianSwap32( (value) )
 #endif
 
 // Macros to support portable type casting on BE/LE platforms
 #if defined(PLX_BIG_ENDIAN)
-    #define PLX_64_HIGH_32(value)             ((U32)((U64)value))
-    #define PLX_64_LOW_32(value)              ((U32)(((U64)value) >> 32))
+    #define PLX_64_HIGH_32(value)               ((U32)((U64)value))
+    #define PLX_64_LOW_32(value)                ((U32)(((U64)value) >> 32))
 
-    #define PLX_CAST_64_TO_8_PTR( ptr64 )     (U8*) ((U8*)PLX_INT_TO_PTR(ptr64) + (7*sizeof(U8)))
-    #define PLX_CAST_64_TO_16_PTR( ptr64 )    (U16*)((U8*)PLX_INT_TO_PTR(ptr64) + (6*sizeof(U8)))
-    #define PLX_CAST_64_TO_32_PTR( ptr64 )    (U32*)((U8*)PLX_INT_TO_PTR(ptr64) + sizeof(U32))
+    #define PLX_CAST_64_TO_8_PTR( ptr64 )       (U8*) ((U8*)PLX_INT_TO_PTR(ptr64) + (7 * sizeof(U8)))
+    #define PLX_CAST_64_TO_16_PTR( ptr64 )      (U16*)((U8*)PLX_INT_TO_PTR(ptr64) + (6 * sizeof(U8)))
+    #define PLX_CAST_64_TO_32_PTR( ptr64 )      (U32*)((U8*)PLX_INT_TO_PTR(ptr64) + sizeof(U32))
 
-    #define PLX_LE_U32_BIT( pos )             ((U32)(1 << (31 - (pos))))
+    #define PLX_LE_U32_BIT( pos )               ((U32)(1 << (31 - (pos))))
 #else
-    #define PLX_64_HIGH_32(value)             ((U32)(((U64)value) >> 32))
-    #define PLX_64_LOW_32(value)              ((U32)((U64)value))
+    #define PLX_64_HIGH_32( value )             ((U32)(((U64)value) >> 32))
+    #define PLX_64_LOW_32( value )              ((U32)((U64)value))
 
-    #define PLX_CAST_64_TO_8_PTR( ptr64 )     (U8*) PLX_INT_TO_PTR(ptr64)
-    #define PLX_CAST_64_TO_16_PTR( ptr64 )    (U16*)PLX_INT_TO_PTR(ptr64)
-    #define PLX_CAST_64_TO_32_PTR( ptr64 )    (U32*)PLX_INT_TO_PTR(ptr64)
+    #define PLX_CAST_64_TO_8_PTR( ptr64 )       (U8*) PLX_INT_TO_PTR(ptr64)
+    #define PLX_CAST_64_TO_16_PTR( ptr64 )      (U16*)PLX_INT_TO_PTR(ptr64)
+    #define PLX_CAST_64_TO_32_PTR( ptr64 )      (U32*)PLX_INT_TO_PTR(ptr64)
 
-    #define PLX_LE_U32_BIT( pos )             ((U32)(1 << (pos)))
+    #define PLX_LE_U32_BIT( pos )               ((U32)(1 << (pos)))
 #endif
 
 
@@ -148,6 +151,18 @@ extern "C" {
 #if !defined(FALSE)
     #define FALSE             0
 #endif
+
+// Min/Max
+#define PEX_MIN(v1,v2)        ( (v1) < (v2) ? (v1) : (v2) )
+#define PEX_MAX(v1,v2)        ( (v1) > (v2) ? (v1) : (v2) )
+
+// Round up/down based on power of 2
+#define PEX_P2_ROUND_UP( val, align )       ( ((val) + ((align) - 1)) & ~(align - 1) )
+#define PEX_P2_ROUND_DOWN( val, align )     ( (val) & ~((align) - 1) )
+
+// Calculate time difference between 2 timeb structures
+#define PLX_DIFF_TIMEB(time1,time0)         ( ((double)((time1).time - (time0).time)) + \
+                                              (((double)(time1).millitm - (time0).millitm) / 1000) )
 
 #if defined(PLX_MSWINDOWS)
     #define PLX_TIMEOUT_INFINITE        INFINITE
@@ -190,6 +205,12 @@ extern "C" {
 
 // Clear all bits in generic bitmask variable
 #define PEX_BITMASK_CLEAR_ALL(Mask)         memset( (Mask), 0, sizeof((Mask)) )
+
+// Returns 32-bit DW port mask at provided DW index
+#define PEX_BITMASK_GET_DW(Mask,Idx)        ((Mask)[Idx])
+
+// Sets 32-bit DW port mask at provided DW index
+#define PEX_BITMASK_SET_DW(Mask,Idx,Val)    ((Mask)[Idx] = (Val))
 
 // Copies one mask to another
 #define PEX_BITMASK_COPY(Src,Dest)          memcpy( (Dest), (Src), sizeof((Dest)) )
@@ -249,6 +270,24 @@ typedef enum _PLX_API_MODE
 } PLX_API_MODE;
 
 
+// Supported UART cable connections for SDB
+typedef enum _SDB_UART_CABLE
+{
+    SDB_UART_CABLE_DEFAULT     = 0,     // Default connection
+    SDB_UART_CABLE_UART        = 1,     // Standard COMx connection
+    SDB_UART_CABLE_USB         = 2      // USB-to-serial cable
+} SDB_UART_CABLE;
+
+
+// Baud rates supported by SDB
+typedef enum _SDB_BAUD_RATE
+{
+    SDB_BAUD_RATE_DEFAULT      = 0,     // Default rate
+    SDB_BAUD_RATE_19200        = 1,     // 19,200 BAUD
+    SDB_BAUD_RATE_115200       = 2      // 115,200 BAUD
+} SDB_BAUD_RATE;
+
+
 // Access Size Type
 typedef enum _PLX_ACCESS_TYPE
 {
@@ -303,33 +342,47 @@ typedef enum _PLX_CHIP_MODE
 // PLX port flags for mask
 typedef enum _PLX_FLAG_PORT
 {
-    PLX_FLAG_PORT_NT_LINK_1     = 63,   // Bit for NT Link port 0
-    PLX_FLAG_PORT_NT_LINK_0     = 62,   // Bit for NT Link port 1
-    PLX_FLAG_PORT_NT_VIRTUAL_1  = 61,   // Bit for NT Virtual port 0
-    PLX_FLAG_PORT_NT_VIRTUAL_0  = 60,   // Bit for NT Virtual port 1
-    PLX_FLAG_PORT_NT_DS_P2P     = 59,   // Bit for NT DS P2P port (Virtual)
-    PLX_FLAG_PORT_DMA_RAM       = 58,   // Bit for DMA RAM
-    PLX_FLAG_PORT_DMA_3         = 57,   // Bit for DMA channel 3
-    PLX_FLAG_PORT_DMA_2         = 56,   // Bit for DMA channel 2
-    PLX_FLAG_PORT_DMA_1         = 55,   // Bit for DMA channel 1
-    PLX_FLAG_PORT_DMA_0         = 54,   // Bit for DMA ch 0 or Func 1 (all 4 ch)
-    PLX_FLAG_PORT_PCIE_TO_USB   = 53,   // Bit for PCIe-to-USB P2P or Root Port
-    PLX_FLAG_PORT_USB           = 52,   // Bit for USB Host/Bridge
-    PLX_FLAG_PORT_ALUT_3        = 51,   // Bit for ALUT RAM arrays 0
-    PLX_FLAG_PORT_ALUT_2        = 50,   // Bit for ALUT RAM arrays 1
-    PLX_FLAG_PORT_ALUT_1        = 49,   // Bit for ALUT RAM arrays 2
-    PLX_FLAG_PORT_ALUT_0        = 48,   // Bit for ALUT RAM arrays 3
-    PLX_FLAG_PORT_STN_REGS_S5   = 47,   // Bit for VS or Fabric mode station 0 specific regs
-    PLX_FLAG_PORT_STN_REGS_S4   = 46,   // Bit for VS or Fabric mode station 1 specific regs
-    PLX_FLAG_PORT_STN_REGS_S3   = 45,   // Bit for VS or Fabric mode station 2 specific regs
-    PLX_FLAG_PORT_STN_REGS_S2   = 44,   // Bit for VS or Fabric mode station 3 specific regs
-    PLX_FLAG_PORT_STN_REGS_S1   = 43,   // Bit for VS or Fabric mode station 4 specific regs
-    PLX_FLAG_PORT_STN_REGS_S0   = 42,   // Bit for VS or Fabric mode station 5 specific regs
-    PLX_FLAG_PORT_MAX           = 41,   // Bit for highest possible standard port
+    // Flags for special port/device types
+    PLX_FLAG_PORT_NT_LINK_0     = 178,  // Bit for NT Link port 0
+    PLX_FLAG_PORT_NT_LINK_1     = 179,  // Bit for NT Link port 1
+    PLX_FLAG_PORT_NT_VIRTUAL_0  = 180,  // Bit for NT Virtual port 0
+    PLX_FLAG_PORT_NT_VIRTUAL_1  = 181,  // Bit for NT Virtual port 1
+    PLX_FLAG_PORT_NT_DS_P2P     = 182,  // Bit for NT DS P2P port (Virtual)
+    PLX_FLAG_PORT_DMA_RAM       = 183,  // Bit for DMA RAM
+    PLX_FLAG_PORT_DMA_0         = 184,  // Bit for DMA channel 3
+    PLX_FLAG_PORT_DMA_1         = 185,  // Bit for DMA channel 2
+    PLX_FLAG_PORT_DMA_2         = 186,  // Bit for DMA channel 1
+    PLX_FLAG_PORT_DMA_3         = 187,  // Bit for DMA ch 0 or Func 1 (all 4 ch)
+    PLX_FLAG_PORT_PCIE_TO_USB   = 188,  // Bit for PCIe-to-USB P2P or Root Port
+    PLX_FLAG_PORT_USB           = 189,  // Bit for USB Host/Bridge
+    PLX_FLAG_PORT_ALUT_0        = 190,  // Bit for ALUT RAM arrays 0
+    PLX_FLAG_PORT_ALUT_1        = 191,  // Bit for ALUT RAM arrays 1
+    PLX_FLAG_PORT_ALUT_2        = 192,  // Bit for ALUT RAM arrays 2
+    PLX_FLAG_PORT_ALUT_3        = 193,  // Bit for ALUT RAM arrays 3
+    PLX_FLAG_PORT_STN_REGS_S0   = 194,  // Bit for VS or Fabric mode station 0 specific regs
+    PLX_FLAG_PORT_STN_REGS_S1   = 195,  // Bit for VS or Fabric mode station 1 specific regs
+    PLX_FLAG_PORT_STN_REGS_S2   = 196,  // Bit for VS or Fabric mode station 2 specific regs
+    PLX_FLAG_PORT_STN_REGS_S3   = 197,  // Bit for VS or Fabric mode station 3 specific regs
+    PLX_FLAG_PORT_STN_REGS_S4   = 198,  // Bit for VS or Fabric mode station 4 specific regs
+    PLX_FLAG_PORT_STN_REGS_S5   = 199,  // Bit for VS or Fabric mode station 5 specific regs
+    PLX_FLAG_PORT_MAX           = 200,  // Bit for highest possible standard port
 
-	// Flags below are special ports for GEP (24) & its parent P2P (25)
-    PLX_FLAG_PORT_GEP           = 24,
-    PLX_FLAG_PORT_GEP_P2P       = 25
+	// Flags for internal fan out ports & endpoints
+    PLX_FLAG_PORT_INT_MGMT      = 253,  // Internal Management port (iSSW)
+    PLX_FLAG_PORT_INT_DS_0      = 224,  // Internal DS 0
+    PLX_FLAG_PORT_INT_DS_4      = 225,  // Internal DS 4
+    PLX_FLAG_PORT_INT_DS_8      = 226,  // Internal DS 8
+    PLX_FLAG_PORT_INT_DS_12     = 227,  // Internal DS 12
+    PLX_FLAG_PORT_INT_UP_0      = 232,  // Internal UP 0
+    PLX_FLAG_PORT_INT_UP_4      = 233,  // Internal UP 4
+    PLX_FLAG_PORT_INT_UP_8      = 234,  // Internal UP 8
+    PLX_FLAG_PORT_INT_UP_12     = 235,  // Internal UP 12
+    PLX_FLAG_PORT_GEP           = 251,  // GEP
+    PLX_FLAG_PORT_GEP_DS        = 255,  // GEP parent DS
+    PLX_FLAG_PORT_MPT0          = 247,  // MPT0
+    PLX_FLAG_PORT_MPT1          = 248,  // MPT1
+    PLX_FLAG_PORT_MPT2          = 249,  // MPT2
+    PLX_FLAG_PORT_MPT3          = 250   // MPT3
 } PLX_FLAG_PORT;
 
 
@@ -424,6 +477,29 @@ typedef enum _PLX_CRC_STATUS
 } PLX_CRC_STATUS;
 
 
+// SPI flags
+typedef enum _PEX_SPI_FLAGS
+{
+    PEX_SPI_FLAG_NONE           = 0,        // No flags
+    PEX_SPI_FLAG_USE_MM_RD      = (1 << 1), // Use mem-mapped read if supp
+    PEX_SPI_FLAG_DUAL_IO_SUPP   = (1 << 2), // Dual I/O supported
+    PEX_SPI_FLAG_QUAD_IO_SUPP   = (1 << 3)  // Dual I/O supported
+} PEX_SPI_FLAGS;
+
+
+// SPI I/O mode types
+typedef enum _PEX_SPI_IO_MODE
+{
+    PEX_SPI_IO_MODE_SERIAL      = 0,        // Standard serial mode
+    PEX_SPI_IO_MODE_DUAL_IO     = 1,        // Dual I/O mode
+    PEX_SPI_IO_MODE_QUAD_IO     = 2         // Quad I/O mode
+} PEX_SPI_IO_MODE;
+
+
+// Special value to indicate erase all of flash
+#define SPI_FLASH_ERASE_ALL     (U32)-1
+
+
 // PCI Express Link Speeds
 typedef enum _PLX_LINK_SPEED
 {
@@ -437,11 +513,11 @@ typedef enum _PLX_LINK_SPEED
 // Interrupt generation types
 typedef enum _PLX_IRQ_TYPE
 {
-    PLX_IRQ_TYPE_NONE           = 0,           // No interrupt
-    PLX_IRQ_TYPE_UNKNOWN        = 1,           // Undefined interrupt type
-    PLX_IRQ_TYPE_INTX           = 2,           // Legacy INTx interrupt (INTA,INTB,etc)
-    PLX_IRQ_TYPE_MSI            = 3,           // MSI interrupt
-    PLX_IRQ_TYPE_MSIX           = 4            // MSI-X interrupt
+    PLX_IRQ_TYPE_NONE           = 0,        // No interrupt
+    PLX_IRQ_TYPE_UNKNOWN        = 1,        // Undefined interrupt type
+    PLX_IRQ_TYPE_INTX           = 2,        // Legacy INTx interrupt (INTA,INTB,etc)
+    PLX_IRQ_TYPE_MSI            = 3,        // MSI interrupt
+    PLX_IRQ_TYPE_MSIX           = 4         // MSI-X interrupt
 } PLX_IRQ_TYPE;
 
 
@@ -483,15 +559,8 @@ typedef enum _PLX_SPECIFIC_PORT_TYPE
     PLX_SPEC_PORT_SYNTH_EN_EP   = 15,           // Synthetic Enabler EP
     PLX_SPEC_PORT_SYNTH_NT      = 16,           // Synthetic NT 2.0 EP
     PLX_SPEC_PORT_SYNTH_MPT     = 17,           // Synthetic MPT SAS controller EP
-    PLX_SPEC_PORT_SYNTH_GDMA    = 18            // Synthetic gDMA EP
-
-    // Following definitions are deprecated & only remain for compatibility
-   ,PLX_NT_PORT_NONE            = PLX_SPEC_PORT_UNKNOWN,
-    PLX_NT_PORT_PRIMARY         = PLX_SPEC_PORT_NT_VIRTUAL,
-    PLX_NT_PORT_SECONDARY       = PLX_SPEC_PORT_NT_LINK,
-    PLX_NT_PORT_VIRTUAL         = PLX_SPEC_PORT_NT_VIRTUAL,
-    PLX_NT_PORT_LINK            = PLX_SPEC_PORT_NT_LINK,
-    PLX_NT_PORT_UNKOWN          = PLX_SPEC_PORT_INVALID
+    PLX_SPEC_PORT_SYNTH_GDMA    = 18,           // Synthetic gDMA EP
+    PLX_SPEC_PORT_INT_MGMT      = 19,           // iSSW internal management port
 } PLX_SPECIFIC_PORT_TYPE;
 
 // For compatibility
@@ -541,9 +610,9 @@ typedef enum _PLX_DMA_DIR
 // DMA Descriptor Mode
 typedef enum _PLX_DMA_DESCR_MODE
 {
-    PLX_DMA_MODE_BLOCK         = 0,                      // DMA Block transfer mode
-    PLX_DMA_MODE_SGL           = 1,                      // DMA SGL with descriptors off-chip
-    PLX_DMA_MODE_SGL_INTERNAL  = 2                       // DMA SGL with descriptors on-chip
+    PLX_DMA_MODE_BLOCK         = 0,         // DMA Block transfer mode
+    PLX_DMA_MODE_SGL           = 1,         // DMA SGL with descriptors off-chip
+    PLX_DMA_MODE_SGL_INTERNAL  = 2          // DMA SGL with descriptors on-chip
 } PLX_DMA_DESCR_MODE;
 
 
@@ -638,16 +707,6 @@ typedef struct _PLX_MODE_PROP
     };
 } PLX_MODE_PROP;
 
-// Types of supported UART cable connections for SDB
-#define SDB_UART_CABLE_DEFAULT          0
-#define SDB_UART_CABLE_UART             1
-#define SDB_UART_CABLE_USB              2
-
-// Baud rates supported by SDB
-#define SDB_BAUD_RATE_DEFAULT           0
-#define SDB_BAUD_RATE_19200             1
-#define SDB_BAUD_RATE_115200            2
-
 
 // PLX version information
 typedef struct _PLX_VERSION
@@ -669,6 +728,16 @@ typedef struct _PLX_VERSION
         } I2c;
     };
 } PLX_VERSION;
+
+
+// Chip features & port mask
+typedef struct _PEX_CHIP_FEAT
+{
+    U8 StnCount;                     // Supported station count
+    U8 PortsPerStn;                  // Max number of ports per station
+    U8 StnMask;                      // Bitmask of enabled stations
+    PEX_BITMASK_T( PortMask, 256 );  // Bitmask for ports and special types
+} PEX_CHIP_FEAT;
 
 
 // PCI Memory Structure
@@ -733,26 +802,21 @@ typedef struct _PLX_MULTI_HOST_PROP
 } PLX_MULTI_HOST_PROP;
 
 
-// PLX EEPROM entry
-typedef struct _PLX_EEPROM_ENTRY
+// SPI flash properties
+typedef struct _PEX_SPI_OBJ
 {
-    U8   ChipPort;                   // Destination port
-    U32  Offset;                     // Register offset
-    U32  Value;                      // Register value
-    char Comment[100];               // User entry-specific comments
-} PLX_EEPROM_ENTRY;
-
-
-// PLX EEEPROM structure
-typedef struct _PLX_EEPROM_PROP
-{
-    U8               Signature;      // EEPROM signature (5Ah = Valid)
-    U8               bLoadRegs;      // Load registers from EEPROM? (8111/8112)
-    U8               bLoadSharedMem; // Load shared mem from EEPROM? (8111/8112)
-    char             Comment[200];   // User comments about the EEPROM
-    U16              RegCount;       // Number of register entries
-    PLX_EEPROM_ENTRY RegEntry[1];    // EEPROM register entries
-} PLX_EEPROM_PROP;
+    U32 IsValidTag;                  // Magic number to determine validity
+    U8  Flags;                       // Additional flags
+    U8  ChipSel;                     // Chip select to access
+    U8  IoMode;                      // I/O moode to use
+    U8  PageSize;                    // Page size in power of 2
+    U8  SectorsCount;                // Sector count in power of 2
+    U8  SectorSize;                  // Sector size in  power of 2
+    U8  MfgID;                       // Manufacturer ID
+    U16 DeviceId;                    // Device-reported ID
+    U32 CtrlBaseAddr;                // Address/offset of SPI controller registers
+    U32 MmapAddr;                    // AXI mem-mapped address to flash (optional)
+} PEX_SPI_OBJ;
 
 
 // PCI Device Key Identifier
@@ -769,17 +833,14 @@ typedef struct _PLX_DEVICE_KEY
     U16 SubDeviceId;
     U8  Revision;
     U16 PlxChip;                     // PLX chip type
+    U16 ChipID;                      // Chip ID (if reported)
     U8  PlxRevision;                 // PLX chip revision
     U8  PlxFamily;                   // PLX chip family
     U8  ApiIndex;                    // Used internally by the API
     U16 DeviceNumber;                // Used internally by device drivers
     U8  ApiMode;                     // Mode API uses to access device
     U8  PlxPort;                     // PLX port number of device
-    union
-    {
-        U8  PlxPortType;             // PLX-specific port type (NT/DMA/Host/etc)
-        U8  NTPortType;              // (Deprecated) If NT, stores NT port type
-    };
+    U8  PlxPortType;                 // PLX-specific port type (NT/DMA/Host/etc)
     U8  NTPortNum;                   // If NT port exists, store NT port number
     U8  DeviceMode;                  // Device mode used internally by API
     U32 ApiInternal[2];              // Reserved for internal PLX API use

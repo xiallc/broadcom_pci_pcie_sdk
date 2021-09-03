@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      03-01-18 : PLX SDK v8.00
+ *     11-01-19: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -434,8 +434,8 @@ PlxChipTypeDetect(
     U16 capID;
     U16 vsecID;
     U16 offset;
-    U16 deviceId;
-    U32 regValue;
+    U16 devID;
+    U32 regVal;
 
 
     // Jump to set family if requested
@@ -447,11 +447,11 @@ PlxChipTypeDetect(
     // Default revision to PCI revision
     pDevice->Key.PlxRevision = pDevice->Key.Revision;
 
-    // Default to search for 1st PCI VSEC
-    capID        = PCI_CAP_ID_VENDOR_SPECIFIC;
-    bPCIeCap     = FALSE;
+    // Default to search for 1st PCIe VSEC
+    capID        = PCIE_CAP_ID_VENDOR_SPECIFIC;
+    bPCIeCap     = TRUE;
     instanceNum  = 0;
-    offsetChipId = 0x18;    // PCI VSEC: ID @ 18h in capability
+    offsetChipId = 0x8; // PCIe VSEC: ID @ 08h in capability
 
     /*********************************************************************
      * Search device's PCI/PCIe VSEC capabilities for hard-coded ID. VSEC
@@ -473,7 +473,7 @@ PlxChipTypeDetect(
         if (offset == 0)
         {
             // No VSEC found
-            if (bPCIeCap == TRUE)
+            if (bPCIeCap == FALSE)
             {
                 // Have already scanned both PCI/PCIe, halt search
                 bSearch = FALSE;
@@ -481,10 +481,10 @@ PlxChipTypeDetect(
             else
             {
                 // PCI VSEC search ended, jump to PCIe
-                capID        = PCIE_CAP_ID_VENDOR_SPECIFIC;
-                bPCIeCap     = TRUE;
+                capID        = PCI_CAP_ID_VENDOR_SPECIFIC;
+                bPCIeCap     = FALSE;
                 instanceNum  = 0;
-                offsetChipId = 0x8; // PCIe VSEC: ID @ 08h in capability
+                offsetChipId = 0x18; // PCI VSEC: ID @ 18h in capability
             }
         }
         else
@@ -496,9 +496,9 @@ PlxChipTypeDetect(
                 PLX_PCI_REG_READ(
                     pDevice,
                     offset + sizeof(U32),
-                    &regValue
+                    &regVal
                     );
-                vsecID = (U16)(regValue >> 0);
+                vsecID = (U16)(regVal >> 0);
 
                 // Valid ID is 1
                 if (vsecID != 1)
@@ -515,16 +515,12 @@ PlxChipTypeDetect(
             else
             {
                 // 0h[31:24] is used for VSEC ID since not used per PCI spec
-                PLX_PCI_REG_READ(
-                    pDevice,
-                    offset,
-                    &regValue
-                    );
-                vsecID = (U8)(regValue >> 24);
+                PLX_PCI_REG_READ( pDevice, offset, &regVal );
+                vsecID = (U8)(regVal >> 24);
 
                 // Valid IDs are 0 or 1 & is final capability
                 if ( ((vsecID != 0) && (vsecID != 1)) ||
-                     ((U8)(regValue >> 8) != 0) )
+                     ((U8)(regVal >> 8) != 0) )
                 {
                     offset = 0;
                 }
@@ -537,18 +533,19 @@ PlxChipTypeDetect(
                 offset += offsetChipId;
 
                 // Check for hard-coded ID
-                PLX_PCI_REG_READ(
-                    pDevice,
-                    offset,
-                    &regValue
-                    );
+                PLX_PCI_REG_READ( pDevice, offset, &regVal );
 
-                if (((regValue & 0xFFFF) == PLX_PCI_VENDOR_ID_PLX) ||
-                    ((regValue & 0xFFFF) == PLX_PCI_VENDOR_ID_LSI))
+                // Get device ID
+                devID = (U16)(regVal >> 16);
+
+                // Check vendor ID ([15:0])
+                regVal &= 0xFFFF;
+                if ( (regVal == PLX_PCI_VENDOR_ID_PLX) ||
+                     (regVal == PLX_PCI_VENDOR_ID_LSI) )
                 {
-                    pDevice->Key.PlxChip = (U16)(regValue >> 16);
+                    pDevice->Key.PlxChip = devID;
 
-                    // Some chips do not have updated hard-coded revision ID
+                    // Get hard-coded revision ID, if supported
                     if ((pDevice->Key.PlxChip != 0x8612) &&
                         (pDevice->Key.PlxChip != 0x8616) &&
                         (pDevice->Key.PlxChip != 0x8624) &&
@@ -557,20 +554,20 @@ PlxChipTypeDetect(
                         (pDevice->Key.PlxChip != 0x8648))
                     {
                         // Revision should be in next register
-                        PLX_PCI_REG_READ(
-                            pDevice,
-                            offset + sizeof(U32),
-                            &regValue
-                            );
+                        PLX_PCI_REG_READ( pDevice, offset + sizeof(U32), &regVal );
+                        pDevice->Key.PlxRevision = (U8)(regVal & 0xFF);
 
-                        pDevice->Key.PlxRevision = (U8)(regValue & 0xFF);
-                    }
+                        // Newer chips also report a chip ID (A0xxh) in [31:16]
+                        if ((pDevice->Key.PlxChip & 0xFF00) == 0xC000)
+                        {
+                            pDevice->Key.ChipID = (U16)(regVal >> 16);
 
-                    // Override revision ID if necessary
-                    if ( ((pDevice->Key.PlxChip & 0xFF00) == 0xC000) &&
-                          (pDevice->Key.PlxRevision == 0xAA) )
-                    {
-                        pDevice->Key.PlxRevision = 0xA0;
+                            // Override revision ID if necessary
+                            if (pDevice->Key.PlxRevision == 0xAA)
+                            {
+                                pDevice->Key.PlxRevision = 0xA0;
+                            }
+                        }
                     }
 
                     // Override MPT EP chip ID
@@ -588,7 +585,7 @@ PlxChipTypeDetect(
                         else
                         {
                             // MPT in BSW doesn't report C0xx in config space, so just pick one
-                            pDevice->Key.PlxChip = 0xC012;
+                            pDevice->Key.PlxChip = 0xC010;
                         }
                     }
 
@@ -608,13 +605,13 @@ PlxChipTypeDetect(
     //
 
     // Get current device ID
-    deviceId = pDevice->Key.DeviceId;
+    devID = pDevice->Key.DeviceId;
 
     // Group some devices
     if ((pDevice->Key.VendorId == PLX_PCI_VENDOR_ID_PLX) ||
         (pDevice->Key.VendorId == PLX_PCI_VENDOR_ID_LSI))
     {
-        switch (deviceId & 0xFF00)
+        switch (devID & 0xFF00)
         {
             case 0x2300:
             case 0x3300:
@@ -625,16 +622,16 @@ PlxChipTypeDetect(
             case 0xC000:
             case 0x8100:
                 // Don't include 8311 RDK
-                if (deviceId != 0x86e1)
+                if (devID != 0x86e1)
                 {
-                    deviceId = 0x8000;
+                    devID = 0x8000;
                 }
                 break;
         }
     }
 
     // Compare Device/Vendor ID
-    switch (((U32)deviceId << 16) | pDevice->Key.VendorId)
+    switch (((U32)devID << 16) | pDevice->Key.VendorId)
     {
         case 0x800010B5:        // All 8000 series devices
         case 0x80001000:        // All Avago devices
@@ -700,27 +697,19 @@ PlxChipTypeDetect(
 
         case 0x00213388:        // 6140/6152/6254(NT)
             // Get PCI header type
-            PLX_PCI_REG_READ(
-                pDevice,
-                PCI_REG_HDR_CACHE_LN,
-                &regValue
-                );
-            regValue = (U8)((regValue >> 16) & 0x7F);
+            PLX_PCI_REG_READ( pDevice, PCI_REG_HDR_CACHE_LN, &regVal );
+            regVal = (U8)((regVal >> 16) & 0x7F);
 
-            if (regValue == PCI_HDR_TYPE_0)
+            if (regVal == PCI_HDR_TYPE_0)
             {
                 pDevice->Key.PlxChip = 0x6254;
             }
             else
             {
                 // Get 6152 VPD register
-                PLX_PCI_REG_READ(
-                    pDevice,
-                    0xA0,
-                    &regValue
-                    );
+                PLX_PCI_REG_READ( pDevice, 0xA0, &regVal );
 
-                if ((regValue & 0xF) == PCI_CAP_ID_VPD)
+                if ((regVal & 0xF) == PCI_CAP_ID_VPD)
                 {
                     pDevice->Key.PlxChip = 0x6152;
                 }
@@ -779,6 +768,12 @@ PlxChipTypeDetect(
     PlxChipRevisionDetect( pDevice );
 
 _PlxChipAssignFamily:
+
+    // Set chip ID to match chip if not supported
+    if (pDevice->Key.ChipID == 0x0)
+    {
+        pDevice->Key.ChipID = pDevice->Key.PlxChip;
+    }
 
     switch (pDevice->Key.PlxChip)
     {

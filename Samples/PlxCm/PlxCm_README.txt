@@ -173,16 +173,29 @@ The available PlxCm commands are documented here, grouped by feature.
         i2c 1 68 0   - Auto-scan @ 68h using default I2C clock using USB #1
 
 
-  * set_chip <Chip_Type>
-      Force the selected device to a specific PLX chip type. Generally used in
-      DOS when a device has been programmed with a non-default PLX ID so PlxCm
-      is not able to detect it as a PLX chip. Setting the correct chip type
-      then allows PlxCm to perform PLX-specific operations, such as EEPROM
-      access.
+  * sdb <COM Port> <BAUD Rate> [u]
+      Probe for new devices using Serial Debug interface.
+
+      Parameters:
+        COM Port : COM/TTY port number (1,2..)
+        BAUD Rate: 0=Default  1=19,200  2=115,2000 (default)
+        u        : [Linux] Specify USB-to-Serial (ttyUSBx)
 
       Examples:
-        set_chip 9056  - Force selected device to be treated as a 9056 chip
-        set_chip 0     - Force auto-detection re-attempt of the PLX chip type
+        sdb 1 0      - COM1 115,200 baud
+        sdb 2 1 u    - COM2 19,200 baud via USB cable (/dev/ttyUSB1)
+
+
+  * setchip <Chip_Type>
+      [Legacy PCI devices only] Force the selected device to a specific PLX
+      chip type. Generally used in DOS when a device has been programmed with
+      a non-default PLX ID so PlxCm is not able to detect it as a PLX chip.
+      Setting the correct chip type then allows PlxCm to perform PLX-specific
+      operations, such as EEPROM access.
+
+      Examples:
+        setchip 9056  - Force selected device to be treated as a 9056 chip
+        setchip 0     - Force auto-detection re-attempt of the PLX chip type
 
 
 

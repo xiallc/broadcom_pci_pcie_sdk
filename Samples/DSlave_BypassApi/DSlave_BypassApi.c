@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -44,7 +44,7 @@
  *
  * Revision History:
  *
- *      12-01-07 : PLX SDK v5.20
+ *      11-01-19 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -90,7 +90,7 @@ PerformDirectSlave(
  * Description:  The main entry point
  *
  *****************************************************************************/
-int 
+int
 main(
     void
     )
@@ -209,10 +209,16 @@ PerformDirectSlave(
 
     Cons_printf("\n\n");
     Cons_printf("Please enter PCI BAR to access --> ");
-    Cons_scanf("%hd", &BarIndex);
+    if (Cons_scanf("%hd", &BarIndex) <= 0)
+    {
+        // Added for compiler warning
+    }
+
     Cons_printf("Please enter a valid offset    --> ");
-    Cons_scanf("%x", &offset);
-    
+    if (Cons_scanf("%x", &offset) <= 0)
+    {
+        // Added for compiler warning
+    }
 
     // Test an absolute address with remapping
     Cons_printf(
@@ -259,7 +265,9 @@ PerformDirectSlave(
 
     Cons_printf("    Preparing buffer data........ ");
     for (i=0; i < SIZE_BUFFER; i += sizeof(U32))
+    {
         *(U32*)(pBufferSrc + i) = i;
+    }
     Cons_printf("Ok\n");
 
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -45,7 +45,7 @@
 
 
 #include <stdlib.h>
-#include <time.h>
+#include <sys/timeb.h>
 #include "PlxApi.h"
 #include "PlxEep.h"
 
@@ -739,7 +739,10 @@ SelectDevice(
     do
     {
         Cons_printf("\t   Device selection --> ");
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
@@ -1010,20 +1013,20 @@ Plx_EepromFileLoad(
     BOOLEAN            bEndianSwap
     )
 {
-    S8       rc;
-    U16      offset;
-    U32      Crc;
-    U32      value;
-    U32      Verify_Value;
-    U32      FileSize;
-    U32     *pBuffer;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    S8            rc;
+    U16           offset;
+    U32           Crc;
+    U32           value;
+    U32           Verify_Value;
+    U32           FileSize;
+    U32          *pBuffer;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     Cons_printf("Load EEPROM file....... ");
     Cons_fflush( stdout );
@@ -1059,12 +1062,15 @@ Plx_EepromFileLoad(
     }
 
     // Read data from file
-    fread(
-        pBuffer,        // Buffer for data
-        sizeof(U8),     // Item size
-        FileSize,       // Buffer size
-        pFile           // File pointer
-        );
+    if (fread(
+            pBuffer,        // Buffer for data
+            sizeof(U8),     // Item size
+            FileSize,       // Buffer size
+            pFile           // File pointer
+            ) <= 0)
+    {
+        // Added for compiler warning
+    }
 
     // Close the file
     fclose( pFile );
@@ -1147,11 +1153,11 @@ _Exit_File_Load:
     }
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return rc;
@@ -1177,15 +1183,15 @@ Plx_EepromFileSave(
     BOOLEAN            bEndianSwap
     )
 {
-    U16      offset;
-    U32      value;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    U16           offset;
+    U32           value;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     // Open the file to write
     pFile = fopen( pOptions->FileName, "wb" );
@@ -1268,11 +1274,11 @@ Plx_EepromFileSave(
     Cons_printf("Ok (%dB)\n", (int)EepSize);
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return EXIT_CODE_SUCCESS;
@@ -1295,23 +1301,23 @@ Plx8000_EepromFileLoad(
     BOOLEAN            bCrc
     )
 {
-    S8       rc;
-    U8       bCrcEn;
-    U8      *pBuffer;
-    U16      Verify_Value_16;
-    U32      value;
-    U32      Verify_Value;
-    U32      Crc;
-    U32      offset;
-    U32      FileSize;
-    U32      EepHeader;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    S8            rc;
+    U8            bCrcEn;
+    U8           *pBuffer;
+    U16           Verify_Value_16;
+    U32           value;
+    U32           Verify_Value;
+    U32           Crc;
+    U32           offset;
+    U32           FileSize;
+    U32           EepHeader;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     pBuffer   = NULL;
     EepHeader = 0;
@@ -1351,12 +1357,15 @@ Plx8000_EepromFileLoad(
     }
 
     // Read data from file
-    fread(
-        pBuffer,        // Buffer for data
-        sizeof(U8),     // Item size
-        FileSize  ,     // Buffer size
-        pFile           // File pointer
-        );
+    if (fread(
+            pBuffer,        // Buffer for data
+            sizeof(U8),     // Item size
+            FileSize,       // Buffer size
+            pFile           // File pointer
+            ) <= 0)
+    {
+        // Added for compiler warning
+    }
 
     // Close the file
     fclose( pFile );
@@ -1458,11 +1467,11 @@ _Exit_File_Load_8000:
     }
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return rc;
@@ -1486,18 +1495,18 @@ Plx8000_EepromFileSave(
     BOOLEAN            bCrc
     )
 {
-    U8      *pBuffer;
-    U16      value16;
-    U32      value;
-    U32      offset;
-    U32      EepSize;
-    FILE    *pFile;
-    clock_t  start;
-    clock_t  end;
+    U8           *pBuffer;
+    U16           value16;
+    U32           value;
+    U32           offset;
+    U32           EepSize;
+    FILE         *pFile;
+    struct timeb  end;
+    struct timeb  start;
 
 
     // Note start time
-    start = clock();
+    ftime( &start );
 
     Cons_printf( "Get EEPROM data size.. " );
 
@@ -1620,11 +1629,11 @@ Plx8000_EepromFileSave(
     Cons_printf( "Ok (%s)\n", pOptions->FileName );
 
     // Note completion time
-    end = clock();
+    ftime( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
-        ((double)end - start) / CLOCKS_PER_SEC
+        PLX_DIFF_TIMEB( end, start )
         );
 
     return EXIT_CODE_SUCCESS;

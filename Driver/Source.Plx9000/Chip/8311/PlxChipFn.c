@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      02-01-14 : PLX SDK v7.20
+ *     11-01-19: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -179,10 +179,10 @@ PlxChipSetInterruptStatusFlags(
     if (pIntData->Source_Ints & INTR_TYPE_LOCAL_1)
         pPlxIntr->LocalToPci = (1 << 0);
 
-    if (pIntData->Source_Ints & INTR_TYPE_DMA_0) 
+    if (pIntData->Source_Ints & INTR_TYPE_DMA_0)
         pPlxIntr->DmaDone |= (1 << 0);
 
-    if (pIntData->Source_Ints & INTR_TYPE_DMA_1) 
+    if (pIntData->Source_Ints & INTR_TYPE_DMA_1)
         pPlxIntr->DmaDone |= (1 << 1);
 
     if (pIntData->Source_Ints & INTR_TYPE_OUTBOUND_POST)
@@ -208,6 +208,7 @@ PlxChipTypeDetect(
 {
     // Set default values (ignore hard-coded ID since 8311 will be 9056)
     pdx->Key.PlxChip     = PLX_CHIP_TYPE;
+    pdx->Key.ChipID      = pdx->Key.PlxChip;      // Set Chip ID to match chip type
     pdx->Key.PlxRevision = 0xAA;                  // 8311 is only revision AA
     pdx->Key.PlxFamily   = PLX_FAMILY_BRIDGE_P2L;
 
@@ -288,7 +289,7 @@ PlxChipGetRemapOffset(
                 return;
             }
             break;
-            
+
         case 2:
             // BAR 2 could be Space 0 or Space 1 if shifted
             if (bBarsShifted)

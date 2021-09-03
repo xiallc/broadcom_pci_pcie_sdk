@@ -1000,7 +1000,7 @@ Plx8000_EepromGetCtrlOffset(
     if (pdx->Key.PlxFamily == PLX_FAMILY_MIRA)
     {
         // In Legacy mode (EP only), EEPROM offset moves
-        if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+        if (pdx->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER)
         {
             OffsetCtrl = 0x1260;
         }

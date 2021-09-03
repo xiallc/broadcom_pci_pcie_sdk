@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -41,10 +41,6 @@
  *
  *      This sample demonstrates basic communication across an NT port between
  *      two custom PLX applications.
- *
- * Revision History:
- *
- *      05-01-16 : PLX SDK v7.30
  *
  ******************************************************************************/
 
@@ -104,7 +100,6 @@ typedef struct _PLX_NT_HOST
     U8  NtConnectType;
     U8  bInitialized;
     U16 PlxChip;
-
 } PLX_NT_HOST;
 
 
@@ -430,9 +425,13 @@ main(
 
     // Set mailbox to write
     if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
+    {
         value = 6;
+    }
     else
+    {
         value = 3;
+    }
 
     // Post buffer address
     PlxPci_PlxMailboxWrite(
@@ -472,9 +471,13 @@ main(
 
     // Set mailbox to read
     if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
+    {
         value = 3;
+    }
     else
+    {
         value = 6;
+    }
 
     // Get buffer address
     PhysAddr =
@@ -563,7 +566,7 @@ main(
             PlxBarMem_32(BarVa, BarOffset) = value;
 
             // Exit if ESC pressed
-            if (value == 27)
+            if (value == CONS_KEY_ESCAPE)
             {
                 Cons_printf("\n\n   -- User halt, closing connection -- \n");
                 break;
@@ -583,15 +586,16 @@ main(
             {
                 Cons_printf("%c", CharRead);
             }
-            else if ((CharRead == '\r') || (CharRead == '\n'))
+            else if ( (CharRead == CONS_KEY_CARRIAGE_RET) ||
+                      (CharRead == CONS_KEY_NEWLINE) )
             {
                 Cons_printf("\n");
             }
-            else if (CharRead == '\b')
+            else if (CharRead == CONS_KEY_BACKSPACE)
             {
                 Cons_printf("\b \b");
             }
-            else if (CharRead == 27)
+            else if (CharRead == CONS_KEY_ESCAPE)
             {
                 // Other side terminated connection
                 Cons_printf("\n\n    -- Other side terminated, closing connection -- \n");
@@ -774,7 +778,9 @@ SelectDevice_NT(
     while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
     Cons_printf(
         "\t\t   0. Cancel\n\n"
@@ -783,13 +789,17 @@ SelectDevice_NT(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_NT[i - 1];

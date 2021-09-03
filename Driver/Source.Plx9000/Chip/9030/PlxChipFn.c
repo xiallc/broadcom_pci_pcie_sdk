@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      02-01-14 : PLX SDK v7.20
+ *     11-01-19: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -192,6 +192,7 @@ PlxChipTypeDetect(
     )
 {
     pdx->Key.PlxChip     = PLX_CHIP_TYPE;
+    pdx->Key.ChipID      = pdx->Key.PlxChip;      // Set Chip ID to match chip type
     pdx->Key.PlxRevision = 0xAA;
     pdx->Key.PlxFamily   = PLX_FAMILY_BRIDGE_P2L;
 

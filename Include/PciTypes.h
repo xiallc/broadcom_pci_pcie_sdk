@@ -348,10 +348,12 @@ typedef volatile U64          VU64;
 #define ACPI_PCIE_DEFAULT_TO_OS         2
 #define ACPI_PCIE_ALWAYS_USE_OS         3
 
-// ECAM
-#define ECAM_PROBE_ADDR_START           0x80000000
-#define ECAM_PROBE_ADDR_END             0xFF000000
+// ECAM probe definitions
+#define ECAM_PROBE_ADDR_MIN             0x80000000
+#define ECAM_PROBE_ADDR_MAX             0xFC000000
 #define ECAM_PROBE_ADDR_INCR            0x01000000
+#define ECAM_PROBE_ADDR_DEFAULT_START   0xC0000000
+#define ECAM_PROBE_ADDR_DEFAULT_END     0xFC000000
 
 // Number of PCI registers to compare
 #define ECAM_PROBE_REG_CMP_COUNT        4

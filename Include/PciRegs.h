@@ -2,7 +2,7 @@
 #define __PCI_REGS_H
 
 /*******************************************************************************
- * Copyright 2013-2019 Avago Technologies
+ * Copyright 2013-2020 Broadcom, Inc.
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *      08-01-19 : PCI/PCIe SDK v8.00
+ *      01-01-20 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -134,6 +134,7 @@
 #define PCI_CAP_ID_SATA                         0x12
 #define PCI_CAP_ID_ADV_FEATURES                 0x13
 #define PCI_CAP_ID_ENHANCED_ALLOCATION          0x14
+#define PCI_CAP_ID_FLATTENING_PORTAL_BRIDGE     0x15
 
 
 // PCI Express Extended Capability IDs
@@ -179,6 +180,10 @@
 #define PCIE_CAP_ID_PHYS_LAYER_16GT_MARGINING   0x027       // Physical Layer 16 GT/s Margining
 #define PCIE_CAP_ID_HIERARCHY_ID                0x028       // Hierarchy ID
 #define PCIE_CAP_ID_NATIVE_PCIE_ENCL_MGMT       0x029       // Native PCIe Enclosure Management (NPEM)
+#define PCIE_CAP_ID_PHYS_LAYER_32GT             0x02A       // Physical Layer 32 GT/s
+#define PCIE_CAP_ID_ALTERNATE_PROTOCOL          0x02B       // Alternate Protocol
+#define PCIE_CAP_ID_SYS_FW_INTERMEDIARY         0x02C       // System Firmware Intermediary (SFI)
+
 
 // Convert encoding of MPS/MRR to bytes (128 * (2 ^ encoded_val))
 #define PCIE_MPS_MRR_TO_BYTES(val)              ( 128 * (1 << (val)) )
@@ -211,8 +216,25 @@
 #define PLX_PCI_VENDOR_ID_LSI                   0x1000
 #define PLX_PCI_VENDOR_ID_PLX                   0x10B5
 #define PLX_PCI_VENDOR_ID_BROADCOM              0x14E4
+#define PLX_PCI_VENDOR_ID_AMD                   0x1022
+#define PLX_PCI_VENDOR_ID_HEWLETT_PACKARD       0x103C
+#define PLX_PCI_VENDOR_ID_HP_ENTERPRISE         0x1590
+#define PLX_PCI_VENDOR_ID_HITACHI               0x1054
+#define PLX_PCI_VENDOR_ID_HUAWEI                0x19E5
+#define PLX_PCI_VENDOR_ID_IBM                   0x1014
 #define PLX_PCI_VENDOR_ID_INTEL                 0x8086
+#define PLX_PCI_VENDOR_ID_LENOVO                0x1D49
+#define PLX_PCI_VENDOR_ID_MARVELL               0x1148
+#define PLX_PCI_VENDOR_ID_MATROX                0x102B
+#define PLX_PCI_VENDOR_ID_MELLANOX              0x15B3
+#define PLX_PCI_VENDOR_ID_NETAPP                0x1275
 #define PLX_PCI_VENDOR_ID_NVIDIA                0x10DE
+#define PLX_PCI_VENDOR_ID_QUALCOMM              0x5143
+#define PLX_PCI_VENDOR_ID_REALTEK               0x10EC
+#define PLX_PCI_VENDOR_ID_SAMSUNG               0x144D
+#define PLX_PCI_VENDOR_ID_SEAGATE               0x1BB1
+#define PLX_PCI_VENDOR_ID_TOSHIBA               0x1179
+#define PLX_PCI_VENDOR_ID_WESTERN_DIGITAL       0x1B96
 
 
 // PCIe ReqID support macros

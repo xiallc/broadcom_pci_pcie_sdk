@@ -2,7 +2,7 @@
 #define __SDB_COM_PORT_H
 
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -38,15 +38,15 @@
  *
  * File Name:
  *
- *      SdbComPort.h
+ *     SdbComPort.h
  *
  * Description:
  *
- *      Header file for SDB COM port interface functions
+ *     Header file for SDB COM port interface functions
  *
  * Revision History:
  *
- *      01-01-19 : PCI/PCIe SDK v8.00
+ *     09-01-19: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -93,7 +93,7 @@ extern "C" {
 #define SDB_CMD_END                     '\n'
 #define SDB_CMD_ACK                     '%'
 #define SDB_CMD_ERROR                   'E'
-#define SDB_CMD_INIT                    "\n~%\n"
+#define SDB_CMD_INIT                    "%\n"
 
 
 
@@ -122,7 +122,7 @@ Sdb_DeviceFindEx(
 /******************************************
  *      MDIO Private Support Functions
  *****************************************/
-BOOLEAN
+PLX_STATUS
 Sdb_Driver_Connect(
     PLX_DEVICE_OBJECT *pDevice,
     PLX_MODE_PROP     *pModeProp

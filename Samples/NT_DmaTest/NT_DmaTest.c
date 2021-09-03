@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -39,12 +39,8 @@
  *
  * Description:
  *
- *      This sample demonstrates communication across an NT port using 
+ *      This sample demonstrates communication across an NT port using
  *      fast DMA transfers.
- *
- * Revision History:
- *
- *      07-01-14 : PLX SDK v7.20
  *
  ******************************************************************************/
 
@@ -504,7 +500,7 @@ main(
      ************************************************************/
     Cons_printf("Setup NT translation: ");
 
-    // Convert BAR size to range 
+    // Convert BAR size to range
     size = ~((U32)BarProp.Size - 1);
 
     // Calculate BAR offset
@@ -733,22 +729,26 @@ SelectDevice_NT(
     while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
-    Cons_printf(
-        "\t\t   0. Cancel\n\n"
-        );
+    Cons_printf( "\t\t   0. Cancel\n\n" );
 
     do
     {
         Cons_printf("\t  Device Selection --> ");
-
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_NT[i - 1];
@@ -763,7 +763,7 @@ SelectDevice_NT(
  *
  * Function   :  WaitForConnection
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 S8
@@ -881,7 +881,7 @@ WaitForConnection(
  *
  * Function   :  PlxPci_SetupNtTranslation
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 PLX_STATUS

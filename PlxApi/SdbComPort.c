@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      01-01-19 : PCI/PCIe SDK v8.00
+ *      12-01-19 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -60,6 +60,13 @@
  *  ApiInternal[1]  - Last data read address
  *
  ******************************************************************************/
+
+#if defined(_WIN32)
+    // Block warnings in newer MS VC compilers
+    #define _CRT_SECURE_NO_DEPRECATE        // Prevents deprecation warnings during compile
+    #define _CRT_NONSTDC_NO_WARNINGS        // Prevents POSIX function warnings
+    #pragma warning( once : 4996 )          // Limits deprecation warnings to display only once
+#endif
 
 
 #include "PciRegs.h"
@@ -109,10 +116,14 @@ Sdb_DeviceOpen(
     PLX_DEVICE_OBJECT *pDevice
     )
 {
+    PLX_STATUS status;
+
+
     // Open connection to driver
-    if (Sdb_Driver_Connect( pDevice, NULL ) == FALSE)
+    status = Sdb_Driver_Connect( pDevice, NULL );
+    if (status != PLX_STATUS_OK)
     {
-        return PLX_STATUS_INVALID_OBJECT;
+        return status;
     }
 
     // Mark object as valid
@@ -145,8 +156,8 @@ Sdb_DeviceClose(
     // Clear handle
     pDevice->hDevice = 0;
 
-    // Flag need to issue init command first
-    pDevice->Key.ApiInternal[1] = SDB_NEEDS_INIT_CMD;
+    // Reset next read offset
+    pDevice->Key.ApiInternal[1] = SDB_NEXT_READ_OFFSET_INIT;
 
     return PLX_STATUS_OK;
 }
@@ -169,7 +180,6 @@ Sdb_DeviceFindEx(
     )
 {
     U16               numMatched;
-    U16               totalMatches;
     U32               regVal;
     BOOLEAN           bFound;
     PLX_STATUS        status;
@@ -181,12 +191,11 @@ Sdb_DeviceFindEx(
     RtlZeroMemory( &devObj, sizeof(PLX_DEVICE_OBJECT) );
 
     // Open connection to driver
-    if (Sdb_Driver_Connect( &devObj, pModeProp ) == FALSE)
+    status = Sdb_Driver_Connect( &devObj, pModeProp );
+    if (status != PLX_STATUS_OK)
     {
-        return PLX_STATUS_INVALID_OBJECT;
+        return status;
     }
-
-    totalMatches = 0;
 
     // Must validate object so probe API calls don't fail
     ObjectValidate( &devObj );
@@ -204,7 +213,7 @@ Sdb_DeviceFindEx(
     regVal =
         Sdb_PlxRegisterRead(
             &devObjTemp,
-            PEX_REG_CCR_DEV_ID,     // Port 0 Device/Vendor ID
+            ATLAS_REG_CCR_DEV_ID,   // Hard-coded ID
             &status,
             FALSE,                  // Adjust for port?
             FALSE                   // Retry on error?
@@ -222,7 +231,7 @@ Sdb_DeviceFindEx(
                 PlxDir_ProbeSwitch(
                     &devObjTemp,
                     pKey,
-                    (U16)(DeviceNumber - totalMatches),
+                    DeviceNumber,
                     &numMatched
                     );
 
@@ -232,8 +241,7 @@ Sdb_DeviceFindEx(
             }
             else
             {
-                // Add number of matched devices
-                totalMatches += numMatched;
+                status = PLX_STATUS_INVALID_OBJECT;
             }
         }
     }
@@ -251,7 +259,7 @@ Sdb_DeviceFindEx(
         return PLX_STATUS_OK;
     }
 
-    return PLX_STATUS_INVALID_OBJECT;
+    return status;
 }
 
 
@@ -308,7 +316,14 @@ Sdb_PlxRegisterRead(
     // Check for first operation
     if (pDevice->Key.ApiInternal[1] == SDB_NEEDS_INIT_CMD)
     {
-        Sdb_Sync_Connection( pDevice );
+        if (Sdb_Sync_Connection( pDevice ) == FALSE)
+        {
+            if (pStatus != NULL)
+            {
+                *pStatus = PLX_STATUS_INVALID_STATE;
+            }
+            return 0;
+        }
     }
 
     // Set max number of attempts
@@ -373,6 +388,9 @@ Sdb_PlxRegisterRead(
         byteCount = 0;
         do
         {
+            // Reset Rx bytes
+            rxBytes = 0;
+
             ReadFile(
                 pDevice->hDevice,
                 &(sdbReply[byteCount]),
@@ -395,7 +413,10 @@ Sdb_PlxRegisterRead(
 
             // Decrement attempt count & re-sync
             maxAttempts--;
-            Sdb_Sync_Connection( pDevice );
+            if (maxAttempts != 0)
+            {
+                Sdb_Sync_Connection( pDevice );
+            }
         }
         else
         {
@@ -463,7 +484,10 @@ Sdb_PlxRegisterWrite(
     // Check for first operation
     if (pDevice->Key.ApiInternal[1] == SDB_NEEDS_INIT_CMD)
     {
-        Sdb_Sync_Connection( pDevice );
+        if (Sdb_Sync_Connection( pDevice ) == FALSE)
+        {
+            return PLX_STATUS_INVALID_STATE;
+        }
     }
 
     // Reset next read offset since write operation now
@@ -508,6 +532,9 @@ Sdb_PlxRegisterWrite(
         byteCount = 0;
         do
         {
+            // Reset Rx bytes
+            rxBytes = 0;
+
             ReadFile(
                 pDevice->hDevice,
                 &(sdbReply[byteCount]),
@@ -528,7 +555,10 @@ Sdb_PlxRegisterWrite(
         {
             // Decrement attempt count & re-sync
             maxAttempts--;
-            Sdb_Sync_Connection( pDevice );
+            if (maxAttempts != 0)
+            {
+                Sdb_Sync_Connection( pDevice );
+            }
         }
         else
         {
@@ -560,14 +590,15 @@ Sdb_PlxRegisterWrite(
  *               FALSE  - Driver not found
  *
  *****************************************************************************/
-BOOLEAN
+PLX_STATUS
 Sdb_Driver_Connect(
     PLX_DEVICE_OBJECT *pDevice,
     PLX_MODE_PROP     *pModeProp
     )
 {
-    U8   bReconnect;
-    char strPortName[100];
+    U8         bReconnect;
+    char       strPortName[100];
+    PLX_STATUS status;
 
 
     // If re-connecting, must close current handle
@@ -587,6 +618,12 @@ Sdb_Driver_Connect(
     // If mode properties supplied, copy into device object
     if (pModeProp != NULL)
     {
+        if (pModeProp->Sdb.Port == 0)
+        {
+            DebugPrintf(("SDB: ERROR: COM0 is not a valid COM port\n"));
+            return PLX_STATUS_INVALID_ADDR;
+        }
+
         pDevice->Key.ApiMode  = PLX_API_MODE_SDB;
         pDevice->Key.ApiIndex = (U8)pModeProp->Sdb.Port;
 
@@ -605,8 +642,8 @@ Sdb_Driver_Connect(
         }
     }
 
-    // Flag need to issue init command first
-    pDevice->Key.ApiInternal[1] = SDB_NEEDS_INIT_CMD;
+    // Reset next read offset
+    pDevice->Key.ApiInternal[1] = SDB_NEXT_READ_OFFSET_INIT;
 
     //
     // Attempt connection to serial port
@@ -647,7 +684,17 @@ Sdb_Driver_Connect(
         if (hComm == INVALID_HANDLE_VALUE)
         {
             DebugPrintf(("SDB: ERROR: Unable to open %s\n", strPortName));
-            return FALSE;
+            switch ( GetLastError() )
+            {
+                case ERROR_ACCESS_DENIED:
+                    status = PLX_STATUS_IN_USE;
+                    break;
+
+                default:
+                    status = PLX_STATUS_INVALID_DATA;
+                    break;
+            }
+            return status;
         }
 
         // Store handle
@@ -668,11 +715,11 @@ Sdb_Driver_Connect(
             );
 
         // Set timeouts
-        commTimeouts.ReadIntervalTimeout         = 50;
-        commTimeouts.ReadTotalTimeoutConstant    = 50;
-        commTimeouts.ReadTotalTimeoutMultiplier  = 10;
-        commTimeouts.WriteTotalTimeoutConstant   = 50;
-        commTimeouts.WriteTotalTimeoutMultiplier = 10;
+        commTimeouts.ReadIntervalTimeout         = 0;
+        commTimeouts.ReadTotalTimeoutConstant    = 0;
+        commTimeouts.ReadTotalTimeoutMultiplier  = 200;
+        commTimeouts.WriteTotalTimeoutConstant   = 0;
+        commTimeouts.WriteTotalTimeoutMultiplier = 200;
         SetCommTimeouts( hComm, &commTimeouts );
 
         // Get current comm properties
@@ -731,12 +778,26 @@ Sdb_Driver_Connect(
             strPortName
             ));
 
-        // Attempt to open port
+        /*******************************************************
+         * Attempt to open port
+         * O_RDWR     - Read/Write access to serial port
+         * O_NOCTTY   - No terminal will control the process
+         ******************************************************/
         hComm = open( strPortName, O_RDWR | O_NOCTTY );
         if (hComm == INVALID_HANDLE_VALUE)
         {
             DebugPrintf(("SDB: ERROR: Unable to open %s\n", strPortName));
-            return FALSE;
+            switch ( errno )
+            {
+                case EACCES:
+                    status = PLX_STATUS_IN_USE;
+                    break;
+
+                default:
+                    status = PLX_STATUS_INVALID_DATA;
+                    break;
+            }
+            return status;
         }
 
         // Store handle
@@ -779,7 +840,7 @@ Sdb_Driver_Connect(
 
         // Set timeouts
         commParams.c_cc[VMIN]  = 0;     // Min characters to wait for
-        commParams.c_cc[VTIME] = 3;     // In deciseconds (1ds = 100ms)
+        commParams.c_cc[VTIME] = 2;     // In deciseconds (1ds = 100ms)
 
         // Update comm properties
         tcsetattr( hComm, TCSANOW, &commParams );
@@ -788,7 +849,7 @@ Sdb_Driver_Connect(
 #endif
 
     DebugPrintf(("SDB: Connect complete\n"));
-    return TRUE;
+    return PLX_STATUS_OK;
 }
 
 
@@ -807,7 +868,7 @@ Sdb_Sync_Connection(
     )
 {
     U8  reply;
-    U32 byteCount;
+    S32 byteCount;
     U32 totalBytes;
 
 
@@ -817,16 +878,17 @@ Sdb_Sync_Connection(
     WriteFile(
         pDevice->hDevice,
         SDB_CMD_INIT,
-        strlen(SDB_CMD_INIT),
+        (U32)strlen(SDB_CMD_INIT),
         &byteCount,
         NULL
         );
 
-    if (byteCount != strlen(SDB_CMD_INIT))
+    if (byteCount != (S32)strlen(SDB_CMD_INIT))
     {
         ErrorPrintf((
             "SDB: ERROR: Sent %dB of sync string %dB (err=%d)\n",
-            byteCount, strlen(SDB_CMD_INIT), GetLastError()
+            (byteCount > 0) ? byteCount : 0,
+            (int)strlen(SDB_CMD_INIT), GetLastError()
             ));
         /************************************************************
          * In some case, such as if the connected device is powered
@@ -841,18 +903,24 @@ Sdb_Sync_Connection(
     totalBytes = 0;
     do
     {
+        // Reset Rx bytes
+        byteCount = 0;
+
         ReadFile(
             pDevice->hDevice,
             &reply,
-            sizeof(U8),
+            sizeof(reply),
             &byteCount,
             NULL
             );
 
         // Track total bytes received
-        totalBytes += byteCount;
+        if (byteCount > 0)
+        {
+            totalBytes += byteCount;
+        }
     }
-    while (byteCount != 0);
+    while (byteCount > 0);
 
     if (totalBytes == 0)
     {
@@ -941,9 +1009,9 @@ Sdb_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PCI Reg %03X = %08lX\n",
+                "PCI reg %03X = %08X\n",
                 (U16)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -959,8 +1027,8 @@ Sdb_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PCI Reg %03X\n",
-                (U32)pIoBuffer->value[1],
+                "Wrote %08X to PCI reg %03X\n",
+                (int)pIoBuffer->value[1],
                 (U16)pIoBuffer->value[0]
                 ));
             break;
@@ -982,9 +1050,9 @@ Sdb_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PLX Reg %03lX = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "Reg %03X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -1000,9 +1068,9 @@ Sdb_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PLX Reg %03lX\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to reg %03X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -1019,9 +1087,9 @@ Sdb_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PLX Mapped Reg %03lX = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "Mapped reg %03X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -1037,9 +1105,9 @@ Sdb_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PLX Mapped Reg %03lX\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to mapped reg %03X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -1060,7 +1128,7 @@ Sdb_Dispatch_IoControl(
 
 
         /******************************************
-         * PLX Performance Object Functions
+         * Performance Monitor Functions
          *****************************************/
         case PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES:
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES\n"));

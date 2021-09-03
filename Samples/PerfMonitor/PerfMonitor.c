@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -41,10 +41,6 @@
  *
  *      This sample demonstrates how to use the PLX Performance API with 8000
  *      devices to measure PCIe performance
- *
- * Revision History:
- *
- *      03-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -103,7 +99,7 @@ SelectDevice_8000(
  * Description:  The main entry point
  *
  *****************************************************************************/
-int 
+int
 main(
     void
     )
@@ -178,7 +174,6 @@ main(
     PlxPci_DeviceClose( &Device );
 
     ConsoleEnd();
-
     exit(0);
 }
 
@@ -187,9 +182,9 @@ main(
 
 /******************************************************************************
  *
- * Function   :  
+ * Function   :
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 void
@@ -345,7 +340,7 @@ PerformTest(
 
         if (Cons_kbhit())
         {
-            if (Cons_getch() == 27)
+            if (Cons_getch() == CONS_KEY_ESCAPE)
             {
                 Cons_printf("\n");
                 break;
@@ -531,23 +526,23 @@ SelectDevice_8000(
                     );
 
                 if (DevKey.PlxPortType == PLX_SPEC_PORT_UPSTREAM)
-                    Cons_printf("PLX Upstream port\n");
+                    Cons_printf("Upstream port\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM)
-                    Cons_printf("PLX Downstream port\n");
+                    Cons_printf("Downstream port\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
-                    Cons_printf("PLX NT Virtual port\n");
+                    Cons_printf("NT Virtual port\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
-                    Cons_printf("PLX NT Link port\n");
+                    Cons_printf("NT Link port\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_LEGACY_EP)
-                    Cons_printf("PLX USB Controller\n");
+                    Cons_printf("USB Controller\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_DMA)
-                    Cons_printf("PLX DMA controller\n");
+                    Cons_printf("DMA controller\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_HOST)
-                    Cons_printf("PLX Host port\n");
+                    Cons_printf("Host port\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_FABRIC)
-                    Cons_printf("PLX Fabric port\n");
+                    Cons_printf("Fabric port\n");
                 else if (DevKey.PlxPortType == PLX_SPEC_PORT_GEP)
-                    Cons_printf("PLX GEP\n");
+                    Cons_printf("GEP\n");
                 else
                     Cons_printf("**Unknown device**\n");
 
@@ -570,7 +565,10 @@ SelectDevice_8000(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 

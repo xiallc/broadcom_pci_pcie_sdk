@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -40,10 +40,6 @@
  * Description:
  *
  *      Demonstrates using the PLX API to perform DMA transfers
- *
- * Revision History:
- *
- *      03-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -141,8 +137,6 @@ main(
         exit(-1);
     }
 
-    Cons_clear();
-
     Cons_printf(
         "\nSelected: %04x %04x [b:%02x  s:%02x  f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
@@ -185,7 +179,6 @@ _Exit_App:
     Cons_printf("\n\n");
 
     ConsoleEnd();
-
     exit(0);
 }
 
@@ -256,7 +249,9 @@ SelectDevice_DMA(
                         {
                             // DMA is always function 1 or higher
                             if (DevKey.function == 0)
+                            {
                                 bAddDevice = FALSE;
+                            }
                         }
                         else
                         {
@@ -290,9 +285,7 @@ SelectDevice_DMA(
             }
 
             // Close device
-            PlxPci_DeviceClose(
-                &Device
-                );
+            PlxPci_DeviceClose( &Device );
 
             if (bAddDevice)
             {
@@ -316,7 +309,9 @@ SelectDevice_DMA(
     while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
     Cons_printf(
         "\t\t   0. Cancel\n\n"
@@ -325,12 +320,17 @@ SelectDevice_DMA(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-        Cons_scanf("%d", &i);
+        if (Cons_scanf("%d", &i) <= 0)
+        {
+            // Added for compiler warning
+        }
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_DMA[i - 1];
@@ -377,10 +377,16 @@ PerformDma_9000(
         );
 
     Cons_printf("Please enter a valid local address ----> ");
-    Cons_scanf("%x", &LocalAddress);
+    if (Cons_scanf("%x", &LocalAddress) <= 0)
+    {
+        // Added for compiler warning
+    }
 
     Cons_printf("Please select a DMA channel (0 or 1) --> ");
-    Cons_scanf("%hd", &ChannelInput);
+    if (Cons_scanf("%hd", &ChannelInput) <= 0)
+    {
+        // Added for compiler warning
+    }
     Cons_printf("\n");
 
     if ((ChannelInput != 0) && (ChannelInput != 1))
@@ -522,10 +528,14 @@ PerformDma_9000(
         Cons_printf("Ok (triggered ints:");
 
         if (PlxInterrupt.DmaDone & (1 << 0))
+        {
             Cons_printf(" DMA_0");
+        }
 
         if (PlxInterrupt.DmaDone & (1 << 1))
+        {
             Cons_printf(" DMA_1");
+        }
 
         Cons_printf(")\n");
     }
@@ -607,7 +617,9 @@ PerformDma_9000(
 
     // Release user buffer
     if (pUserBuffer != NULL)
+    {
         free(pUserBuffer);
+    }
 }
 
 
@@ -642,7 +654,10 @@ PerformDma_8000(
         );
 
     Cons_printf("Please select a DMA channel (0-3) --> ");
-    Cons_scanf("%hd", &ChannelInput);
+    if (Cons_scanf("%hd", &ChannelInput) <= 0)
+    {
+        // Added for compiler warning
+    }
     Cons_printf("\n");
 
     if (ChannelInput >= 4)
@@ -706,7 +721,6 @@ PerformDma_8000(
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
     }
-
 
 
     // Set DMA properties
@@ -888,7 +902,9 @@ PerformDma_8000(
 
     // Allocate a buffer
     if (pUserBuffer == NULL)
+    {
         pUserBuffer = malloc(PciBuffer.Size);
+    }
 
     // Clear DMA data
     memset(&DmaParams, 0, sizeof(PLX_DMA_PARAMS));

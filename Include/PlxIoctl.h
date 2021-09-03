@@ -47,7 +47,7 @@
  *
  * Revision History:
  *
- *      09-01-16 : PLX SDK v7.25
+ *      09-01-19 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -91,6 +91,7 @@ typedef struct _PLX_PARAMS
         PLX_DMA_PARAMS      TxParams;
         PLX_DRIVER_PROP     DriverProp;
         PLX_MULTI_HOST_PROP MH_Prop;
+        PEX_SPI_OBJ         SpiProp;
     } u;
 } PLX_PARAMS;
 

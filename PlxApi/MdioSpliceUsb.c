@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2019 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -35,15 +35,15 @@
  *
  * File Name:
  *
- *      MdioSpliceUsb.c
+ *     MdioSpliceUsb.c
  *
  * Description:
  *
- *      Implements the PLX API functions over a Splice MDIO USB interface
+ *     Implements the PLX API functions over a Splice MDIO USB interface
  *
  * Revision History:
  *
- *      01-01-19 : PCI/PCIe SDK v8.00
+ *     09-01-19 : PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -362,7 +362,7 @@ MdioSplice_DeviceFindEx(
     regVal =
         MdioSplice_PlxRegisterRead(
             &devObjTemp,
-            PEX_REG_CCR_DEV_ID,     // Port 0 Device/Vendor ID
+            ATLAS_REG_CCR_DEV_ID,   // Hard-coded ID
             &status,
             FALSE,                  // Adjust for port?
             FALSE                   // Retry on error?
@@ -986,9 +986,9 @@ MdioSplice_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PCI Reg %03X = %08lX\n",
+                "PCI reg %03X = %08X\n",
                 (U16)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -1004,8 +1004,8 @@ MdioSplice_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PCI Reg %03X\n",
-                (U32)pIoBuffer->value[1],
+                "Wrote %08X to PCI reg %03X\n",
+                (int)pIoBuffer->value[1],
                 (U16)pIoBuffer->value[0]
                 ));
             break;
@@ -1027,9 +1027,9 @@ MdioSplice_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PLX Reg %03lX = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "Reg %03X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -1045,9 +1045,9 @@ MdioSplice_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PLX Reg %03lX\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to reg %03X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -1064,9 +1064,9 @@ MdioSplice_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PLX Mapped Reg %03lX = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "Mapped reg %03X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -1082,9 +1082,9 @@ MdioSplice_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PLX Mapped Reg %03lX\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to mapped reg %03X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -1105,7 +1105,7 @@ MdioSplice_Dispatch_IoControl(
 
 
         /******************************************
-         * PLX Performance Object Functions
+         * Performance Monitor Functions
          *****************************************/
         case PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES:
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES\n"));

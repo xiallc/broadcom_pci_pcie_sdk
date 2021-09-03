@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Broadcom Inc
+ * Copyright 2013-2020 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -35,15 +35,15 @@
  *
  * File Name:
  *
- *      I2cAaUsb.c
+ *     I2cAaUsb.c
  *
  * Description:
  *
- *      Implements PLX API support functions over an Aardark I2C interface
+ *     Implements PLX API support functions over an Aardark I2C interface
  *
  * Revision History:
  *
- *      11-01-18 : PLX SDK v8.00
+ *     01-01-20: PCI/PCIe SDK v8.10
  *
  ******************************************************************************/
 
@@ -742,11 +742,31 @@ PlxI2c_PlxRegisterRead(
         return 0;
     }
 
-    // Default to error
-    if (pStatus != NULL)
-    {
-        *pStatus = PLX_STATUS_FAILED;
-    }
+	/*********************************************************************
+	 * Atlas MPT 0 offset B0h exhibits chip issues when simply read via
+	 * I2C. The read operation returns a portion or all of a previously
+	 * read value from another register. Additionally, that value actually
+	 * gets written to B0 (can verify via SDB for example), which may
+	 * throw off software that reads it.
+	 *
+	 * The register value should always return 0000_4803h, which is the RO
+	 * PCI VPD capability ID header. So, the access is trapped here and a
+	 * hard-coded value is returned to bypass the I2C access.
+	 ********************************************************************/
+    if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+	{
+		// Check for absolute or adjusted address of MPT 0 B0h
+		if ( ((bAdjustForPort == FALSE) && (offset == 0x608F70B0)) ||
+			 ((bAdjustForPort == TRUE) && (offset == 0xB0) &&
+			  (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT0)) )
+		{
+			if (pStatus != NULL)
+			{
+				*pStatus = PLX_STATUS_OK;
+			}
+			return 0x00004803;	// RO PCI VPD capability
+		}
+	}
 
     // If outside PEX region (60800000-60FFFFFF), must use indexing method
     if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
@@ -758,7 +778,7 @@ PlxI2c_PlxRegisterRead(
         {
             PlxI2c_PlxRegisterWrite(
                 pDevice,
-                ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_ADDR,
+                ATLAS_REGS_AXI_BASE_ADDR + ATLAS_REG_IDX_AXI_ADDR,
                 offset,
                 FALSE        // Adjust for port?
                 );
@@ -770,7 +790,7 @@ PlxI2c_PlxRegisterRead(
         // Issue read command (1F0108h[1]=1)
         PlxI2c_PlxRegisterWrite(
             pDevice,
-            ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_CTRL,
+            ATLAS_REGS_AXI_BASE_ADDR + ATLAS_REG_IDX_AXI_CTRL,
             PEX_IDX_CTRL_CMD_READ,
             FALSE        // Adjust for port?
             );
@@ -779,13 +799,23 @@ PlxI2c_PlxRegisterRead(
         regVal =
             PlxI2c_PlxRegisterRead(
                 pDevice,
-                ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_DATA,
+                ATLAS_REGS_AXI_BASE_ADDR + ATLAS_REG_IDX_AXI_DATA,
                 pStatus,
                 FALSE,                    // Adjust for port?
                 (U8)(bRetryOnError != 0)  // Retry on error?
                 );
 
+        if (pStatus != NULL)
+        {
+            *pStatus = PLX_STATUS_OK;
+        }
         return regVal;
+    }
+
+    // Default to error
+    if (pStatus != NULL)
+    {
+        *pStatus = PLX_STATUS_FAILED;
     }
 
     // Generate the I2C command
@@ -832,7 +862,7 @@ PlxI2c_PlxRegisterRead(
                 (U8*)&command,                  // Write data
                 &nBytesWritten,                 // Bytes written
                 sizeof(U32),                    // Num bytes to read
-                (U8*)&regVal,                 // Read data buffer
+                (U8*)&regVal,                   // Read data buffer
                 &nBytesRead                     // Bytes read
                 );
 
@@ -949,7 +979,7 @@ PlxI2c_PlxRegisterWrite(
             status =
                 PlxI2c_PlxRegisterWrite(
                     pDevice,
-                    ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_ADDR,
+                    ATLAS_REGS_AXI_BASE_ADDR + ATLAS_REG_IDX_AXI_ADDR,
                     offset,
                     FALSE        // Adjust for port?
                     );
@@ -968,7 +998,7 @@ PlxI2c_PlxRegisterWrite(
             status =
                 PlxI2c_PlxRegisterWrite(
                     pDevice,
-                    ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_DATA,
+                    ATLAS_REGS_AXI_BASE_ADDR + ATLAS_REG_IDX_AXI_DATA,
                     value,
                     FALSE        // Adjust for port?
                     );
@@ -980,7 +1010,7 @@ PlxI2c_PlxRegisterWrite(
             status =
                 PlxI2c_PlxRegisterWrite(
                     pDevice,
-                    ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_CTRL,
+                    ATLAS_REGS_AXI_BASE_ADDR + ATLAS_REG_IDX_AXI_CTRL,
                     PEX_IDX_CTRL_CMD_WRITE,
                     FALSE        // Adjust for port?
                     );
@@ -1490,7 +1520,7 @@ PlxI2c_EepromReadByOffset(
     *pValue = 0;
 
     // Make sure offset is aligned on 32-bit boundary
-    if (offset & (3 << 0))
+    if (offset & 0x3)
     {
         return PLX_STATUS_INVALID_OFFSET;
     }
@@ -1519,7 +1549,7 @@ PlxI2c_EepromReadByOffset(
 /*******************************************************************************
  *
  * Function   :  PlxI2c_EepromWriteByOffset
-8 *
+ *
  * Description:  Write a 32-bit value to the EEPROM at a specified offset
  *
  ******************************************************************************/
@@ -1531,8 +1561,10 @@ PlxI2c_EepromWriteByOffset(
     )
 {
     // Make sure offset is aligned on 32-bit boundary
-    if (offset & (3 << 0))
+    if (offset & 0x3)
+    {
         return PLX_STATUS_INVALID_OFFSET;
+    }
 
     switch (pDevice->Key.PlxChip & 0xFF00)
     {
@@ -2018,13 +2050,13 @@ PlxI2c_GenerateCommand(
     BOOLEAN            bAdjustForPort
     )
 {
-    U8  portType;
     U8  bMultiNt;
     U8  bitPosMode;
     U8  bitPosStnSel;
     U8  bitPosPtSel;
     U8  portsPerStn;
     U8  highAddr;
+    U16 portType;
     U32 mode;
     U32 stnSel;
     U32 portSel;
@@ -2146,7 +2178,7 @@ PlxI2c_GenerateCommand(
     {
         portType = PLX_FLAG_PORT_NT_VIRTUAL_0;          // NTV 0
     }
-    else if (addr_Base == (addr_NTV0Base + 0x1000))
+    else if (addr_Base == (addr_NTV0Base + PEX_PORT_REGS_SIZE))
     {
         portType = PLX_FLAG_PORT_NT_LINK_0;             // NTL 0
     }
@@ -2154,7 +2186,7 @@ PlxI2c_GenerateCommand(
     {
         portType = PLX_FLAG_PORT_NT_VIRTUAL_1;          // NTV 1
     }
-    else if (bMultiNt && (addr_Base == (addr_NTV0Base - 0x1000)))
+    else if (bMultiNt && (addr_Base == (addr_NTV0Base - PEX_PORT_REGS_SIZE)))
     {
         portType = PLX_FLAG_PORT_NT_LINK_1;             // NTL 1
     }
@@ -2209,7 +2241,7 @@ PlxI2c_GenerateCommand(
     }
     else
     {
-        portSel = (Address >> 12);
+        portSel = (Address / PEX_PORT_REGS_SIZE);
     }
 
     // Handle chips where NT Virtual is accessed as transparent port
@@ -2240,7 +2272,7 @@ PlxI2c_GenerateCommand(
             // Check if NT-Link port or within NT-Virtual port
             if ((portType == PLX_FLAG_PORT_NT_LINK_0) ||
                 (portType == PLX_FLAG_PORT_NT_VIRTUAL_0) ||
-                (addr_Base == ((U32)pDevice->Key.NTPortNum * 0x1000)))
+                (addr_Base == ((U32)pDevice->Key.NTPortNum * PEX_PORT_REGS_SIZE)))
             {
                 if (portType == PLX_FLAG_PORT_NT_LINK_0)
                 {
@@ -2765,9 +2797,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PCI Reg %03X = %08lX\n",
+                "PCI reg %03X = %08X\n",
                 (U16)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -2778,13 +2810,13 @@ PlxI2c_Dispatch_IoControl(
                 PlxI2c_PlxRegisterWrite(
                     pDevice,
                     (U32)pIoBuffer->value[0],
-                    (U32)pIoBuffer->value[1],
+                    (int)pIoBuffer->value[1],
                     TRUE        // Adjust for port?
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PCI Reg %03X\n",
-                (U32)pIoBuffer->value[1],
+                "Wrote %08X to PCI reg %03X\n",
+                (int)pIoBuffer->value[1],
                 (U16)pIoBuffer->value[0]
                 ));
             break;
@@ -2806,9 +2838,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PLX Reg %03lX = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "Reg %03X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -2824,9 +2856,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PLX Reg %03lX\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to reg %03X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -2843,9 +2875,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "PLX Mapped Reg %03lX = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "Mapped reg %03X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -2861,9 +2893,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to PLX Mapped Reg %03lX\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to mapped reg %03X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -2959,9 +2991,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "EEPROM Offset %02X = %08lX\n",
-                (U32)pIoBuffer->value[0],
-                (U32)pIoBuffer->value[1]
+                "EEPROM Offset %02X = %08X\n",
+                (int)pIoBuffer->value[0],
+                (int)pIoBuffer->value[1]
                 ));
             break;
 
@@ -2976,9 +3008,9 @@ PlxI2c_Dispatch_IoControl(
                     );
 
             DebugPrintf((
-                "Wrote %08lX to EEPROM Offset %02X\n",
-                (U32)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                "Wrote %08X to EEPROM Offset %02X\n",
+                (int)pIoBuffer->value[1],
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
@@ -2994,7 +3026,7 @@ PlxI2c_Dispatch_IoControl(
 
             DebugPrintf((
                 "EEPROM Offset %02X = %04X\n",
-                (U32)pIoBuffer->value[0],
+                (int)pIoBuffer->value[0],
                 (U16)pIoBuffer->value[1]
                 ));
             break;
@@ -3012,13 +3044,13 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf((
                 "Wrote %04X to EEPROM Offset %02X\n",
                 (U16)pIoBuffer->value[1],
-                (U32)pIoBuffer->value[0]
+                (int)pIoBuffer->value[0]
                 ));
             break;
 
 
         /******************************************
-         * PLX Performance Object Functions
+         * Performance Monitor Functions
          *****************************************/
         case PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES:
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES\n"));
@@ -3124,173 +3156,163 @@ PlxI2c_ProbeSwitch(
     U16               *pNumMatched
     )
 {
-    U8            Port;
-    U8            Port_Upstream;
-    U8            PciHeaderType;
-    U8            NtMask;
-    U8            StnPort;
-    U8            PortsPerStn;
-    U16           PlxChip;
-    U16           DeviceCount;
-    U32           offset;
-    U32           Offset_Upstream;
-    U32           Offset_NTV0Base;
-    U32           Offset_DebugCtrl;
-    U32           DevVenID;
-    U32           RegValue;
-    U32           RegDebugCtrl;
-    U32           RegPciHeader;
-    U64           PossiblePorts;
-    BOOLEAN       bCompareDevice;
-    BOOLEAN       bMatchId;
-    BOOLEAN       bMatchLoc;
-    PLX_STATUS    status;
-    PLX_PORT_PROP PortProp;
+    U8             port_Upstream;
+    U8             pciHeaderType;
+    U8             ntMask;
+    U8             stnPort;
+    U16            pexChip;
+    U16            portNum;
+    U16            devCount;
+    U32            offset;
+    U32            offset_Upstream;
+    U32            offset_NTV0Base;
+    U32            offset_DebugCtrl;
+    U32            devVenID;
+    U32            regVal;
+    U32            regDebugCtrl;
+    BOOLEAN        bMatchId;
+    BOOLEAN        bMatchLoc;
+    PLX_STATUS     status;
+    PLX_PORT_PROP  portProp;
+    PEX_CHIP_FEAT  chipFeat;
+    PLX_DEVICE_KEY tempKey;
 
 
-    DeviceCount   = 0;
-    PortsPerStn   = 0;
-    RegDebugCtrl  = (U32)-1;
-    Port_Upstream = (U8)-1;
+    devCount      = 0;
+    regDebugCtrl  = PCI_CFG_RD_ERR_VAL_32;
+    port_Upstream = (U8)PCI_FIELD_IGNORE;
 
     // Reset upstream bus number & NT port numbers in case chips are daisy-chained
     Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = PCI_FIELD_IGNORE;
     memset( Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum, PCI_FIELD_IGNORE, I2C_MAX_NT_PORTS );
 
-    // Always reset key but save I2C properties
-    Port     = pDevice->Key.ApiIndex;
-    RegValue = pDevice->Key.DeviceNumber;
-
+    // Always reset key but save some properties temporarily to restore
+    tempKey = pDevice->Key;
     RtlZeroMemory( &pDevice->Key, sizeof(PLX_DEVICE_KEY) );
-    pDevice->Key.ApiIndex     = Port;
-    pDevice->Key.DeviceNumber = (U16)RegValue;
-    pDevice->Key.ApiMode      = PLX_API_MODE_I2C_AARDVARK;
+    pDevice->Key.ApiIndex       = tempKey.ApiIndex;
+    pDevice->Key.DeviceNumber   = tempKey.DeviceNumber;
+    pDevice->Key.ApiMode        = tempKey.ApiMode;
+    pDevice->Key.DeviceMode     = tempKey.DeviceMode;
+    pDevice->Key.ApiInternal[0] = tempKey.ApiInternal[0];
+    pDevice->Key.ApiInternal[1] = tempKey.ApiInternal[1];
 
     // Start with port 0
-    Port = 0;
+    portNum = 0;
 
-    // Start with PLX chip unknown
-    PlxChip = 0;
+    // Start with unknown chip type
+    pexChip = 0;
 
     // Start with empty Device ID
-    DevVenID = 0;
+    devVenID = 0;
 
     // Default to NT disabled
-    NtMask          = 0;
-    Offset_NTV0Base = 0x3E000;
+    ntMask          = 0;
+    offset_NTV0Base = 0x3E000;
 
     // Initially allow access only to port 0
-    PossiblePorts = (1 << 0);
+    RtlZeroMemory( &chipFeat, sizeof(PEX_CHIP_FEAT) );
+    PEX_BITMASK_SET( chipFeat.PortMask, 0 );
 
     // Probe all possible ports in the switch
-    while (Port < (sizeof(PossiblePorts) * 8))
+    while (portNum < (sizeof(chipFeat.PortMask) * 8))
     {
-        // Default to not compare device
-        bCompareDevice = FALSE;
-
-        // Default to unknown port type
-        pDevice->Key.PlxPortType = PLX_SPEC_PORT_UNKNOWN;
-
-        // Store the port
-        pDevice->Key.PlxPort = Port;
-
-        // Set default offset
-        offset = 0x0;
-
-        // Verify port and set offset
-        if (Port == PLX_FLAG_PORT_NT_VIRTUAL_0)         // NT 0 Virtual port
+        // Skip probe of non-port devices
+        if ( (portNum == PLX_FLAG_PORT_DMA_RAM) ||
+             (portNum == PLX_FLAG_PORT_ALUT_0)  ||
+             (portNum == PLX_FLAG_PORT_ALUT_1)  ||
+             (portNum == PLX_FLAG_PORT_ALUT_2)  ||
+             (portNum == PLX_FLAG_PORT_ALUT_3)  ||
+             (portNum == PLX_FLAG_PORT_STN_REGS_S0) ||
+             (portNum == PLX_FLAG_PORT_STN_REGS_S1) ||
+             (portNum == PLX_FLAG_PORT_STN_REGS_S2) ||
+             (portNum == PLX_FLAG_PORT_STN_REGS_S3) ||
+             (portNum == PLX_FLAG_PORT_STN_REGS_S4) ||
+             (portNum == PLX_FLAG_PORT_STN_REGS_S5) )
         {
-            pDevice->Key.ApiInternal[1] = Offset_NTV0Base + 0x0;
-        }
-        else if (Port == PLX_FLAG_PORT_NT_LINK_0)       // NT 0 Link port
-        {
-            pDevice->Key.ApiInternal[1] = Offset_NTV0Base + 0x1000;
-        }
-        else if (Port == PLX_FLAG_PORT_NT_VIRTUAL_1)    // NT 1 Virtual port
-        {
-            pDevice->Key.ApiInternal[1] = Offset_NTV0Base - 0x2000;
-        }
-        else if (Port == PLX_FLAG_PORT_NT_LINK_1)       // NT 1 Link port
-        {
-            pDevice->Key.ApiInternal[1] = Offset_NTV0Base - 0x1000;
-        }
-        else if (Port == PLX_FLAG_PORT_NT_DS_P2P)       // NT Virtual or Downstream Parent port
-        {
-            pDevice->Key.ApiInternal[1] = (U32)-1;
-        }
-        else if (Port == PLX_FLAG_PORT_DMA_0)           // DMA functions
-        {
-            pDevice->Key.ApiInternal[1] = 0x21000;
-        }
-        else if (Port == PLX_FLAG_PORT_DMA_1)
-        {
-            pDevice->Key.ApiInternal[1] = 0x22000;
-        }
-        else if (Port == PLX_FLAG_PORT_DMA_2)
-        {
-            pDevice->Key.ApiInternal[1] = 0x23000;
-        }
-        else if (Port == PLX_FLAG_PORT_DMA_3)
-        {
-            pDevice->Key.ApiInternal[1] = 0x24000;
-        }
-        else if (Port == PLX_FLAG_PORT_DMA_RAM)
-        {
-            // Skip probe of DMA RAM since not a device
-            PossiblePorts &= ~((U64)1 << Port);
-        }
-        else if ((Port == PLX_FLAG_PORT_ALUT_0) || (Port == PLX_FLAG_PORT_ALUT_1) ||
-                 (Port == PLX_FLAG_PORT_ALUT_2) || (Port == PLX_FLAG_PORT_ALUT_3))
-        {
-            // Skip probe of ALUT since not a device
-            PossiblePorts &= ~((U64)1 << Port);
-        }
-        else if ((Port == PLX_FLAG_PORT_STN_REGS_S0) || (Port == PLX_FLAG_PORT_STN_REGS_S1) ||
-                 (Port == PLX_FLAG_PORT_STN_REGS_S2) || (Port == PLX_FLAG_PORT_STN_REGS_S3) ||
-                 (Port == PLX_FLAG_PORT_STN_REGS_S4) || (Port == PLX_FLAG_PORT_STN_REGS_S5))
-        {
-            // Skip probe of VS/Fabric mode station-specific registers since not a device
-            PossiblePorts &= ~((U64)1 << Port);
-        }
-        else
-        {
-            // Determine offset
-            pDevice->Key.ApiInternal[1] = (U32)Port * 0x1000;
+            PEX_BITMASK_CLEAR( chipFeat.PortMask, portNum );
         }
 
         // Skip probe if port is known not to exist
-        if ((PossiblePorts & ((U64)1 << Port)) == 0)
+        if (PEX_BITMASK_TEST( chipFeat.PortMask, portNum ) == FALSE)
         {
             status = PLX_STATUS_FAILED;
         }
         else
         {
+            // Set port offset
+            if (portNum == PLX_FLAG_PORT_NT_VIRTUAL_0)      // NT 0 Virtual port
+            {
+                pDevice->Key.ApiInternal[1] = offset_NTV0Base + 0x0;
+            }
+            else if (portNum == PLX_FLAG_PORT_NT_LINK_0)    // NT 0 Link port
+            {
+                pDevice->Key.ApiInternal[1] = offset_NTV0Base + PEX_PORT_REGS_SIZE;
+            }
+            else if (portNum == PLX_FLAG_PORT_NT_VIRTUAL_1) // NT 1 Virtual port
+            {
+                pDevice->Key.ApiInternal[1] = offset_NTV0Base - (2 * PEX_PORT_REGS_SIZE);
+            }
+            else if (portNum == PLX_FLAG_PORT_NT_LINK_1)    // NT 1 Link port
+            {
+                pDevice->Key.ApiInternal[1] = offset_NTV0Base - PEX_PORT_REGS_SIZE;
+            }
+            else if (portNum == PLX_FLAG_PORT_NT_DS_P2P)    // NT Virtual or Downstream Parent port
+            {
+                pDevice->Key.ApiInternal[1] = (U32)-1;
+            }
+            else if (portNum == PLX_FLAG_PORT_DMA_0)        // DMA functions
+            {
+                pDevice->Key.ApiInternal[1] = 0x21000;
+            }
+            else if (portNum == PLX_FLAG_PORT_DMA_1)
+            {
+                pDevice->Key.ApiInternal[1] = 0x22000;
+            }
+            else if (portNum == PLX_FLAG_PORT_DMA_2)
+            {
+                pDevice->Key.ApiInternal[1] = 0x23000;
+            }
+            else if (portNum == PLX_FLAG_PORT_DMA_3)
+            {
+                pDevice->Key.ApiInternal[1] = 0x24000;
+            }
+            else
+            {
+                pDevice->Key.ApiInternal[1] = (U32)portNum * PEX_PORT_REGS_SIZE;
+            }
+
+            // Default to unknown port type
+            pDevice->Key.PlxPortType = PLX_SPEC_PORT_UNKNOWN;
+
+            // Store the port
+            pDevice->Key.PlxPort = (U8)portNum;
+
             // Get Device/Vendor ID
-            DevVenID =
-                PlxI2c_PlxRegisterRead(
-                    pDevice,
-                    PCI_REG_DEV_VEN_ID,
-                    &status,
-                    TRUE,       // Adjust for port?
-                    FALSE       // Retry on error?
-                    );
+            devVenID = PlxDir_PlxRegRead( pDevice, PCI_REG_DEV_VEN_ID, &status );
         }
 
-        if ((status != PLX_STATUS_OK) || ((DevVenID & 0xFFFF) != PLX_PCI_VENDOR_ID_PLX))
+        if ( (status != PLX_STATUS_OK) ||
+             (((devVenID & 0x0000FFFF) != PLX_PCI_VENDOR_ID_PLX) &&
+              ((devVenID & 0x0000FFFF) != PLX_PCI_VENDOR_ID_LSI)) )
         {
-            goto _PlxI2c_ProbeSwitch_Next_Port;
+            // Skip to next port
+            portNum++;
+            continue;
         }
 
-        DebugPrintf(("I2C: Port %d detected (ID=%08X)\n", Port, DevVenID));
+        DebugPrintf((
+            "I2C: Port %d detected (ID=%08X)\n",
+            portNum, devVenID
+            ));
 
         // Update possible ports
-        if (PlxChip == 0)
+        if (pexChip == 0)
         {
-            // Set PLX chip type & revision
+            // Set chip type & revision
             if (pDevice->Key.PlxChip == 0)
             {
                 // Set device ID in case needed by chip detection algorithm
-                pDevice->Key.DeviceId = (U16)(DevVenID >> 16);
+                pDevice->Key.DeviceId = (U16)(devVenID >> 16);
 
                 // Probe to determine chip type
                 PlxDir_ChipTypeDetect( pDevice );
@@ -3299,18 +3321,18 @@ PlxI2c_ProbeSwitch(
             // Store connected chip
             if (pDevice->Key.PlxChip != 0)
             {
-                PlxChip = pDevice->Key.PlxChip;
+                pexChip = pDevice->Key.PlxChip;
             }
 
             // Get chip port mask
             PlxPci_ChipGetPortMask(
-                pDevice->Key.PlxChip,
+                pDevice->Key.ChipID,
                 pDevice->Key.PlxRevision,
-                &PossiblePorts
+                &chipFeat
                 );
 
             // For first port, perform additional steps
-            if (Port == 0)
+            if (portNum == 0)
             {
                 switch (pDevice->Key.PlxFamily)
                 {
@@ -3320,12 +3342,12 @@ PlxI2c_ProbeSwitch(
                     case PLX_FAMILY_DRACO_2:
                     case PLX_FAMILY_CAPELLA_1:
                     case PLX_FAMILY_CAPELLA_2:
-                        Offset_DebugCtrl = 0x350;
-                        Offset_NTV0Base  = 0x3E000;
+                        offset_DebugCtrl = 0x350;
+                        offset_NTV0Base  = 0x3E000;
                         break;
 
                     case PLX_FAMILY_MIRA:
-                        Offset_DebugCtrl = 0x574;
+                        offset_DebugCtrl = 0x574;
                         break;
 
                     case PLX_FAMILY_ALTAIR:
@@ -3334,8 +3356,8 @@ PlxI2c_ProbeSwitch(
                     case PLX_FAMILY_VEGA_LITE:
                     case PLX_FAMILY_DENEB:
                     case PLX_FAMILY_SIRIUS:
-                        Offset_DebugCtrl = 0x1DC;
-                        Offset_NTV0Base  = 0x10000;
+                        offset_DebugCtrl = 0x1DC;
+                        offset_NTV0Base  = 0x10000;
                         break;
 
                     default:
@@ -3347,18 +3369,19 @@ PlxI2c_ProbeSwitch(
                 }
 
                 // Get port 0 debug control register
-                RegDebugCtrl =
-                    PlxI2c_PlxRegisterRead(
+                regDebugCtrl =
+                    PlxDir_PlxMappedRegRead(
                         pDevice,
-                        Offset_DebugCtrl,   // Port 0 debug control
-                        &status,
-                        FALSE,              // Adjust for port?
-                        TRUE                // Retry on error?
+                        offset_DebugCtrl,
+                        &status
                         );
 
-                if ((status != PLX_STATUS_OK) || (RegDebugCtrl == (U32)-1))
+                if ( (status != PLX_STATUS_OK) ||
+                     (regDebugCtrl == PCI_CFG_RD_ERR_VAL_32) )
                 {
-                    goto _PlxI2c_ProbeSwitch_Next_Port;
+                    // Skip to next port
+                    portNum++;
+                    continue;
                 }
 
                 // Default to standard switch fan-out mode
@@ -3374,17 +3397,15 @@ PlxI2c_ProbeSwitch(
                     case PLX_FAMILY_CAPELLA_1:
                     case PLX_FAMILY_CAPELLA_2:
                         // Probe for chip mode
-                        RegValue =
-                            PlxI2c_PlxRegisterRead(
+                        regVal =
+                            PlxDir_PlxMappedRegRead(
                                 pDevice,
                                 0x358,      // VS0 Enable
-                                NULL,
-                                FALSE,      // Adjust for port?
-                                TRUE        // Retry on error?
+                                NULL
                                 );
 
                         // 358[7:0]: 01h=Std else VS mode
-                        if ((RegValue & 0xFF) != (1 << 0))
+                        if ((regVal & 0xFF) != (1 << 0))
                         {
                             pDevice->Key.DeviceMode = PLX_CHIP_MODE_VIRT_SW;
                         }
@@ -3392,86 +3413,55 @@ PlxI2c_ProbeSwitch(
                         // Check for fabric mode
                         if (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2)
                         {
-                            RegValue =
-                                PlxI2c_PlxRegisterRead(
+                            regVal =
+                                PlxDir_PlxMappedRegRead(
                                     pDevice,
                                     0x46C,      // Strap Configuration
-                                    NULL,
-                                    FALSE,      // Adjust for port?
-                                    TRUE        // Retry on error?
+                                    NULL
                                     );
 
                             // Check if fabric mode (46C[15:13]=100b)
-                            if (((RegValue >> 13) & 0x7) == 0x4)
+                            if (((regVal >> 13) & 0x7) == 0x4)
                             {
                                 pDevice->Key.DeviceMode = PLX_CHIP_MODE_FABRIC;
-
-                                // For fabric mode, determine number of ports per station
-                                RegValue =
-                                    PlxI2c_PlxRegisterRead(
-                                        pDevice,
-                                        0x300,      // Port configuration
-                                        NULL,
-                                        FALSE,      // Adjust for port?
-                                        TRUE        // Retry on error?
-                                        );
-
-                                // If station 0 is 5 ports, then only single station
-                                if ((RegValue & 0x7) == 0x5)      // [2:0] = 5
-                                {
-                                    PortsPerStn = 5;              // 5 port x8x2x2x2x2x2 config
-                                }
-                                else
-                                {
-                                    PortsPerStn = 4;              // Other configs are 4 ports/station
-                                }
-
-                                DebugPrintf((
-                                    "I2C: Chip config: %d station%s, %d ports/stn\n",
-                                    (PortsPerStn == 5) ? 1 : 6,
-                                    (PortsPerStn == 5) ? "" : "s",
-                                    PortsPerStn
-                                    ));
                             }
                         }
 
-                        RegValue =
-                            PlxI2c_PlxRegisterRead(
+                        // Get & store upstream port (360h[4:0]
+                        regVal =
+                            PlxDir_PlxMappedRegRead(
                                 pDevice,
                                 0x360,      // VS0 Upstream
-                                NULL,
-                                FALSE,      // Adjust for port?
-                                TRUE        // Retry on error?
+                                NULL
                                 );
 
-                        // Store upstream port number
-                        Port_Upstream = (U8)((RegValue >> 0) & 0x1F);
+                        port_Upstream = (U8)((regVal >> 0) & 0x1F);
 
                         // NT enable setting is not valid in fabric mode
                         if (pDevice->Key.DeviceMode != PLX_CHIP_MODE_FABRIC)
                         {
                             // Determine if NT0 is enabled & store port number
-                            if (RegValue & (1 << 13))
+                            if (regVal & (1 << 13))
                             {
-                                Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((RegValue >> 8) & 0xF);
-                                NtMask |= (1 << 0);
+                                Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((regVal >> 8) & 0xF);
+                                ntMask |= (1 << 0);
                             }
 
                             // Determine if NT1 is enabled & store port number
-                            if (RegValue & (1 << 21))
+                            if (regVal & (1 << 21))
                             {
-                                Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] = (U8)((RegValue >> 16) & 0xF);
-                                NtMask |= (1 << 1);
+                                Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] = (U8)((regVal >> 16) & 0xF);
+                                ntMask |= (1 << 1);
                             }
 
                             // Update chip mode
-                            if (NtMask)
+                            if (ntMask)
                             {
                                 pDevice->Key.DeviceMode = PLX_CHIP_MODE_STD_NT_DS_P2P;
 
                                 // Verify Cygnus in NT P2P mode (360[14]=1)
                                 if ((pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS) &&
-                                   ((RegDebugCtrl & (1 << 14)) == 0))
+                                   ((regDebugCtrl & (1 << 14)) == 0))
                                 {
                                     pDevice->Key.DeviceMode = PLX_CHIP_MODE_STD_LEGACY_NT;
                                 }
@@ -3481,24 +3471,22 @@ PlxI2c_ProbeSwitch(
 
                     case PLX_FAMILY_MIRA:
                         // Upstream port always 0 & no NT
-                        Port_Upstream = 0;
-                        NtMask        = 0;
+                        port_Upstream = 0;
+                        ntMask        = 0;
 
                         // Check port 0 header type
-                        RegPciHeader =
-                            PlxI2c_PlxRegisterRead(
+                        regVal =
+                            PlxDir_PlxMappedRegRead(
                                 pDevice,
                                 PCI_REG_HDR_CACHE_LN,
-                                NULL,
-                                FALSE,      // Adjust for port?
-                                TRUE        // Retry on error?
+                                NULL
                                 );
 
                         // If port 0 is EP, device is in Legacy mode & skip remaining ports
-                        if (((RegPciHeader >> 16) & 0x7F) == 0)
+                        if (((regVal >> 16) & 0x7F) == 0)
                         {
                             // Only enable port 0
-                            PossiblePorts = (1 << 0);
+                            PEX_BITMASK_SET_DW( chipFeat.PortMask, 0, (1 << 0) );
                             pDevice->Key.DeviceMode = PLX_CHIP_MODE_LEGACY_ADAPTER;
                         }
                         break;
@@ -3510,16 +3498,16 @@ PlxI2c_ProbeSwitch(
                     case PLX_FAMILY_DENEB:
                     case PLX_FAMILY_SIRIUS:
                         // Store upstream port number ([11:8])
-                        Port_Upstream = (U8)((RegDebugCtrl >> 8) & 0xF);
+                        port_Upstream = (U8)((regDebugCtrl >> 8) & 0xF);
 
                         // Determine if NT is enabled & store port number
                         if (pDevice->Key.PlxFamily == PLX_FAMILY_VEGA_LITE)
                         {
                             // NT is enabled if NT dual-host or intelligent adapter mode
-                            if ((((RegDebugCtrl >> 18) & 0x3) == 1) ||  // NT intelligent mode
-                                (((RegDebugCtrl >> 18) & 0x3) == 2))    // NT Dual-host mode
+                            if ((((regDebugCtrl >> 18) & 0x3) == 1) ||  // NT intelligent mode
+                                (((regDebugCtrl >> 18) & 0x3) == 2))    // NT Dual-host mode
                             {
-                                NtMask = (1 << 0);
+                                ntMask = (1 << 0);
                             }
                         }
                         else if ((pDevice->Key.PlxFamily == PLX_FAMILY_ALTAIR) ||
@@ -3527,16 +3515,16 @@ PlxI2c_ProbeSwitch(
                         {
                             // Altair doesn't support NT
                         }
-                        else if (RegDebugCtrl & (1 << 18))
+                        else if (regDebugCtrl & (1 << 18))
                         {
-                            NtMask = (1 << 0);
+                            ntMask = (1 << 0);
                         }
 
                         // Update chip mode
-                        if (NtMask)
+                        if (ntMask)
                         {
                             // Store NT port number
-                            Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((RegDebugCtrl >> 24) & 0xF);
+                            Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((regDebugCtrl >> 24) & 0xF);
 
                             // Default to legacy NT
                             pDevice->Key.DeviceMode = PLX_CHIP_MODE_STD_LEGACY_NT;
@@ -3545,22 +3533,20 @@ PlxI2c_ProbeSwitch(
                             if (pDevice->Key.PlxFamily == PLX_FAMILY_SIRIUS)
                             {
                                 // NT P2P mode (1DC[6])
-                                if (RegDebugCtrl & (1 << 6))
+                                if (regDebugCtrl & (1 << 6))
                                 {
                                     pDevice->Key.DeviceMode = PLX_CHIP_MODE_STD_NT_DS_P2P;
                                 }
 
                                 // For some chips, I2C bus timeout (1DC[14]) must be enabled or
                                 //  accesses to a disabled port prevents further I2C accesses.
-                                if ((RegDebugCtrl & (1 << 14)) == 0)
+                                if ((regDebugCtrl & (1 << 14)) == 0)
                                 {
-                                    RegDebugCtrl |= (1 << 14);
-
-                                    PlxI2c_PlxRegisterWrite(
+                                    regDebugCtrl |= (1 << 14);
+                                    PlxDir_PlxMappedRegWrite(
                                         pDevice,
                                         0x1DC,
-                                        RegDebugCtrl,
-                                        FALSE               // Adjust for port?
+                                        regDebugCtrl
                                         );
                                 }
                             }
@@ -3575,577 +3561,531 @@ PlxI2c_ProbeSwitch(
                         return PLX_STATUS_UNSUPPORTED;
                 }
 
+                // Remove disabled ports to avoid probing them
+                // NOTE: Must be called after Key.DeviceMode is set since may refer to it
+                PlxDir_ChipFilterDisabledPorts( pDevice, &chipFeat );
+
+                // If not NT P2P mode, do not probe for NT P2P port
+                if (pDevice->Key.DeviceMode != PLX_CHIP_MODE_STD_NT_DS_P2P)
+                {
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+                }
+
+                // If NT not enabled, don't probe NT ports
+                if (ntMask == 0)
+                {
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_LINK_0 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_LINK_1 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_VIRTUAL_1 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_DS_P2P );
+                }
+
+                // Fabric mode specific settings
+                if ( (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) &&
+                     (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) )
+                {
+                    // Always enable NTV0 which is GEP
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_NT_VIRTUAL_0 );
+                }
+
+                DebugPrintf((
+                    "I2C: Chip config: %d stn %d ports/stn StnMask=%02Xh\n",
+                    chipFeat.StnCount,
+                    chipFeat.PortsPerStn, chipFeat.StnMask
+                    ));
+
                 DebugPrintf((
                     "I2C: ChipMode=%s  UP=%d  NT0=%02Xh  NT1=%02Xh\n",
-                    (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD) ? "STD" :
-                      (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_LEGACY_NT) ? "STD NT" :
+                    (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD) ? "BSW" :
+                      (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_LEGACY_NT) ? "LEGACY NT" :
                       (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_NT_DS_P2P) ? "NT P2P" :
                       (pDevice->Key.DeviceMode == PLX_CHIP_MODE_VIRT_SW) ? "VS" :
-                      (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) ? "FABRIC" :
+                      (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) ? "SSW" :
                       (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER) ? "LEGACY" :
                       "UNKOWN",
-                    Port_Upstream,
-                    NtMask & (1 << 0) ? Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] : 0xFF,
-                    NtMask & (1 << 1) ? Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] : 0xFF
+                    port_Upstream,
+                    ntMask & (1 << 0) ? Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] : 0xFF,
+                    ntMask & (1 << 1) ? Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] : 0xFF
                     ));
-            }
-
-            // Remove disabled ports to avoid probing them
-            // NOTE: Must be called after Key.DeviceMode is set since may refer to it
-            PlxDir_ChipFilterDisabledPorts(
-                pDevice,
-                &PossiblePorts
-                );
-
-            // If not NT P2P mode, do not probe for NT P2P port
-            if (pDevice->Key.DeviceMode != PLX_CHIP_MODE_STD_NT_DS_P2P)
-            {
-                PossiblePorts &= ~((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
-            }
-
-            // If NT not enabled, don't probe NT ports
-            if (NtMask == 0)
-            {
-                PossiblePorts &=
-                    ~(((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
-                      ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
-                      ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
-                      ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
-                      ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P));
-            }
-
-            // Fabric mode specific settings
-            if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC)
-            {
-                // Always enable NTV0 which is GEP
-                PossiblePorts |= ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
             }
         }
 
-        // Get PCI header
-        RegPciHeader =
-            PlxI2c_PlxRegisterRead(
-                pDevice,
-                PCI_REG_HDR_CACHE_LN,
-                &status,
-                TRUE,       // Adjust for port?
-                TRUE        // Retry on error?
-                );
+        // Get PCI header type
+        regVal = PlxDir_PlxRegRead( pDevice, PCI_REG_HDR_CACHE_LN, &status );
         if (status != PLX_STATUS_OK)
         {
-            goto _PlxI2c_ProbeSwitch_Next_Port;
+            // Set register value to flag failure
+            regVal = PCI_CFG_RD_ERR_VAL_32;
         }
 
         // Verify port exists
-        if (RegPciHeader == (U32)-1)
+        if (regVal == PCI_CFG_RD_ERR_VAL_32)
         {
             // Some chips return FFFF_FFFF when accessing 0Ch of disabled port
-            DebugPrintf(("I2C: Port %d is disabled, PCI[0Ch]=FFFF_FFFF\n", Port));
+            DebugPrintf(("I2C: Port %d is disabled, PCI[0Ch]=FFFF_FFFF\n", portNum));
         }
-        else if ((RegPciHeader & 0xFFFF) == PLX_PCI_VENDOR_ID_PLX)
+        else if ((regVal & 0xFFFF) == PLX_PCI_VENDOR_ID_PLX)
         {
             // Some chips return value of last register (Dev/Ven ID)
             // read when accessing 0Ch of disabled port
-            DebugPrintf(("I2C: Port %d is disabled, PCI[0Ch]=%08X (Dev/Ven ID)\n", Port, RegPciHeader));
+            DebugPrintf(("I2C: Port %d is disabled, PCI[0Ch]=%08X (Dev/Ven ID)\n", portNum, regVal));
+            regVal = PCI_CFG_RD_ERR_VAL_32;
+        }
+
+        // If read failed, skip to next port
+        if (regVal == PCI_CFG_RD_ERR_VAL_32)
+        {
+            portNum++;
+            continue;
+        }
+
+        DebugPrintf((
+            "%s: Port %d is enabled, get additional properties\n",
+            DbgGetApiModeStr( pDevice ), portNum
+            ));
+
+        // Set header type field
+        pciHeaderType = (U8)((regVal >> 16) & 0x7F);
+
+        // Fill in device key
+        pDevice->Key.DeviceId = (U16)(devVenID >> 16);
+        pDevice->Key.VendorId = (U16)devVenID;
+
+        // Get port properties
+        PlxDir_GetPortProperties( pDevice, &portProp );
+
+        // Store NT port numbers if exist
+        if (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] != (U8)PCI_FIELD_IGNORE)
+        {
+            pDevice->Key.NTPortNum |= Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0];
+        }
+
+        if (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] != (U8)PCI_FIELD_IGNORE)
+        {
+            pDevice->Key.NTPortNum |= (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] << 4);
+        }
+
+        // Set PLX-specific port type
+        if (portProp.PortType == PLX_PORT_UPSTREAM)
+        {
+            // In fabric mode, upstream ports other than chip UP are host ports
+            if ((pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) &&
+                (port_Upstream != portNum))
+            {
+                pDevice->Key.PlxPortType = PLX_SPEC_PORT_HOST;
+            }
+            else
+            {
+                pDevice->Key.PlxPortType = PLX_SPEC_PORT_UPSTREAM;
+            }
+        }
+        else if (portProp.PortType == PLX_PORT_DOWNSTREAM)
+        {
+            // Default to DS port
+            pDevice->Key.PlxPortType = PLX_SPEC_PORT_DOWNSTREAM;
+
+            // Could be a fabric port in fabric mode
+            if ( (portNum < PEX_MAX_PORT) &&
+                 (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) )
+            {
+                // Calculate offset for port's configuration
+                stnPort = portNum % chipFeat.PortsPerStn;
+                offset  = 0x80000 + ((portNum / chipFeat.PortsPerStn) * 0x10000);
+                offset += ((stnPort / 4) * sizeof(U32));
+
+                regVal = PlxDir_PlxMappedRegRead( pDevice, offset, NULL );
+
+                // Get port type in [1:0] (01 = Fabric)
+                regVal = (U8)((regVal >> ((stnPort % 4) * 8)) & 0x3);
+                if (regVal == 1)
+                {
+                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_FABRIC;
+                }
+            }
+        }
+        else if (portProp.PortType == PLX_PORT_ENDPOINT)
+        {
+            // NT link port
+            if ( (portNum == PLX_FLAG_PORT_NT_LINK_0) ||
+                 (portNum == PLX_FLAG_PORT_NT_LINK_1) )
+            {
+                pDevice->Key.PlxPortType = PLX_SPEC_PORT_NT_LINK;
+            }
+            else if ( (portNum == PLX_FLAG_PORT_NT_VIRTUAL_0) ||
+                      (portNum == PLX_FLAG_PORT_NT_VIRTUAL_1) ||
+                      (portNum == Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0]) )
+            {
+                // NT virtual (Check older chips where NTV accessed by port #)
+                pDevice->Key.PlxPortType = PLX_SPEC_PORT_NT_VIRTUAL;
+            }
+            else if ( (portNum == PLX_FLAG_PORT_DMA_0) ||
+                      (portNum == PLX_FLAG_PORT_DMA_1) ||
+                      (portNum == PLX_FLAG_PORT_DMA_2) ||
+                      (portNum == PLX_FLAG_PORT_DMA_3) )
+            {
+                pDevice->Key.PlxPortType = PLX_SPEC_PORT_DMA;   // DMA function
+            }
+            else if (pDevice->Key.DeviceId == 0x1009)
+            {
+                pDevice->Key.PlxPortType = PLX_SPEC_PORT_GEP;   // GEP
+            }
+        }
+
+        /******************************************************************
+         * When port 0 is not the upstream port, additional work is needed
+         * to probe the upstream port first and determine its bus number.
+         *****************************************************************/
+        if ((Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus == (U8)PCI_FIELD_IGNORE) &&
+            (portNum == 0) &&
+            (portProp.PortType != PLX_PORT_UPSTREAM))
+        {
+            if (port_Upstream != (U8)PCI_FIELD_IGNORE)
+            {
+                // Set upstream port base offset
+                offset_Upstream = port_Upstream * PEX_PORT_REGS_SIZE;
+
+                regVal =
+                    PlxDir_PlxMappedRegRead(
+                        pDevice,
+                        offset_Upstream + PCI_REG_T1_PRIM_SEC_BUS,
+                        &status
+                        );
+
+                if ((status == PLX_STATUS_OK) && (regVal != PCI_CFG_RD_ERR_VAL_32))
+                {
+                    // Set the upstream bus number
+                    Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = (U8)(regVal >> 0);
+                }
+            }
+        }
+
+        // Reset device location
+        pDevice->Key.bus      = 0;
+        pDevice->Key.slot     = 0;
+        pDevice->Key.function = 0;
+
+        // Attempt to determine bus number
+        if (pciHeaderType == PCI_HDR_TYPE_1)
+        {
+            regVal = PlxDir_PlxRegRead( pDevice, PCI_REG_T1_PRIM_SEC_BUS, NULL );
+
+            // Bus is primary bus number field (18h[7:0])
+            pDevice->Key.bus = (U8)(regVal >> 0);
+
+            // Store the upstream port bus number
+            if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_UPSTREAM)
+            {
+                Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = pDevice->Key.bus;
+                DebugPrintf(("I2C: UP bus=%02Xh\n", pDevice->Key.bus));
+            }
+
+            // For host/fabric ports, use bus number assigned by manager in [15:8]
+            if ( (pDevice->Key.PlxPortType == PLX_SPEC_PORT_HOST) ||
+                 (pDevice->Key.PlxPortType == PLX_SPEC_PORT_FABRIC) )
+            {
+                pDevice->Key.bus = (U8)(regVal >> 8);
+            }
         }
         else
         {
-            DebugPrintf(("I2C: Port %d is enabled, get additional properties\n", Port));
-            bCompareDevice = TRUE;
+            // Some chips have captured bus number register
+            if ( (pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS)  ||
+                 (pDevice->Key.PlxFamily == PLX_FAMILY_SCOUT)   ||
+                 (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
+                 (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) ||
+                 (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
+                 (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) )
+            {
+                // GEP doesn't report correct captured bus, so get from parent P2P
+                if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_GEP)
+                {
+                    // Get Primary/Secondary bus register (18h)
+                    regVal =
+                        PlxDir_PlxMappedRegRead(
+                            pDevice,
+                            (portProp.PortNumber * PEX_PORT_REGS_SIZE) + PCI_REG_T1_PRIM_SEC_BUS,
+                            NULL
+                            );
+                    pDevice->Key.bus = (U8)(regVal >> 8);
+                }
+
+                if (pDevice->Key.bus == 0)
+                {
+                    // Get Captured bus number (1DCh[7:0])
+                    regVal =
+                        PlxDir_PlxRegRead(
+                            pDevice,
+                            0x1DC,      // Captured bus number
+                            NULL
+                            );
+                    pDevice->Key.bus = (U8)regVal;
+                }
+
+                // Cygnus NT Virtual port 1DCh not corrrect over I2C
+                if ((pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS) &&
+                    (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL))
+                {
+                    pDevice->Key.bus = 0;
+                }
+            }
         }
 
-        if (bCompareDevice)
+        /***************************************************************
+         * If devices aren't enumerated, DS ports & other device bus
+         * numbers will not be assigned and will always end up on
+         * bus 0. If that is the case, auto-generate bus numbers
+         **************************************************************/
+        if (pDevice->Key.bus == 0)
         {
-            // Fill in device key
-            pDevice->Key.DeviceId = (U16)(DevVenID >> 16);
-            pDevice->Key.VendorId = (U16)DevVenID;
-
-            // Set header type field
-            PciHeaderType = (U8)((RegPciHeader >> 16) & 0x7F);
-
-            // Store NT port numbers if exist
-            if (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] != (U8)PCI_FIELD_IGNORE)
+            // Default to upstream bus if known
+            if (Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus != (U8)PCI_FIELD_IGNORE)
             {
-                pDevice->Key.NTPortNum |= Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0];
+                pDevice->Key.bus = Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus;
             }
 
-            if (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] != (U8)PCI_FIELD_IGNORE)
+            if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_UPSTREAM)
             {
-                pDevice->Key.NTPortNum |= (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] << 4);
+                pDevice->Key.bus = 0x1;     // Standard upstream in BSW mode
+
+                // Store UP bus override
+                Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = pDevice->Key.bus;
             }
-
-            // Get port properties
-            PlxDir_GetPortProperties( pDevice, &PortProp );
-
-            // Set PLX-specific port type
-            if (PortProp.PortType == PLX_PORT_UPSTREAM)
+            else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM)
             {
-                // In fabric mode, upstream ports other than chip UP are host ports
-                if ((pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) &&
-                    (Port_Upstream != Port))
+                // DS ports are below upstream bus
+                pDevice->Key.bus = 2;
+            }
+            else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
+            {
+                // NT Link port
+                pDevice->Key.bus = 0x30;
+
+                // Add a bus for 2nd NT port
+                if (pDevice->Key.PlxPort == PLX_FLAG_PORT_NT_LINK_1)
                 {
-                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_HOST;
+                    pDevice->Key.bus += 1;
+                }
+            }
+            else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DMA)
+            {
+                // DMA controller on upstream port bus
+            }
+            else if ( (pDevice->Key.PlxPortType == PLX_SPEC_PORT_HOST) ||
+                      (pDevice->Key.PlxPortType == PLX_SPEC_PORT_FABRIC) )
+            {
+                // Host & fabric ports - Pick high bus number
+                pDevice->Key.bus = 0x80 + pDevice->Key.PlxPort;
+            }
+            else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_GEP)
+            {
+                pDevice->Key.bus = 0x78;
+            }
+            else if ( (portProp.PortType == PLX_PORT_LEGACY_ENDPOINT) &&
+                      (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER) )
+            {
+                // USB controller
+                pDevice->Key.bus = 0x40;
+            }
+            else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
+            {
+                if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_LEGACY_NT)
+                {
+                    // In legacy mode, NTV is on internal virtual bus
+                    pDevice->Key.bus += 1;
                 }
                 else
                 {
-                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_UPSTREAM;
-                }
-            }
-            else if (PortProp.PortType == PLX_PORT_DOWNSTREAM)
-            {
-                // Default to DS port
-                pDevice->Key.PlxPortType = PLX_SPEC_PORT_DOWNSTREAM;
-
-                // Could be a fabric port in fabric mode
-                if ((Port < 24) && (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC))
-                {
-                    // Calculate offset for port's configuration
-                    StnPort = Port % PortsPerStn;
-                    offset  = 0x80000 + ((Port / PortsPerStn) * 0x10000);
-                    offset += ((StnPort / 4) * sizeof(U32));
-
-                    RegValue =
-                        PlxI2c_PlxRegisterRead(
-                            pDevice,
-                            offset,     // Port configuration
-                            NULL,
-                            FALSE,      // Adjust for port?
-                            TRUE        // Retry on error?
-                            );
-
-                    // Get port type in [1:0] (01 = Fabric)
-                    RegValue = (U8)((RegValue >> ((StnPort % 4) * 8)) & 0x3);
-                    if (RegValue == 1)
-                    {
-                        pDevice->Key.PlxPortType = PLX_SPEC_PORT_FABRIC;
-                    }
-                }
-            }
-            else if (PortProp.PortType == PLX_PORT_ENDPOINT)
-            {
-                // NT link port
-                if ((Port == PLX_FLAG_PORT_NT_LINK_0) || (Port == PLX_FLAG_PORT_NT_LINK_1))
-                {
-                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_NT_LINK;
+                    pDevice->Key.bus = 0x20;
                 }
 
-                // NT virtual port (Also check for older chips where NTV accessed by port #)
-                if ((Port == PLX_FLAG_PORT_NT_VIRTUAL_0) || (Port == PLX_FLAG_PORT_NT_VIRTUAL_1) ||
-                    (Port == Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0]))
+                // Add a bus for 2nd NT port
+                if (pDevice->Key.PlxPort == PLX_FLAG_PORT_NT_VIRTUAL_1)
                 {
-                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_NT_VIRTUAL;
-                }
-
-                // DMA function
-                if ((Port == PLX_FLAG_PORT_DMA_0) || (Port == PLX_FLAG_PORT_DMA_1) ||
-                    (Port == PLX_FLAG_PORT_DMA_2) || (Port == PLX_FLAG_PORT_DMA_3))
-                {
-                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_DMA;
-                }
-
-                // GEP
-                if (pDevice->Key.DeviceId == 0x1009)
-                {
-                    pDevice->Key.PlxPortType = PLX_SPEC_PORT_GEP;
-                }
-            }
-
-            /******************************************************************
-             * When port 0 is not the upstream port, additional work is needed
-             * to probe the upstream port first and determine its bus number.
-             *****************************************************************/
-            if ((Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus == (U8)PCI_FIELD_IGNORE) &&
-                (Port == 0) &&
-                (PortProp.PortType != PLX_PORT_UPSTREAM))
-            {
-                if (Port_Upstream != (U8)-1)
-                {
-                    // Set upstream port base offset
-                    Offset_Upstream = Port_Upstream * 0x1000;
-
-                    RegValue =
-                        PlxI2c_PlxRegisterRead(
-                            pDevice,
-                            Offset_Upstream + PCI_REG_T1_PRIM_SEC_BUS,
-                            &status,
-                            FALSE,                  // Adjust for port?
-                            TRUE                    // Retry on error?
-                            );
-
-                    if ((status == PLX_STATUS_OK) && (RegValue != (U32)-1))
-                    {
-                        // Set the upstream bus number
-                        Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = (U8)(RegValue >> 0);
-                    }
-                }
-            }
-
-            // Reset bus
-            pDevice->Key.bus = 0;
-
-            // Get bus number
-            if (PciHeaderType == PCI_HDR_TYPE_1)
-            {
-                RegValue =
-                    PlxI2c_PlxRegisterRead(
-                        pDevice,
-                        PCI_REG_T1_PRIM_SEC_BUS,
-                        NULL,
-                        TRUE,       // Adjust for port?
-                        TRUE        // Retry on error?
-                        );
-
-                // Bus is primary bus number field (18h[7:0])
-                pDevice->Key.bus = (U8)(RegValue >> 0);
-
-                // Store the upstream port bus number
-                if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_UPSTREAM)
-                {
-                    Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = pDevice->Key.bus;
-                    DebugPrintf(("I2C: UP bus=%02X\n", pDevice->Key.bus));
-                }
-
-                // For host/fabric ports, use bus number assigned by manager in [15:8]
-                if ((pDevice->Key.PlxPortType == PLX_SPEC_PORT_HOST) ||
-                    (pDevice->Key.PlxPortType == PLX_SPEC_PORT_FABRIC))
-                {
-                    pDevice->Key.bus = (U8)(RegValue >> 8);
+                    pDevice->Key.bus += 1;
                 }
             }
             else
             {
-                // Some chips have captured bus number register
-                if ((pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS)  ||
-                    (pDevice->Key.PlxFamily == PLX_FAMILY_SCOUT)   ||
-                    (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
-                    (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) ||
-                    (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
-                    (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
-                {
-                    // GEP doesn't report correct captured bus, so get from parent P2P
-                    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_GEP)
-                    {
-                        // Get Primary/Secondary bus register (18h)
-                        RegValue =
-                            PlxI2c_PlxRegisterRead(
-                                pDevice,
-                                (PortProp.PortNumber * 0x1000) + PCI_REG_T1_PRIM_SEC_BUS,
-                                NULL,
-                                FALSE,      // Adjust for port?
-                                TRUE        // Retry on error?
-                                );
-
-                        pDevice->Key.bus = (U8)(RegValue >> 8);
-                    }
-
-                    if (pDevice->Key.bus == 0)
-                    {
-                        // Get Captured bus number
-                        RegValue =
-                            PlxI2c_PlxRegisterRead(
-                                pDevice,
-                                0x1DC,      // Captured bus number
-                                NULL,
-                                TRUE,       // Adjust for port?
-                                TRUE        // Retry on error?
-                                );
-
-                        pDevice->Key.bus = (U8)RegValue;
-                    }
-
-                    // Cygnus NT Virtual port 1DCh not corrrect over I2C
-                    if ((pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS) &&
-                        (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL))
-                    {
-                        pDevice->Key.bus = 0;
-                    }
-                }
+                ErrorPrintf((
+                    "ERROR: Bus # auto-gen not implemented for port type %d\n",
+                    pDevice->Key.PlxPortType
+                    ));
+                pDevice->Key.bus = 0xFF;
             }
+        }
 
-            /***************************************************************
-             * If devices aren't enumerated, DS ports & other device bus
-             * numbers will not be assigned and will always end up on
-             * bus 0. If that is the case, auto-generate bus numbers
-             **************************************************************/
-            if ((pDevice->Key.bus == 0) && (pDevice->Key.PlxPortType != PLX_SPEC_PORT_UPSTREAM))
-            {
-                // Default to upstream bus if known
-                if (Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus != (U8)PCI_FIELD_IGNORE)
-                {
-                    pDevice->Key.bus = Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus;
-                }
-
-                if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM)
-                {
-                    // DS ports are behind upstream bus
-                    pDevice->Key.bus += 1;
-                }
-                else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
-                {
-                    // NT Link port
-                    pDevice->Key.bus += 4;
-
-                    // Add a bus for 2nd NT port
-                    if (pDevice->Key.PlxPort == PLX_FLAG_PORT_NT_LINK_1)
-                    {
-                        pDevice->Key.bus += 1;
-                    }
-                }
-                else if ((PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT) ||
-                         (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL))
-                {
-                    // USB controller or NT-Virtual port
-                    pDevice->Key.bus += 2;
-
-                    // For P2P mode, NT Virtual has parent DS port
-                    if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_NT_DS_P2P)
-                    {
-                        pDevice->Key.bus += 1;
-                    }
-
-                    // Add a bus for 2nd NT port
-                    if (pDevice->Key.PlxPort == PLX_FLAG_PORT_NT_VIRTUAL_1)
-                    {
-                        pDevice->Key.bus += 1;
-                    }
-                }
-                else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DMA)
-                {
-                    // DMA controller is on same bus as upstream port
-                }
-                else if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_GEP)
-                {
-                    // GEP
-                    pDevice->Key.bus += 0x20;
-                }
-                else if ((pDevice->Key.PlxPortType == PLX_SPEC_PORT_HOST) ||
-                         (pDevice->Key.PlxPortType == PLX_SPEC_PORT_FABRIC))
-                {
-                    // Host & fabric ports - Pick high bus number
-                    pDevice->Key.bus = 0xE0 + pDevice->Key.PlxPortType;
-                }
-                else
-                {
-                    ErrorPrintf((
-                        "ERROR: Bus # auto-gen not implemented for port type %d\n",
-                        pDevice->Key.PlxPortType
-                        ));
-                    pDevice->Key.bus = 0xFF;
-                }
-            }
-
-            // Default to slot 0
-            pDevice->Key.slot = 0;
-
-            // Set slot number
-            if (PortProp.PortType == PLX_PORT_ENDPOINT)
-            {
-                // UP & EPs are always slot 0 except NTV in older chips
-                if ((Port != PLX_FLAG_PORT_NT_VIRTUAL_0) &&
-                    (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL))
-                {
-                    pDevice->Key.slot = (U8)Port;  // Slot matches port number
-                }
-            }
-            else if (pDevice->Key.PlxPort == PLX_FLAG_PORT_NT_DS_P2P)
+        // Set non-0 slot numbers
+        if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM)
+        {
+            if (pDevice->Key.PlxPort == PLX_FLAG_PORT_NT_DS_P2P)
             {
                 // NT P2P port uses NT port number as slot
                 pDevice->Key.slot = pDevice->Key.NTPortNum;
             }
             else
             {
-                pDevice->Key.slot = (U8)Port;  // Slot matches port number
+                // Slot tied to port number
+                pDevice->Key.slot = (U8)portNum % PCI_MAX_DEV;
             }
+        }
+        else if ( (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL) &&
+                  (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_LEGACY_NT) )
+        {
+            // In legacy mode, NTV slot matches port number
+            pDevice->Key.slot = (U8)portNum;
+        }
 
-            // Function number is non-zero for DMA & 0 for other ports
-            if (pDevice->Key.PlxPort == PLX_FLAG_PORT_DMA_0)
-            {
-                pDevice->Key.function = 1;
-            }
-            else if (pDevice->Key.PlxPort == PLX_FLAG_PORT_DMA_1)
-            {
-                pDevice->Key.function = 2;
-            }
-            else if (pDevice->Key.PlxPort == PLX_FLAG_PORT_DMA_2)
-            {
-                pDevice->Key.function = 3;
-            }
-            else if (pDevice->Key.PlxPort == PLX_FLAG_PORT_DMA_3)
-            {
-                pDevice->Key.function = 4;
-            }
-            else
-            {
-                pDevice->Key.function = 0;
-            }
+        // Set non-0 function numbers
+        if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DMA)
+        {
+            // DMA functions numbers are 1-4
+            pDevice->Key.function =
+                     1 + (pDevice->Key.PlxPort - PLX_FLAG_PORT_DMA_0);
+        }
 
-            // Get PCI Revision
-            RegValue =
-                PlxI2c_PlxRegisterRead(
+        // Get PCI Revision
+        regVal = PlxDir_PlxRegRead( pDevice, PCI_REG_CLASS_REV, NULL );
+        pDevice->Key.Revision = (U8)regVal;
+
+        // Get subsystem device ID
+        if (pciHeaderType == PCI_HDR_TYPE_0)
+        {
+            regVal = PlxDir_PlxRegRead( pDevice, PCI_REG_TO_SUBSYS_ID, NULL );
+        }
+        else
+        {
+            // Get subsytem ID from capability if supported
+            offset =
+                PlxDir_PciFindCapability(
                     pDevice,
-                    PCI_REG_CLASS_REV,
-                    &status,
-                    TRUE,       // Adjust for port?
-                    TRUE        // Retry on error?
+                    PCI_CAP_ID_BRIDGE_SUB_ID,
+                    FALSE,
+                    0
                     );
-
-            pDevice->Key.Revision = (U8)RegValue;
-
-            // Get subsystem device ID
-            if (PciHeaderType == PCI_HDR_TYPE_0)
+            if (offset == 0)
             {
-                RegValue =
-                    PlxI2c_PlxRegisterRead(
-                        pDevice,
-                        PCI_REG_TO_SUBSYS_ID,
-                        &status,
-                        TRUE,       // Adjust for port?
-                        TRUE        // Retry on error?
-                        );
+                regVal = 0;
             }
             else
             {
-                // Get subsytem ID from capability if supported
-                offset =
-                    PlxDir_PciFindCapability(
-                        pDevice,
-                        PCI_CAP_ID_BRIDGE_SUB_ID,
-                        FALSE,
-                        0
-                        );
-                if (offset == 0)
-                {
-                    RegValue = 0;
-                }
-                else
-                {
-                    RegValue =
-                        PlxI2c_PlxRegisterRead(
-                            pDevice,
-                            offset + 0x04,
-                            &status,
-                            TRUE,       // Adjust for port?
-                            TRUE        // Retry on error?
-                            );
-                }
+                regVal = PlxDir_PlxRegRead( pDevice, (U16)(offset + 0x04), NULL );
             }
+        }
+        pDevice->Key.SubDeviceId = (U16)(regVal >> 16);
+        pDevice->Key.SubVendorId = (U16)regVal;
 
-            pDevice->Key.SubDeviceId = (U16)(RegValue >> 16);
-            pDevice->Key.SubVendorId = (U16)RegValue;
+        // Display MIRA mode for debug
+        if (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA)
+        {
+            DebugPrintf((
+                "MIRA Device @ [b:%02x s:%02x] in %s mode\n",
+                pDevice->Key.bus, pDevice->Key.slot,
+                (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD) ? "Enhanced" : "Legacy"
+                ));
+        }
 
-            // Display MIRA mode for debug
-            if (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA)
+        // Assume successful match
+        bMatchLoc = TRUE;
+        bMatchId  = TRUE;
+
+        //
+        // Compare device key information
+        //
+
+        // Compare Bus, Slot, Fn numbers
+        if ( (pKey->bus      != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->slot     != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->function != (U8)PCI_FIELD_IGNORE) )
+        {
+            if ( (pKey->bus      != pDevice->Key.bus)  ||
+                 (pKey->slot     != pDevice->Key.slot) ||
+                 (pKey->function != pDevice->Key.function) )
             {
-                DebugPrintf((
-                    "MIRA Device @ [b:%02x s:%02x] in %s mode\n",
-                    pDevice->Key.bus, pDevice->Key.slot,
-                    (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD) ? "Enhanced" : "Legacy"
-                    ));
-            }
-
-            // Assume successful match
-            bMatchLoc = TRUE;
-            bMatchId  = TRUE;
-
-            //
-            // Compare device key information
-            //
-
-            // Compare Bus, Slot, Fn numbers
-            if ( (pKey->bus      != (U8)PCI_FIELD_IGNORE) ||
-                 (pKey->slot     != (U8)PCI_FIELD_IGNORE) ||
-                 (pKey->function != (U8)PCI_FIELD_IGNORE) )
-            {
-                if ( (pKey->bus      != pDevice->Key.bus)  ||
-                     (pKey->slot     != pDevice->Key.slot) ||
-                     (pKey->function != pDevice->Key.function) )
-                {
-                    bMatchLoc = FALSE;
-                }
-            }
-
-            //
-            // Compare device ID information
-            //
-
-            // Compare Vendor ID
-            if (pKey->VendorId != (U16)PCI_FIELD_IGNORE)
-            {
-                if (pKey->VendorId != pDevice->Key.VendorId)
-                {
-                    bMatchId = FALSE;
-                }
-            }
-
-            // Compare Device ID
-            if (pKey->DeviceId != (U16)PCI_FIELD_IGNORE)
-            {
-                if (pKey->DeviceId != pDevice->Key.DeviceId)
-                {
-                    bMatchId = FALSE;
-                }
-            }
-
-            // Compare Subsystem ID only if valid in chip
-            if (pDevice->Key.SubVendorId != 0)
-            {
-                // Compare Subsystem Vendor ID
-                if (pKey->SubVendorId != (U16)PCI_FIELD_IGNORE)
-                {
-                    if (pKey->SubVendorId != pDevice->Key.SubVendorId)
-                    {
-                        bMatchId = FALSE;
-                    }
-                }
-
-                // Compare Subsystem Device ID
-                if (pKey->SubDeviceId != (U16)PCI_FIELD_IGNORE)
-                {
-                    if (pKey->SubDeviceId != pDevice->Key.SubDeviceId)
-                    {
-                        bMatchId = FALSE;
-                    }
-                }
-            }
-
-            // Compare Revision
-            if (pKey->Revision != (U8)PCI_FIELD_IGNORE)
-            {
-                if (pKey->Revision != pDevice->Key.Revision)
-                {
-                    bMatchId = FALSE;
-                }
-            }
-
-            // Check if match on location and ID
-            if (bMatchLoc && bMatchId)
-            {
-                // Match found, check if it is the desired device
-                if (DeviceCount == DeviceNumber)
-                {
-                    DebugPrintf((
-                        "Criteria matched device %04X %04X [%02X:%02X.%d]\n",
-                        pDevice->Key.DeviceId, pDevice->Key.VendorId,
-                        pDevice->Key.bus, pDevice->Key.slot, pDevice->Key.function
-                        ));
-
-                    // Copy the device information
-                    *pKey = pDevice->Key;
-                    return PLX_STATUS_OK;
-                }
-
-                // Increment device count
-                DeviceCount++;
+                bMatchLoc = FALSE;
             }
         }
 
-_PlxI2c_ProbeSwitch_Next_Port:
+        //
+        // Compare device ID information
+        //
+
+        // Compare Vendor ID
+        if (pKey->VendorId != (U16)PCI_FIELD_IGNORE)
+        {
+            if (pKey->VendorId != pDevice->Key.VendorId)
+            {
+                bMatchId = FALSE;
+            }
+        }
+
+        // Compare Device ID
+        if (pKey->DeviceId != (U16)PCI_FIELD_IGNORE)
+        {
+            if (pKey->DeviceId != pDevice->Key.DeviceId)
+            {
+                bMatchId = FALSE;
+            }
+        }
+
+        // Compare Subsystem ID only if valid in chip
+        if (pDevice->Key.SubVendorId != 0)
+        {
+            // Compare Subsystem Vendor ID
+            if (pKey->SubVendorId != (U16)PCI_FIELD_IGNORE)
+            {
+                if (pKey->SubVendorId != pDevice->Key.SubVendorId)
+                {
+                    bMatchId = FALSE;
+                }
+            }
+
+            // Compare Subsystem Device ID
+            if (pKey->SubDeviceId != (U16)PCI_FIELD_IGNORE)
+            {
+                if (pKey->SubDeviceId != pDevice->Key.SubDeviceId)
+                {
+                    bMatchId = FALSE;
+                }
+            }
+        }
+
+        // Compare Revision
+        if (pKey->Revision != (U8)PCI_FIELD_IGNORE)
+        {
+            if (pKey->Revision != pDevice->Key.Revision)
+            {
+                bMatchId = FALSE;
+            }
+        }
+
+        // Check if match on location and ID
+        if (bMatchLoc && bMatchId)
+        {
+            // Match found, check if it is the desired device
+            if (devCount == DeviceNumber)
+            {
+                DebugPrintf((
+                    "Criteria matched device %04X %04X [%02X:%02X.%d]\n",
+                    pDevice->Key.DeviceId, pDevice->Key.VendorId,
+                    pDevice->Key.bus, pDevice->Key.slot, pDevice->Key.function
+                    ));
+
+                // Copy the device information
+                *pKey = pDevice->Key;
+                return PLX_STATUS_OK;
+            }
+
+            // Increment device count
+            devCount++;
+        }
+
         // Go to next port
-        Port++;
+        portNum++;
     }
 
     // Return number of matched devices
-    *pNumMatched = DeviceCount;
+    *pNumMatched = devCount;
 
     DebugPrintf(("Criteria did not match any devices\n"));
     return PLX_STATUS_INVALID_OBJECT;

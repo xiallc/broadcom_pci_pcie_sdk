@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -313,14 +313,16 @@ DeviceListCreate(
 
     do
     {
-        // For I2C mode, allow user to cancel with 'ESC' key
-        if (ApiMode == PLX_API_MODE_I2C_AARDVARK)
+        // For non-PCI access, allow user to cancel with 'ESC' key
+        if ( (ApiMode == PLX_API_MODE_I2C_AARDVARK) ||
+             (ApiMode == PLX_API_MODE_MDIO_SPLICE) ||
+             (ApiMode == PLX_API_MODE_SDB) )
         {
             if (Cons_kbhit())
             {
                 if (Cons_getch() == 27)
                 {
-                    return DevCount | (U8)(1 << 7);
+                    return DevCount | (U8)(1 << 15);
                 }
             }
         }
@@ -364,6 +366,58 @@ DeviceListCreate(
                         break;
                 }
             }
+            else if (ApiMode == PLX_API_MODE_MDIO_SPLICE)
+            {
+                // Display error message for MDIO
+                switch (status)
+                {
+                    case PLX_STATUS_NO_DRIVER:
+                        Cons_printf("Error: No MDIO USB devices detected\n");
+                        break;
+
+                    case PLX_STATUS_INVALID_DATA:
+                        Cons_printf("Error: MDIO device %d not detected\n", pModeProp->Mdio.Port);
+                        break;
+
+                    case PLX_STATUS_IN_USE:
+                        Cons_printf("Error: MDIO device %d is in-use\n", pModeProp->Mdio.Port);
+                        break;
+
+                    case PLX_STATUS_INVALID_OBJECT:
+                        // No device matched, nothing to display
+                        break;
+
+                    default:
+                        Cons_printf("Error: MDIO status = %03X\n", status);
+                        break;
+                }
+            }
+            else if (ApiMode == PLX_API_MODE_SDB)
+            {
+                // Display error message for MDIO
+                switch (status)
+                {
+                    case PLX_STATUS_NO_DRIVER:
+                        Cons_printf("Error: COM/TTY port %d not detected\n", pModeProp->Sdb.Port);
+                        break;
+
+                    case PLX_STATUS_INVALID_DATA:
+                        Cons_printf("Error: No device detected over SDB\n");
+                        break;
+
+                    case PLX_STATUS_IN_USE:
+                        Cons_printf("Error: COM/TTY port %d in-use\n", pModeProp->Sdb.Port);
+                        break;
+
+                    case PLX_STATUS_INVALID_OBJECT:
+                        // No device matched, nothing to display
+                        break;
+
+                    default:
+                        Cons_printf("Error: SDB status = %03X\n", status);
+                        break;
+                }
+            }
         }
         else
         {
@@ -395,10 +449,7 @@ DeviceListCreate(
                     pNode->PciHeaderType &= 0x3F;
 
                     // Get port properties
-                    PlxPci_GetPortProperties(
-                        &DeviceObj,
-                        &pNode->PortProp
-                        );
+                    PlxPci_GetPortProperties( &DeviceObj, &pNode->PortProp );
 
                     // Store PCI Class Information
                     pNode->PciClass =
@@ -418,13 +469,29 @@ DeviceListCreate(
                 // Ensure status is ok to prevent halting before finding all devices
                 status = PLX_STATUS_OK;
 
-                if (ApiMode == PLX_API_MODE_I2C_AARDVARK)
+                // In non-PCI, display devices as they are detected
+                if ( (ApiMode == PLX_API_MODE_I2C_AARDVARK) ||
+                     (ApiMode == PLX_API_MODE_MDIO_SPLICE) ||
+                     (ApiMode == PLX_API_MODE_SDB) )
                 {
                     Device_GetClassString( pNode, DeviceText );
 
+                    // Display initial access-specific string
+                    if (ApiMode == PLX_API_MODE_I2C_AARDVARK)
+                    {
+                        Cons_printf(" Add: %d-%02X", pNode->Key.ApiIndex, pNode->Key.DeviceNumber );
+                    }
+                    else if (ApiMode == PLX_API_MODE_MDIO_SPLICE)
+                    {
+                        Cons_printf(" Add: %d", pNode->Key.ApiIndex );
+                    }
+                    else if (ApiMode == PLX_API_MODE_SDB)
+                    {
+                        Cons_printf(" Add: COM%d", pNode->Key.ApiIndex );
+                    }
+
                     Cons_printf(
-                        " Add: %d-%02X: %04X %02X P%d%s G%dx%d%s [D%d %02X:%02X.%X] - %s\n",
-                        pNode->Key.ApiIndex, pNode->Key.DeviceNumber,
+                        ": %04X %02X P%d%s G%dx%d%s [D%d %02X:%02X.%X] - %s\n",
                         pNode->Key.PlxChip, pNode->Key.PlxRevision,
                         pNode->PortProp.PortNumber,
                         (pNode->PortProp.PortNumber < 10) ? " " : "",
@@ -468,7 +535,7 @@ DeviceListDisplay(
 
     Cons_printf(
         "\n"
-        "   # D Bs Dv Fn Pt Dev  Ven  Chip Rv I2C  Description\n"
+        "   # D Bs Dv F Pt Dev  Ven  Chip Rv I/M  Description\n"
         " ------------------------------------------------------------------------------\n"
         );
 
@@ -513,7 +580,7 @@ DeviceListDisplay(
 
         // Display device description
         Cons_printf(
-            "%X %d %02X %02X %02X %s %04X %04X ",
+            "%X %d %02X %02X %X %s %04X %04X ",
             index,
             pNode->Key.domain,
             pNode->Key.bus,
@@ -551,10 +618,18 @@ DeviceListDisplay(
             Cons_printf(" --  --");
         }
 
-        // Display I2C address
+        // Display I2C/MDIO/SDB address
         if (pNode->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK)
         {
             Cons_printf(" %d:%02X", pNode->Key.ApiIndex, pNode->Key.DeviceNumber);
+        }
+        else if (pNode->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE)
+        {
+            Cons_printf("  M%d ", pNode->Key.ApiIndex);
+        }
+        else if (pNode->Key.ApiMode == PLX_API_MODE_SDB)
+        {
+            Cons_printf("  C%d ", pNode->Key.ApiIndex);
         }
         else
         {
@@ -562,7 +637,6 @@ DeviceListDisplay(
         }
 
         Device_GetClassString( pNode, DeviceText );
-
         Cons_printf(" %s\n", DeviceText);
 
         // Jump to next node
@@ -666,7 +740,7 @@ DeviceNodeAdd(
         }
         else
         {
-            // For I2C mode, skip adding device
+            // For I2C/MDIO/SDB mode, skip adding device
             // until end of list is reached
 
             // Add for PCI mode
@@ -677,6 +751,16 @@ DeviceNodeAdd(
                      (pKey->DeviceNumber > pNodeCurr->Key.DeviceNumber)))
                 {
                     // I2C device at higher port/address, add lower in list
+                }
+                else if ((pNodeCurr->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE) &&
+                         (pKey->ApiIndex > pNodeCurr->Key.ApiIndex))
+                {
+                    // MDIO device at higher port, add lower in list
+                }
+                else if ((pNodeCurr->Key.ApiMode == PLX_API_MODE_SDB) &&
+                         (pKey->ApiIndex > pNodeCurr->Key.ApiIndex))
+                {
+                    // SDB device at higher port, add lower in list
                 }
                 else
                 {
@@ -774,6 +858,24 @@ DeviceNodeExist(
                 if ((pKey->ApiIndex     == pNode->Key.ApiIndex) &&
                     (pKey->PlxPort      == pNode->Key.PlxPort)  &&
                     (pKey->DeviceNumber == pNode->Key.DeviceNumber))
+                {
+                    return TRUE;
+                }
+            }
+            else if (pKey->ApiMode == PLX_API_MODE_MDIO_SPLICE)
+            {
+                // For MDIO, also compare MDIO USB device & PLX port
+                if ((pKey->ApiIndex == pNode->Key.ApiIndex) &&
+                    (pKey->PlxPort  == pNode->Key.PlxPort))
+                {
+                    return TRUE;
+                }
+            }
+            else if (pKey->ApiMode == PLX_API_MODE_SDB)
+            {
+                // For SDB, also compare SDB COM port & PLX port
+                if ((pKey->ApiIndex == pNode->Key.ApiIndex) &&
+                    (pKey->PlxPort  == pNode->Key.PlxPort))
                 {
                     return TRUE;
                 }
@@ -929,11 +1031,11 @@ Device_GetClassString(
         case 0x9054:
         case 0x9056:
         case 0x9656:
-            strcpy( pClassText, "PLX PCI <==> Local Bus bridge" );
+            strcpy( pClassText, "PLX PCI <==> Local bus bridge" );
             break;
 
         case 0x8311:
-            strcpy( pClassText, "PLX PCIe <==> Local Bus bridge" );
+            strcpy( pClassText, "PLX PCIe <==> Local bus bridge" );
             break;
 
         case 0x6140:
@@ -970,45 +1072,45 @@ Device_GetClassString(
             break;
 
         case 0x0:
-            // Not PLX/Avago chip
+            // Not PLX/Broadcom chip
             break;
 
         default:
             //
-            // All other PLX/Avago devices (2000/8000/9000/C000/etc)
+            // All other PLX/Broadcom devices (2000/8000/9000/C000/etc)
             //
 
             // Default to unknown EP
-            strcpy( pClassText, "* Avago Unknown Endpoint *" );
+            strcpy( pClassText, "* Broadcom unknown endpoint *" );
 
             if (pNode->PortProp.PortType == PLX_PORT_UPSTREAM)
             {
                 if (pNode->Key.SubDeviceId == 0x100B)
                 {
-                    strcpy( pClassText, "Avago Synthetic PCIe Upstream port" );
+                    strcpy( pClassText, "Broadcom synthetic PCIe upstream" );
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_HOST)
                 {
-                    strcpy( pClassText, "Avago PCIe Host port" );
+                    strcpy( pClassText, "Broadcom PCIe host port" );
                 }
                 else
                 {
-                    strcpy( pClassText, "Avago PCIe Upstream port" );
+                    strcpy( pClassText, "Broadcom PCIe upstream port" );
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_DOWNSTREAM)
             {
                 if (pNode->Key.SubDeviceId == 0x100B)
                 {
-                    strcpy( pClassText, "Avago Synthetic PCIe Downstream port" );
+                    strcpy( pClassText, "Broadcom synthetic PCIe downstream" );
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_FABRIC)
                 {
-                    strcpy( pClassText, "Avago PCIe Fabric port" );
+                    strcpy( pClassText, "Broadcom PCIe fabric port" );
                 }
                 else
                 {
-                    strcpy( pClassText, "Avago PCIe Downstream port" );
+                    strcpy( pClassText, "Broadcom PCIe downstream port" );
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_ENDPOINT)
@@ -1017,74 +1119,82 @@ Device_GetClassString(
                 {
                     if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_TWC)
                     {
-                        strcpy( pClassText, "Avago Synthetic TWC endpoint" );
+                        strcpy( pClassText, "Broadcom synthetic TWC endpoint" );
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
                     {
-                        strcpy( pClassText, "Avago PCIe NT Virtual port" );
+                        strcpy( pClassText, "Broadcom PCIe NT virtual port" );
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
                     {
-                        strcpy( pClassText, "Avago PCIe NT Link port" );
+                        strcpy( pClassText, "Broadcom PCIe NT link port" );
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_NT)
                     {
-                        strcpy( pClassText, "Avago Synthetic NT 2.0 Endpoint" );
+                        strcpy( pClassText, "Broadcom synthetic NT 2.0 endpoint" );
                     }
                 }
                 else if (pNode->PciClass == 0x088000)   // Peripheral devices
                 {
                     if (pNode->Key.PlxPortType == PLX_SPEC_PORT_GEP)
                     {
-                        strcpy( pClassText, "Avago Global Endpoint (GEP)" );
+                        strcpy( pClassText, "Broadcom Global Endpoint (GEP)" );
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_EN_EP)
                     {
-                        strcpy( pClassText, "Avago Synthetic Enabler endpoint" );
+                        strcpy( pClassText, "Broadcom synthetic enabler endpoint" );
                     }
                     else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_DMA)
                     {
-                        strcpy( pClassText, "Avago PCIe DMA controller" );
+                        strcpy( pClassText, "Broadcom PCIe DMA controller" );
+                    }
+                    else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_GDMA)
+                    {
+                        strcpy( pClassText, "Broadcom synthetic gDMA endpoint" );
                     }
                 }
                 else if (pNode->PciClass == 0x028000)   // Network controllers
                 {
                     if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_NIC)
                     {
-                        strcpy( pClassText, "Avago Synthetic NIC endpoint" );
+                        strcpy( pClassText, "Broadcom synthetic NIC endpoint" );
                     }
                     else
                     {
-                        strcpy( pClassText, "Avago PCIe ExpressNIC (NT)" );
+                        strcpy( pClassText, "Broadcom PCIe ExpressNIC (NT)" );
                     }
                 }
                 else if (pNode->PciClass == 0x020000)
                 {
-                    strcpy( pClassText, "Avago PCIe Network controller" );
+                    strcpy( pClassText, "Broadcom PCIe network controller" );
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_MPT)
                 {
-                    strcpy( pClassText, "Avago MPT SAS controller" );
+                    strcpy( pClassText, "Broadcom MPT SES endpoint" );
+                }
+                else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_MPT_NO_SES)
+                {
+                    strcpy( pClassText, "Broadcom MPT endpoint (No SES)" );
                 }
                 else if (pNode->Key.PlxPortType == PLX_SPEC_PORT_SYNTH_MPT)
                 {
-                    strcpy( pClassText, "Avago Synthetic MPT SAS controller" );
+                    strcpy( pClassText, "Broadcom synthetic MPT SES endpoint" );
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT)
             {
                 if (pNode->PciClass == 0x0C03FE)
                 {
-                    strcpy( pClassText, "Avago USB controller" );
+                    strcpy( pClassText, "Broadcom USB controller" );
                 }
                 else
                 {
-                    strcpy( pClassText, "* Avago unknown Legacy endpoint *" );
+                    strcpy( pClassText, "* Broadcom unknown legacy endpoint *" );
                 }
             }
             else
             {
-                strcpy( pClassText, "* Avago PCIe unknown port type *" );
+                strcpy( pClassText, "* Broadcom PCIe unknown port type *" );
             }
             break;
     }
@@ -1094,11 +1204,11 @@ Device_GetClassString(
     {
         if (pNode->PortProp.PortType == PLX_PORT_UPSTREAM)
         {
-            strcpy( pClassText, "PCIe Upstream port" );
+            strcpy( pClassText, "PCIe upstream port" );
         }
         else if (pNode->PortProp.PortType == PLX_PORT_DOWNSTREAM)
         {
-            strcpy( pClassText, "PCIe Downstream port" );
+            strcpy( pClassText, "PCIe downstream port" );
         }
         else if (pNode->PortProp.PortType == PLX_PORT_ROOT_PORT)
         {
@@ -1232,10 +1342,7 @@ Plx_EepromFileLoad(
     pFile = fopen( pFileName, "rb" );
     if (pFile == NULL)
     {
-        Cons_printf(
-            "ERROR: Unable to load \"%s\"\n",
-            pFileName
-            );
+        Cons_printf("ERROR: Unable to load \"%s\"\n", pFileName);
         return FALSE;
     }
 
@@ -1249,7 +1356,7 @@ Plx_EepromFileLoad(
     fseek( pFile, 0, SEEK_SET );
 
     // Allocate a buffer for the data
-    pBuffer = malloc(FileSize);
+    pBuffer = malloc( FileSize );
     if (pBuffer == NULL)
     {
         fclose( pFile );
@@ -1257,12 +1364,15 @@ Plx_EepromFileLoad(
     }
 
     // Read data from file
-    fread(
-        pBuffer,        // Buffer for data
-        sizeof(U8),     // Item size
-        FileSize,       // Buffer size
-        pFile           // File pointer
-        );
+    if (fread(
+            pBuffer,        // Buffer for data
+            sizeof(U8),     // Item size
+            FileSize,       // Buffer size
+            pFile           // File pointer
+            ) == 0)
+    {
+        // Avoid compiler warning
+    }
 
     // Close the file
     fclose( pFile );
@@ -1452,12 +1562,15 @@ Plx_EepromFileSave(
         }
 
         // Write data to file
-        fwrite(
-            &value,         // Buffer to write
-            sizeof(U32),    // Item size
-            1,              // Item count
-            pFile           // File pointer
-            );
+        if (fwrite(
+                &value,         // Buffer to write
+                sizeof(U32),    // Item size
+                1,              // Item count
+                pFile           // File pointer
+                ) == 0)
+        {
+            // Avoid compiler warning
+        }
     }
 
     // In case of 8114 revision, some versions require an
@@ -1467,12 +1580,15 @@ Plx_EepromFileSave(
         value = 0;
 
         // Write data to file
-        fwrite(
-            &value,         // Buffer to write
-            sizeof(U32),    // Item size
-            1,              // Item count
-            pFile           // File pointer
-            );
+        if (fwrite(
+                &value,         // Buffer to write
+                sizeof(U32),    // Item size
+                1,              // Item count
+                pFile           // File pointer
+                ) == 0)
+        {
+            // Avoid compiler warning
+        }
 
         // Update EEPROM size
         EepSize += sizeof(U32);
@@ -1542,10 +1658,7 @@ Plx8000_EepromFileLoad(
     pFile = fopen( pFileName, "rb" );
     if (pFile == NULL)
     {
-        Cons_printf(
-            "ERROR: Unable to load \"%s\"\n",
-            pFileName
-            );
+        Cons_printf("ERROR: Unable to load \"%s\"\n", pFileName);
         return FALSE;
     }
 
@@ -1567,12 +1680,15 @@ Plx8000_EepromFileLoad(
     }
 
     // Read data from file
-    fread(
-        pBuffer,        // Buffer for data
-        sizeof(U8),     // Item size
-        FileSize,       // Buffer size
-        pFile           // File pointer
-        );
+    if (fread(
+            pBuffer,        // Buffer for data
+            sizeof(U8),     // Item size
+            FileSize,       // Buffer size
+            pFile           // File pointer
+            ) == 0)
+    {
+        // Avoid compiler warning
+    }
 
     // Close the file
     fclose( pFile );
@@ -1681,7 +1797,10 @@ Plx8000_EepromFileLoad(
         {
             Cons_fflush( stdout );
             PlxPci_EepromCrcUpdate( pDevice, &Crc, TRUE );
-            Cons_printf("Ok (CRC=%08X offset=%02Xh)\n", (int)Crc, (EepHeader >> 16) + sizeof(U32));
+            Cons_printf(
+                "Ok (CRC=%08X offset=%02Xh)\n",
+                (int)Crc, (EepHeader >> 16) + sizeof(U32)
+                );
         }
     }
 
@@ -1835,12 +1954,15 @@ Plx8000_EepromFileSave(
     }
 
     // Write buffer to file
-    fwrite(
-        pBuffer,        // Buffer to write
-        sizeof(U8),     // Item size
-        EepSize,        // Buffer size
-        pFile           // File pointer
-        );
+    if (fwrite(
+            pBuffer,        // Buffer to write
+            sizeof(U8),     // Item size
+            EepSize,        // Buffer size
+            pFile           // File pointer
+            ) == 0)
+    {
+        // Avoid compiler warning
+    }
 
     // Close the file
     fclose( pFile );

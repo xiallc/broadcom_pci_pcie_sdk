@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,12 +43,12 @@
  *
  * Revision History:
  *
- *      09-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <asm/uaccess.h>     // For user page access
+#include <linux/uaccess.h>   // For user page access
 #include <linux/mm.h>        // For page mapping definitions & functions
 #include "ApiFunc.h"
 #include "Dispatch.h"
@@ -76,7 +76,7 @@ Dispatch_open(
     DEVICE_OBJECT *fdo;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received message ==> OPEN_DEVICE\n"));
 
     if (iminor(inode) != PLX_MNGMT_INTERFACE)
@@ -95,7 +95,9 @@ Dispatch_open(
 
     // Acquire open mutex
     if (down_interruptible( &(fdo->DeviceExtension->Mutex_DeviceOpen) ) < 0)
+    {
         return (-ERESTARTSYS);
+    }
 
     // Increment open count for this device
     fdo->DeviceExtension->OpenCount++;
@@ -107,7 +109,6 @@ Dispatch_open(
     filp->private_data = fdo;
 
     DebugPrintf(("...device opened\n"));
-
     return 0;
 }
 
@@ -131,7 +132,7 @@ Dispatch_release(
     DEVICE_OBJECT *fdo;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received message ==> CLOSE_DEVICE\n"));
 
     if (iminor(inode) != PLX_MNGMT_INTERFACE)
@@ -150,7 +151,9 @@ Dispatch_release(
 
     // Acquire open mutex
     if (down_interruptible( &(fdo->DeviceExtension->Mutex_DeviceOpen) ) < 0)
+    {
         return (-ERESTARTSYS);
+    }
 
     // Decrement open count for this device
     fdo->DeviceExtension->OpenCount--;
@@ -170,7 +173,6 @@ Dispatch_release(
     filp->private_data = NULL;
 
     DebugPrintf(("...device closed\n"));
-
     return 0;
 }
 
@@ -199,7 +201,7 @@ Dispatch_mmap(
     struct list_head *pEntry;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received message ===> MMAP\n"));
 
     // Get device extension
@@ -327,13 +329,17 @@ Dispatch_mmap(
 
     // Set caching based on BAR properties
     if (pDevice->PciBar[offset].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE)
+    {
         vma->vm_page_prot = pgprot_writecombine( vma->vm_page_prot );
+    }
     else
+    {
         vma->vm_page_prot = pgprot_noncached( vma->vm_page_prot );
+    }
 
     // Map device memory
     rc =
-        Plx_io_remap_pfn_range(
+        io_remap_pfn_range(
             vma,
             vma->vm_start,
             AddressToMap >> PAGE_SHIFT,
@@ -357,7 +363,6 @@ Dispatch_mmap(
     }
 
     DebugPrintf(("...Completed message\n"));
-
     return rc;
 }
 
@@ -432,7 +437,7 @@ Dispatch_IoControl(
             break;
     }
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received PLX message ===> "));
 
     // Handle the PLX specific message

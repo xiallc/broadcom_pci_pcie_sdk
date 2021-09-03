@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,12 +43,12 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      11-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <asm/uaccess.h>    // For copy_to/from_user()
+#include <linux/uaccess.h>  // For copy_to/from_user()
 #include <linux/sched.h>    // For MAX_SCHED_TIMEOUT & TASK_UNINTERRUPTIBLE
 #include "ApiFunc.h"
 #include "PciFunc.h"
@@ -99,28 +99,14 @@ PlxDeviceFind(
         // Compare device key information
         //
 
-        // Compare Bus number
-        if (pKey->bus != (U8)PCI_FIELD_IGNORE)
+        // Compare Bus, Slot, Fn numbers
+        if ( (pKey->bus      != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->slot     != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->function != (U8)PCI_FIELD_IGNORE) )
         {
-            if (pKey->bus != pdx->Key.bus)
-            {
-                bMatchLoc = FALSE;
-            }
-        }
-
-        // Compare Slot number
-        if (pKey->slot != (U8)PCI_FIELD_IGNORE)
-        {
-            if (pKey->slot != pdx->Key.slot)
-            {
-                bMatchLoc = FALSE;
-            }
-        }
-
-        // Compare Function number
-        if (pKey->function != (U8)PCI_FIELD_IGNORE)
-        {
-            if (pKey->function != pdx->Key.function)
+            if ( (pKey->bus      != pdx->Key.bus)  ||
+                 (pKey->slot     != pdx->Key.slot) ||
+                 (pKey->function != pdx->Key.function) )
             {
                 bMatchLoc = FALSE;
             }

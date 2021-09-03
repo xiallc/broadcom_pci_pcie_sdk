@@ -33,9 +33,12 @@ BuildApp: CreateOutputDir $(PLX_OBJECTS)
 BuildLibrary: CreateOutputDir $(PLX_OBJECTS)
 	$(OPTIONAL_LF)
 	@echo 'LIB $(ImageName).a'
-	$(AR) -rc $(VERBOSE) $(OUT_DIR)/$(ImageName).a $(PLX_OBJECTS)
+	$(AR) -rc $(OUT_DIR)/$(ImageName).a $(PLX_OBJECTS)
+	$(OPTIONAL_LF)
+	@echo 'LIB $(ImageName).so'
+	$(CC) -shared -o $(OUT_DIR)/$(ImageName).so $(PLX_OBJECTS)
 	@echo
-	@echo Library \"$(OUT_DIR)/$(ImageName).a\" built successfully
+	@echo Libraries \"$(OUT_DIR)/$(ImageName).a\" \& \"$(OUT_DIR)/$(ImageName).so\" built successfully
 	@echo
 
 
@@ -52,6 +55,7 @@ SaveDriverObjects: CreateOutputDir
 	@rm $(VERBOSE) -f Module.symvers
 	@rm $(VERBOSE) -f Module.markers
 	@rm $(VERBOSE) -f modules.order
+	@rm $(VERBOSE) -f .cache.mk
 	@mv $(VERBOSE) $(ImageName).ko        $(OUT_DIR)
 	@if [ -f $(ImageName).ko.* ]; then mv $(VERBOSE) $(ImageName).ko.* $(OUT_DIR); fi
 	@mv $(VERBOSE) $(ImageName).o         $(OBJ_DIR)
@@ -110,7 +114,7 @@ DisplayParameters:
 	@echo - CPU: $(ARCH) \($(PLX_CPU_BITS)-bit $(PLX_CPU_ENDIAN) Endian\)
 	@echo - CMP: $(CROSS_COMPILE)gcc
 	@echo - TYP: $(PLX_CHIP) $(TGT_TYPE)
-	@echo - PLX: SDK v$(SDK_VER);
+	@echo - PKG: PCI/PCIe SDK v$(SDK_VER);
 	@if [ "$(PLX_ENV)" != "" ]; then \
 	    echo - ENV: $(PLX_ENV); \
 	 fi
@@ -135,24 +139,25 @@ cleanobj:
 	@echo Clean: $(ImageName)
 	@echo
 	@echo Delete: Intermediate build files...
-	@rm -v -f    Module.symvers
-	@rm -v -f    Module.markers
-	@rm -v -f    modules.order
-	@rm -v -f    $(COMMON_DIR)/*.o
-	@rm -v -f    $(COMMON_DIR)/.*.o.*
-	@rm -v -f    $(COMMON_DIR)/.*.cmd
-	@rm -v -f    $(PLX_CHIP_DIR)/*.o
-	@rm -v -f    $(PLX_CHIP_DIR)/.*.o.*
-	@rm -v -f    $(PLX_CHIP_DIR)/.*.cmd
 	@rm -v -f -r $(OBJ_DIR)
 	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
+	    rm -v -f Module.symvers \
+	    rm -v -f Module.markers \
+	    rm -v -f modules.order \
+	    rm -v -f .cache.mk \
+	    rm -v -f $(COMMON_DIR)/*.o \
+	    rm -v -f $(COMMON_DIR)/.*.o.* \
+	    rm -v -f $(COMMON_DIR)/.*.cmd \
+	    rm -v -f $(PLX_CHIP_DIR)/*.o \
+	    rm -v -f $(PLX_CHIP_DIR)/.*.o.* \
+	    rm -v -f $(PLX_CHIP_DIR)/.*.cmd \
+	    rm -v -f .tmp_versions/$(ImageName).mod \
 	    rm -v -f $(ImageName).*; \
 	    rm -v -f .$(ImageName).*; \
-	 fi
-	@rm -v -f .tmp_versions/$(ImageName).mod
-	@if [ -d .tmp_versions ]; then \
-	     rmdir -v --ignore-fail-on-non-empty .tmp_versions; \
-	 fi
+	    if [ -d .tmp_versions ]; then \
+	        rmdir -v --ignore-fail-on-non-empty .tmp_versions; \
+	    fi \
+	fi
 	@echo Delete: ....finished!
 	@echo
 

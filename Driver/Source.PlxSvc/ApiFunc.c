@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,13 +43,13 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      11-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
 
 #include <linux/slab.h>     // For kmalloc()
-#include <asm/uaccess.h>    // For copy_to/from_user()
+#include <linux/uaccess.h>  // For copy_to/from_user()
 #include "ApiFunc.h"
 #include "ChipFunc.h"
 #include "Eep_6000.h"
@@ -106,28 +106,14 @@ PlxDeviceFind(
         // Compare device key information
         //
 
-        // Compare Bus number
-        if (pKey->bus != (U8)PCI_FIELD_IGNORE)
+        // Compare Bus, Slot, Fn numbers
+        if ( (pKey->bus      != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->slot     != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->function != (U8)PCI_FIELD_IGNORE) )
         {
-            if (pKey->bus != pDevice->Key.bus)
-            {
-                bMatchLoc = FALSE;
-            }
-        }
-
-        // Compare Slot number
-        if (pKey->slot != (U8)PCI_FIELD_IGNORE)
-        {
-            if (pKey->slot != pDevice->Key.slot)
-            {
-                bMatchLoc = FALSE;
-            }
-        }
-
-        // Compare Function number
-        if (pKey->function != (U8)PCI_FIELD_IGNORE)
-        {
-            if (pKey->function != pDevice->Key.function)
+            if ( (pKey->bus      != pDevice->Key.bus)  ||
+                 (pKey->slot     != pDevice->Key.slot) ||
+                 (pKey->function != pDevice->Key.function) )
             {
                 bMatchLoc = FALSE;
             }
@@ -266,9 +252,8 @@ PlxChipTypeSet(
     U8              *pFamily
     )
 {
-    U16           TempChip;
-    BOOLEAN       bSetUptreamNode;
-    PLX_PORT_PROP PortProp;
+    U16     TempChip;
+    BOOLEAN bSetUptreamNode;
 
 
     // Default to non-upstream node
@@ -324,13 +309,8 @@ PlxChipTypeSet(
             break;
 
         case 0x8000:
-            // Get port properties to ensure upstream node
-            PlxGetPortProperties(
-                pdx,
-                &PortProp
-                );
-
-            if (PortProp.PortType != PLX_PORT_UPSTREAM)
+            // Ensure upstream node
+            if (pdx->PortProp.PortType != PLX_PORT_UPSTREAM)
             {
                 DebugPrintf(("ERROR - Chip type may only be changed on upstream port\n"));
                 return PLX_STATUS_UNSUPPORTED;
@@ -430,7 +410,7 @@ PlxGetPortProperties(
         pPortProp->bNonPcieDevice = TRUE;
 
         // Default to a legacy endpoint
-        if (pdx->PciHeaderType == 0)
+        if (pdx->PciHeaderType == PCI_HDR_TYPE_0)
         {
             pPortProp->PortType = PLX_PORT_LEGACY_ENDPOINT;
         }
@@ -543,9 +523,6 @@ PlxGetPortProperties(
         pPortProp->PortNumber = pdx->Key.slot;
     }
 
-    // Store the port number in the device properties
-    pdx->PortNumber = pPortProp->PortNumber;
-
     DebugPrintf((
         "[D%d %02X:%02X.%X] P=%d T=%d MPS=%d/%d MRR=%d L=G%dx%d/G%dx%d\n",
         pdx->Key.domain, pdx->Key.bus, pdx->Key.slot, pdx->Key.function,
@@ -608,6 +585,7 @@ PlxRegisterRead(
         case 0x8600:
         case 0x8700:
         case 0x9700:
+        case 0xC000:
             TempChip = 0x8000;
             break;
 
@@ -676,6 +654,7 @@ PlxRegisterWrite(
         case 0x8600:
         case 0x8700:
         case 0x9700:
+        case 0xC000:
             TempChip = 0x8000;
             break;
 
@@ -729,14 +708,14 @@ PlxPciBarProperties(
     // Verify BAR index
     switch (pdx->PciHeaderType)
     {
-        case 0:
+        case PCI_HDR_TYPE_0:
             if ((BarIndex != 0) && (BarIndex > 5))
             {
                 return PLX_STATUS_INVALID_ACCESS;
             }
             break;
 
-        case 1:
+        case PCI_HDR_TYPE_1:
             if ((BarIndex != 0) && (BarIndex != 1))
             {
                 DebugPrintf(("BAR %d does not exist on PCI type 1 header\n", BarIndex));
@@ -1987,7 +1966,6 @@ PlxPciPerformanceInitializeProperties(
 {
     U8            StnPortCount;
     PLX_PERF_PROP PerfProp;
-    PLX_PORT_PROP PortProp;
 
 
     // Clear performance object
@@ -2005,6 +1983,7 @@ PlxPciPerformanceInitializeProperties(
             break;
 
         case PLX_FAMILY_SIRIUS:
+        case PLX_FAMILY_ATLAS:
             StnPortCount = 16;
             break;
 
@@ -2018,10 +1997,10 @@ PlxPciPerformanceInitializeProperties(
             return PLX_STATUS_UNSUPPORTED;
     }
 
-    // Get port properties
-    PlxGetPortProperties( pdx, &PortProp );
+    // Update port properties
+    PlxGetPortProperties( pdx, &pdx->PortProp );
 
-    if (PortProp.PortNumber >= PERF_MAX_PORTS)
+    if (pdx->PortProp.PortNumber >= PERF_MAX_PORTS)
     {
         DebugPrintf(("ERROR - Port number exceeds maximum (%d)\n", (PERF_MAX_PORTS-1)));
         return PLX_STATUS_UNSUPPORTED;
@@ -2031,13 +2010,13 @@ PlxPciPerformanceInitializeProperties(
     PerfProp.PlxFamily = pdx->Key.PlxFamily;
 
     // Store relevant port properties for later calculations
-    PerfProp.PortNumber = PortProp.PortNumber;
-    PerfProp.LinkWidth  = PortProp.LinkWidth;
-    PerfProp.LinkSpeed  = PortProp.LinkSpeed;
+    PerfProp.PortNumber = pdx->PortProp.PortNumber;
+    PerfProp.LinkWidth  = pdx->PortProp.LinkWidth;
+    PerfProp.LinkSpeed  = pdx->PortProp.LinkSpeed;
 
     // Determine station and port number within station
-    PerfProp.Station     = (U8)(PortProp.PortNumber / StnPortCount);
-    PerfProp.StationPort = (U8)(PortProp.PortNumber % StnPortCount);
+    PerfProp.Station     = (U8)(pdx->PortProp.PortNumber / StnPortCount);
+    PerfProp.StationPort = (U8)(pdx->PortProp.PortNumber % StnPortCount);
 
     // Copy result to user buffer
     if (copy_to_user( pPerfProp, &PerfProp, sizeof(PLX_PERF_PROP) ) != 0)
@@ -2069,12 +2048,16 @@ PlxPciPerformanceMonitorControl(
     U8  bEgressAllPorts;
     U32 i;
     U32 offset;
+    U32 pexBase;
     U32 RegValue;
     U32 RegCommand;
     U32 StnCount;
     U32 StnPortCount;
     U32 Offset_Control;
 
+
+    // Set default base offset to PCIe port registers
+    pexBase = 0;
 
     // Verify supported device
     switch (pdx->Key.PlxFamily)
@@ -2100,6 +2083,11 @@ PlxPciPerformanceMonitorControl(
             Offset_Control = 0x3E0;
             break;
 
+        case PLX_FAMILY_ATLAS:
+            pexBase        = ATLAS_PEX_REGS_BASE_OFFSET;
+            Offset_Control = 0x3E0;
+            break;
+
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return PLX_STATUS_UNSUPPORTED;
@@ -2109,12 +2097,12 @@ PlxPciPerformanceMonitorControl(
     {
         case PLX_PERF_CMD_START:
             DebugPrintf(("Reset & enable monitor with infinite sampling\n"));
-            RegCommand = (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27);
+            RegCommand = ((U32)1 << 31) | ((U32)1 << 30) | ((U32)1 << 28) | ((U32)1 << 27);
             break;
 
         case PLX_PERF_CMD_STOP:
             DebugPrintf(("Reset & disable monitor\n"));
-            RegCommand = (1 << 30);
+            RegCommand = ((U32)1 << 30);
             break;
 
         default:
@@ -2153,9 +2141,13 @@ PlxPciPerformanceMonitorControl(
              ************************************************************/
             // In MIRA legacy EP mode, PCIe registers start at 1000h
             if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+            {
                 offset = 0x1664;
+            }
             else
+            {
                 offset = 0x664;
+            }
 
             // Clear 664[29:20] to enable all counters
             RegValue = PLX_8000_REG_READ( pdx, offset );
@@ -2167,6 +2159,7 @@ PlxPciPerformanceMonitorControl(
         case PLX_FAMILY_DRACO_2:
         case PLX_FAMILY_CAPELLA_1:
         case PLX_FAMILY_CAPELLA_2:
+        case PLX_FAMILY_ATLAS:
             // Set device configuration
             if (pdx->Key.PlxFamily == PLX_FAMILY_CYGNUS)
             {
@@ -2180,30 +2173,49 @@ PlxPciPerformanceMonitorControl(
                 Bit_EgressEn = 6;
                 StnCount     = 3;
                 StnPortCount = 8;    // Device actually only uses 6 ports out of 8
-
-                // Set 3F0[9:8] to disable probe mode interval timer
-                // & avoid RAM pointer corruption
-                if (command == PLX_PERF_CMD_START)
-                {
-                    RegValue = PLX_8000_REG_READ( pdx, 0x3F0 );
-                    PLX_8000_REG_WRITE( pdx, 0x3F0, RegValue | (3 << 8) );
-                }
             }
             else if ((pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
-                     (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
+                     (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) ||
+                     (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS))
             {
                 Bit_EgressEn    = 6;
                 StnCount        = 6;
                 StnPortCount    = 4;
                 bStationBased   = TRUE;
                 bEgressAllPorts = TRUE;
+
+                // Override station port count for Atlas
+                if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+                {
+                    StnPortCount = 16;
+                }
+
+                // Disable probe mode (350h[8]=0)
+                if (command == PLX_PERF_CMD_START)
+                {
+                    RegValue = PLX_8000_REG_READ( pdx, pexBase + 0x350 );
+                    PLX_8000_REG_WRITE( pdx, pexBase + 0x350, RegValue & ~((U32)1 << 8) );
+                }
+            }
+
+            // For certain chips, set 3F0h[9:8]=3 to disable probe mode interval
+            // timer & avoid RAM pointer corruption
+            if ( (command == PLX_PERF_CMD_START) &&
+                 ((pdx->Key.PlxFamily == PLX_FAMILY_DRACO_1)   ||
+                  (pdx->Key.PlxFamily == PLX_FAMILY_DRACO_2)   ||
+                  (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
+                  (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) ||
+                  (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)) )
+            {
+                RegValue = PLX_8000_REG_READ( pdx, pexBase + 0x3F0 );
+                PLX_8000_REG_WRITE( pdx, pexBase + 0x3F0, RegValue | (3 << 8) );
             }
 
             // Enable/Disable Performance Counter in each station (or ports if applicable)
             for (i = 0; i < (StnCount * StnPortCount); i++)
             {
                 // Set port base offset
-                offset = (i * 0x1000);
+                offset = pexBase + (i * 0x1000);
 
                 // Ingress ports (in station port 0 only)
                 if ((i % StnPortCount) == 0)
@@ -2212,11 +2224,11 @@ PlxPciPerformanceMonitorControl(
 
                     if (command == PLX_PERF_CMD_START)
                     {
-                        PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue | (1 << 29) );
+                        PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue | ((U32)1 << 29) );
                     }
                     else
                     {
-                        PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue & ~(1 << 29) );
+                        PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue & ~((U32)1 << 29) );
                     }
                 }
 
@@ -2225,13 +2237,19 @@ PlxPciPerformanceMonitorControl(
                 {
                     RegValue = PLX_8000_REG_READ( pdx, offset + 0xF30 );
 
+                    // On Atlas, F30h[21] is egress credit enable but always reads 0, so ensure remains set
+                    if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+                    {
+                        RegValue |= ((U32)1 << 21);
+                    }
+
                     if (command == PLX_PERF_CMD_START)
                     {
-                        PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue | (1 << Bit_EgressEn) );
+                        PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue | ((U32)1 << Bit_EgressEn) );
                     }
                     else
                     {
-                        PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue & ~(1 << Bit_EgressEn) );
+                        PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue & ~((U32)1 << Bit_EgressEn) );
                     }
                 }
             }
@@ -2245,7 +2263,7 @@ PlxPciPerformanceMonitorControl(
         {
             PLX_8000_REG_WRITE(
                 pdx,
-                Offset_Control + (i * StnPortCount * 0x1000),
+                pexBase + Offset_Control + (i * StnPortCount * 0x1000),
                 RegCommand
                 );
         }
@@ -2299,6 +2317,10 @@ PlxPciPerformanceResetCounters(
             Offset_Control = 0x3E0;
             break;
 
+        case PLX_FAMILY_ATLAS:
+            Offset_Control = ATLAS_PEX_REGS_BASE_OFFSET + 0x3E0;
+            break;
+
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return PLX_STATUS_UNSUPPORTED;
@@ -2311,19 +2333,25 @@ PlxPciPerformanceResetCounters(
         StnCount     = 6;
         StnPortCount = 4;
     }
+    else if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+    {
+        StnCount     = 6;
+        StnPortCount = 16;
+    }
     else
     {
         StnCount     = 1;
         StnPortCount = 0;
     }
 
+    // Enable monitor in each station
     for (i = 0; i < StnCount; i++)
     {
         // Reset (30) & enable monitor (31) & infinite sampling (28) & start (27)
         PLX_8000_REG_WRITE(
             pdx,
             Offset_Control + (i * StnPortCount * 0x1000),
-            (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27)
+            ((U32)1 << 31) | ((U32)1 << 30) | ((U32)1 << 28) | ((U32)1 << 27)
             );
     }
 
@@ -2347,6 +2375,7 @@ PlxPciPerformanceResetCounters(
  *   EG    = Egress port
  *   PH    = Number of Posted Headers (Write TLPs)
  *   PDW   = Number of Posted DWords
+ *   NPH   = Number of Non-Posted Headers
  *   NPDW  = Non-Posted DWords (Read TLP Dwords)
  *   CPLH  = Number of Completion Headers (CPL TLPs)
  *   CPLDW = Number of Completion DWords
@@ -2356,15 +2385,15 @@ PlxPciPerformanceResetCounters(
  *   RAW   = USB endpoint raw byte count
  *   PKT   = USB endpoint packet count
  *
- *          Deneb & Cygnus                  Draco                     Sirius
- *     --------------------------   -----------------------   -------------------------
- *         14 counters/port           14 counters/port          13 counters/port
- *          4 ports/station            6 ports/station          16 ports/station
- *   Deneb: 3 stations (12 ports)      3 stations (18 ports)     1 station (16 ports)
- *  Cygnus: 6 stations (24 ports)
- *         56 counters/station        84 counters/station      208 counters/station
- * Deneb: 168 counters (56 * 3)      252 counters (84 * 3)     208 counters (208 * 1)
- *Cygnus: 336 counters (56 * 6)
+ *           Deneb & Cygnus                  Draco                     Sirius
+ *      --------------------------   ----------------------    ----------------------
+ *          14 counters/port          14 counters/port          13 counters/port
+ *           4 ports/station           6 ports/station          16 ports/station
+ *    Deneb: 3 stations (12 ports)     3 stations (18 ports)     1 station (16 ports)
+ *   Cygnus: 6 stations (24 ports)
+ *          56 counters/station       84 counters/station      208 counters/station
+ *  Deneb: 168 counters (56 * 3)     252 counters (84 * 3)     208 counters (208 * 1)
+ * Cygnus: 336 counters (56 * 6)
  *
  *       off     Counter            off     Counter            off      Counter
  *           -----------------          -----------------          ------------------
@@ -2454,113 +2483,113 @@ PlxPciPerformanceResetCounters(
  *                                                             33C| Port 15 PHY      |
  *                                                                 ------------------
  *
- *             Mira                        Capella-1/2
- *     --------------------------    -----------------------
- *        14 PCIe counters/port      14 counters/port
- *         4 ports/station            4 pts/stn but 5 in RAM
- *         1 stations (4 ports)       6 stn (24 ports)
- *                                  *SW uses 30 pts to read all
- *        86 counters/station
- *        86 counters (86 * 1)        70 counters/station
- *                                   420 counters (70 * 6)
+ *       Mira                        Capella-1/2                            Atlas
+ * -----------------------     -----------------------               -----------------------
+ *  14 PCIe counters/port      14 counters/port                      14 counters/port
+ *   4 ports/station            4 pts/stn but 5 in RAM               16 ports/station
+ *   1 stations (4 ports)       6 stn (24 ports)                      6 stations (96 ports)
+ *                            *SW uses 30 pts to read all
+ *  86 counters/station                                             224 counters/station
+ *  86 counters (86 * 1)        70 counters/station               1,344 counters (224 * 6)
+ *                             420 counters (70 * 6)
  *
- *       off     Counter             off     Counter
- *           -----------------           -----------------
- *         0| Port 0 IN PH    |        0| Port 0 IN PH    |
- *         4| Port 0 IN PDW   |        4| Port 0 IN PDW   |
- *         8| Port 0 IN NPDW  |        8| Port 0 IN NPDW  |
- *         C| Port 0 IN CPLH  |        C| Port 0 IN CPLH  |
- *        10| Port 0 IN CPLDW |       10| Port 0 IN CPLDW |
- *          |-----------------|         |-----------------|
- *        14| Port 1 IN PH    |       14| Port 1 IN PH    |
- *          |       :         |         |       :         |
- *          |       :         |         |       :         |
- *        24| Port 1 IN CPLDW |       24| Port 1 IN CPLDW |
- *          |-----------------|         |/\/\/\/\/\/\/\/\/|
- *        28| Port 2 IN PH    |         |       :         |
- *          |       :         |         |       :         |
- *          |       :         |         |       :         |
- *        38| Port 2 IN CPLDW |         |       :         |
- *          |-----------------|         |       :         |
- *        3C| Port 3 IN PH    |         |/\/\/\/\/\/\/\/\/|
- *          |       :         |       50| Port 4 IN PH    |
- *          |       :         |         |       :         |
- *        4C| Port 3 IN CPLDW |         |       :         |
- *          |-----------------|       60| Port 4 IN CPLDW |
- *        50| Port 0 EG PH    |         |-----------------|
- *        54| Port 0 EG PDW   |       64| Port 0 EG PH    |
- *        58| Port 0 EG NPDW  |       68| Port 0 EG PDW   |
- *        5C| Port 0 EG CPLH  |       6c| Port 0 EG NPDW  |
- *        60| Port 0 EG CPLDW |       70| Port 0 EG CPLH  |
- *          |-----------------|       74| Port 0 EG CPLDW |
- *        64| Port 1 EG PH    |         |-----------------|
- *          |       :         |       78| Port 1 EG PH    |
- *          |       :         |         |       :         |
- *        74| Port 1 EG CPLDW |         |       :         |
- *          |-----------------|       88| Port 1 EG CPLDW |
- *        78| Port 2 EG PH    |         |/\/\/\/\/\/\/\/\/|
- *          |       :         |         |       :         |
- *          |       :         |         |       :         |
- *        88| Port 2 EG CPLDW |         |       :         |
- *          |-----------------|         |       :         |
- *        8C| Port 3 EG PH    |         |       :         |
- *          |       :         |         |/\/\/\/\/\/\/\/\/|
- *          |       :         |         |-----------------|
- *        9C| Port 3 EG CPLDW |       B4| Port 4 EG PH    |
- *          |-----------------|         |       :         |
- *        A0| Port 0 IN DLLP  |         |       :         |
- *        A4| Port 1 IN DLLP  |       C4| Port 4 EG CPLDW |
- *        A8| Port 2 IN DLLP  |         |-----------------|
- *        AC| Port 3 IN DLLP  |       C8| Port 0 IN DLLP  |
- *          |-----------------|       CC| Port 1 IN DLLP  |
- *        B0| Port 0 EG DLLP  |       D0| Port 2 IN DLLP  |
- *        B4| Port 1 EG DLLP  |       D4| Port 3 IN DLLP  |
- *        B8| Port 2 EG DLLP  |       D8| Port 4 IN DLLP  |
- *        BC| Port 3 EG DLLP  |         |-----------------|
- *          |-----------------|       DC| -- Invalid --   |
- *        C0| GPEP_0 IN PLD   |       E0| Port 0 EG DLLP  |
- *        C4| GPEP_0 IN RAW   |       E4| Port 1 EG DLLP  |
- *        C8| GPEP_0 IN PKT   |       E8| Port 2 EG DLLP  |
- *          |-----------------|       EC| Port 3 EG DLLP  |*P4 EG DLLP missing
- *        CC| GPEP_1 IN PLD   |         |-----------------|
- *        D0| GPEP_1 IN RAW   |       F0| Port 0 IN PHY   |
- *        D4| GPEP_1 IN PKT   |       F4| Port 1 IN PHY   |
- *          |-----------------|       F8| Port 2 IN PHY   |
- *        D8| GPEP_2 IN PLD   |       FC| Port 3 IN PHY   |
- *        DC| GPEP_2 IN RAW   |      100| Port 4 IN PHY   |
- *        E0| GPEP_2 IN PKT   |         |-----------------|
- *          |-----------------|      104| Port 0 EG PHY   |
- *        E4| GPEP_3 IN PLD   |      108| Port 1 EG PHY   |
- *        E8| GPEP_3 IN RAW   |      10C| Port 2 EG PHY   |
- *        EC| GPEP_3 IN PKT   |      110| Port 3 EG PHY   |
- *          |-----------------|      114| Port 4 EG PHY   |
- *        F0| GPEP_0 OUT PLD  |          -----------------
- *        F4| GPEP_0 OUT RAW  |
- *        F8| GPEP_0 OUT PKT  |
- *          |-----------------|
- *        FC| GPEP_1 OUT PLD  |
- *       100| GPEP_1 OUT RAW  |
- *       104| GPEP_1 OUT PKT  |
- *          |-----------------|
- *       108| GPEP_2 OUT PLD  |
- *       10C| GPEP_2 OUT RAW  |
- *       110| GPEP_2 OUT PKT  |
- *          |-----------------|
- *       114| GPEP_3 OUT PLD  |
- *       118| GPEP_3 OUT RAW  |
- *       11C| GPEP_3 OUT PKT  |
- *          |-----------------|
- *       120| EP_0 IN PLD     |
- *       124| EP_0 IN RAW     |
- *       128| EP_0 IN PKT     |
- *          |-----------------|
- *       12C| EP_0 OUT PLD    |
- *       130| EP_0 OUT RAW    |
- *       134| EP_0 OUT PKT    |
- *          |-----------------|
- *       138| PHY (always 0)  |
- *       13C| PHY (always 0)  |
- *           -----------------
+ * off     Counter             off     Counter                      off     Counter
+ *     -----------------           -----------------                    -----------------
+ *   0| Port 0 IN PH    |        0| Port 0 IN PH    |                 0| Port 0 IN PH    |
+ *   4| Port 0 IN PDW   |        4| Port 0 IN PDW   |                 4| Port 0 IN PDW   |
+ *   8| Port 0 IN NPDW  |        8| Port 0 IN NPDW  |                 8| Port 0 IN NPH   |
+ *   C| Port 0 IN CPLH  |        C| Port 0 IN CPLH  |                 C| Port 0 IN NPDW  |
+ *  10| Port 0 IN CPLDW |       10| Port 0 IN CPLDW |                10| Port 0 IN CPLH  |
+ *    |-----------------|         |-----------------|                14| Port 0 IN CPLDW |
+ *  14| Port 1 IN PH    |       14| Port 1 IN PH    |                  |-----------------|
+ *    |       :         |         |       :         |                18| Port 1 IN PH    |
+ *    |       :         |         |       :         |                  |       :         |
+ *  24| Port 1 IN CPLDW |       24| Port 1 IN CPLDW |                  |       :         |
+ *    |-----------------|         |/\/\/\/\/\/\/\/\/|                2C| Port 1 IN CPLDW |
+ *  28| Port 2 IN PH    |         |       :         |                  |/\/\/\/\/\/\/\/\/|
+ *    |       :         |         |       :         |                  |       :         |
+ *    |       :         |         |       :         |                  |       :         |
+ *  38| Port 2 IN CPLDW |         |       :         |                  |       :         |
+ *    |-----------------|         |       :         |                  |       :         |
+ *  3C| Port 3 IN PH    |         |/\/\/\/\/\/\/\/\/|                  |       :         |
+ *    |       :         |       50| Port 4 IN PH    |                  |/\/\/\/\/\/\/\/\/|
+ *    |       :         |         |       :         |               168| Port 15 IN PH   |
+ *  4C| Port 3 IN CPLDW |         |       :         |                  |       :         |
+ *    |-----------------|       60| Port 4 IN CPLDW |                  |       :         |
+ *  50| Port 0 EG PH    |         |-----------------|               17C| Port 15 IN CPDW |
+ *  54| Port 0 EG PDW   |       64| Port 0 EG PH    |                  |-----------------|
+ *  58| Port 0 EG NPDW  |       68| Port 0 EG PDW   |               180| Port 0 EG PH    |
+ *  5C| Port 0 EG CPLH  |       6c| Port 0 EG NPDW  |               184| Port 0 EG PDW   |
+ *  60| Port 0 EG CPLDW |       70| Port 0 EG CPLH  |               188| Port 0 EG NPH   |
+ *    |-----------------|       74| Port 0 EG CPLDW |               18C| Port 0 EG NPDW  |
+ *  64| Port 1 EG PH    |         |-----------------|               190| Port 0 EG CPLH  |
+ *    |       :         |       78| Port 1 EG PH    |               194| Port 0 EG CPLDW |
+ *    |       :         |         |       :         |                  |-----------------|
+ *  74| Port 1 EG CPLDW |         |       :         |               198| Port 1 EG PH    |
+ *    |-----------------|       88| Port 1 EG CPLDW |                  |       :         |
+ *  78| Port 2 EG PH    |         |/\/\/\/\/\/\/\/\/|                  |       :         |
+ *    |       :         |         |       :         |               1AC| Port 1 EG CPLDW |
+ *    |       :         |         |       :         |                  |/\/\/\/\/\/\/\/\/|
+ *  88| Port 2 EG CPLDW |         |       :         |                  |       :         |
+ *    |-----------------|         |       :         |                  |       :         |
+ *  8C| Port 3 EG PH    |         |       :         |                  |       :         |
+ *    |       :         |         |/\/\/\/\/\/\/\/\/|                  |       :         |
+ *    |       :         |         |-----------------|                  |       :         |
+ *  9C| Port 3 EG CPLDW |       B4| Port 4 EG PH    |                  |/\/\/\/\/\/\/\/\/|
+ *    |-----------------|         |       :         |                  |-----------------|
+ *  A0| Port 0 IN DLLP  |         |       :         |               2E8| Port 4 EG PH    |
+ *  A4| Port 1 IN DLLP  |       C4| Port 4 EG CPLDW |                  |       :         |
+ *  A8| Port 2 IN DLLP  |         |-----------------|                  |       :         |
+ *  AC| Port 3 IN DLLP  |       C8| Port 0 IN DLLP  |               2FC| Port 4 EG CPLDW |
+ *    |-----------------|       CC| Port 1 IN DLLP  |                  |-----------------|
+ *  B0| Port 0 EG DLLP  |       D0| Port 2 IN DLLP  |               300| Port 0 IN DLLP  |
+ *  B4| Port 1 EG DLLP  |       D4| Port 3 IN DLLP  |               304| Port 1 IN DLLP  |
+ *  B8| Port 2 EG DLLP  |       D8| Port 4 IN DLLP  |               308| Port 2 IN DLLP  |
+ *  BC| Port 3 EG DLLP  |         |-----------------|               30C| Port 3 IN DLLP  |
+ *    |-----------------|       DC| -- Invalid --   |               310| Port 4 IN DLLP  |
+ *  C0| GPEP_0 IN PLD   |       E0| Port 0 EG DLLP  |               314| Port 5 IN DLLP  |
+ *  C4| GPEP_0 IN RAW   |       E4| Port 1 EG DLLP  |               318| Port 6 IN DLLP  |
+ *  C8| GPEP_0 IN PKT   |       E8| Port 2 EG DLLP  |               31C| Port 7 IN DLLP  |
+ *    |-----------------|       EC| Port 3 EG DLLP  |*P4 EG DLLP    320| Port 8 IN DLLP  |
+ *  CC| GPEP_1 IN PLD   |         |-----------------|  missing      324| Port 9 IN DLLP  |
+ *  D0| GPEP_1 IN RAW   |       F0| Port 0 IN PHY   |               328| Port 10 IN DLLP |
+ *  D4| GPEP_1 IN PKT   |       F4| Port 1 IN PHY   |               32C| Port 11 IN DLLP |
+ *    |-----------------|       F8| Port 2 IN PHY   |               330| Port 12 IN DLLP |
+ *  D8| GPEP_2 IN PLD   |       FC| Port 3 IN PHY   |               334| Port 13 IN DLLP |
+ *  DC| GPEP_2 IN RAW   |      100| Port 4 IN PHY   |               338| Port 14 IN DLLP |
+ *  E0| GPEP_2 IN PKT   |         |-----------------|               33C| Port 15 IN DLLP |
+ *    |-----------------|      104| Port 0 EG PHY   |                  |-----------------|
+ *  E4| GPEP_3 IN PLD   |      108| Port 1 EG PHY   |               340| Port 0 EG DLLP  |
+ *  E8| GPEP_3 IN RAW   |      10C| Port 2 EG PHY   |               344| Port 1 EG DLLP  |
+ *  EC| GPEP_3 IN PKT   |      110| Port 3 EG PHY   |               348| Port 2 EG DLLP  |
+ *    |-----------------|      114| Port 4 EG PHY   |               34C| Port 3 EG DLLP  |
+ *  F0| GPEP_0 OUT PLD  |          -----------------                350| Port 4 EG DLLP  |
+ *  F4| GPEP_0 OUT RAW  |                                           354| Port 5 EG DLLP  |
+ *  F8| GPEP_0 OUT PKT  |                                           358| Port 6 EG DLLP  |
+ *    |-----------------|                                           35C| Port 7 EG DLLP  |
+ *  FC| GPEP_1 OUT PLD  |                                           360| Port 8 EG DLLP  |
+ * 100| GPEP_1 OUT RAW  |                                           364| Port 9 EG DLLP  |
+ * 104| GPEP_1 OUT PKT  |                                           368| Port 10 EG DLLP |
+ *    |-----------------|                                           36C| Port 11 EG DLLP |
+ * 108| GPEP_2 OUT PLD  |                                           370| Port 12 EG DLLP |
+ * 10C| GPEP_2 OUT RAW  |                                           374| Port 13 EG DLLP |
+ * 110| GPEP_2 OUT PKT  |                                           378| Port 14 EG DLLP |
+ *    |-----------------|                                           37C| Port 15 EG DLLP |
+ * 114| GPEP_3 OUT PLD  |                                               -----------------
+ * 118| GPEP_3 OUT RAW  |
+ * 11C| GPEP_3 OUT PKT  |
+ *    |-----------------|
+ * 120| EP_0 IN PLD     |
+ * 124| EP_0 IN RAW     |
+ * 128| EP_0 IN PKT     |
+ *    |-----------------|
+ * 12C| EP_0 OUT PLD    |
+ * 130| EP_0 OUT RAW    |
+ * 134| EP_0 OUT PKT    |
+ *    |-----------------|
+ * 138| PHY (always 0)  |
+ * 13C| PHY (always 0)  |
+ *     -----------------
  *
  ******************************************************************************/
 PLX_STATUS
@@ -2576,6 +2605,7 @@ PlxPciPerformanceGetCounters(
     U8             StnPortCount;
     U8             bStationBased;
     U8             RamStnPortCount;
+    U8             InEgPerPortCount;
     U16            i;
     U16            index;
     U16            IndexBase;
@@ -2596,6 +2626,9 @@ PlxPciPerformanceGetCounters(
 
     // Assume station port count in RAM is identical to station port count
     RamStnPortCount = 0;
+
+    // Most chips have 5 ingress & egress counters per port
+    InEgPerPortCount = 5;
 
     // Setup parameters for reading counters
     switch (pdx->Key.PlxFamily)
@@ -2659,13 +2692,29 @@ PlxPciPerformanceGetCounters(
             bStationBased   = TRUE;
             break;
 
+        case PLX_FAMILY_ATLAS:
+            Offset_RamCtrl   = ATLAS_PEX_REGS_BASE_OFFSET + 0x3F0;
+            Offset_Fifo      = ATLAS_PEX_REGS_BASE_OFFSET + 0x3E4;
+            NumCounters      = 14;
+            StnCount         = 6;
+            StnPortCount     = 16;
+            bStationBased    = TRUE;
+            InEgPerPortCount = 6;    // Non-Posted header count added
+            break;
+
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return PLX_STATUS_UNSUPPORTED;
     }
 
-    // Allocate buffer to contain counter data for all ports (Max = 14 counters/port)
-    pCounters = kmalloc( PERF_MAX_PORTS * PERF_COUNTERS_PER_PORT * sizeof(U32), GFP_KERNEL );
+    // Set RAM station port count if matches station port count
+    if (RamStnPortCount == 0)
+    {
+        RamStnPortCount = StnPortCount;
+    }
+
+    // Allocate buffer to contain counter data for all ports
+    pCounters = kmalloc( (StnCount * RamStnPortCount) * NumCounters * sizeof(U32), GFP_KERNEL );
     if (pCounters == NULL)
     {
         return PLX_STATUS_INSUFFICIENT_RES;
@@ -2692,16 +2741,10 @@ PlxPciPerformanceGetCounters(
         return PLX_STATUS_INVALID_ACCESS;
     }
 
-    // Set RAM station port count if matches station port count
-    if (RamStnPortCount == 0)
-    {
-        RamStnPortCount = StnPortCount;
-    }
-
     // RAM control
-    RegValue = (2 << 4) |   // Capture type ([5:4])
-               (1 << 2) |   // Reset read pointer
-               (1 << 0);    // Enable RAM
+    RegValue = ((U32)2 << 4) |   // Capture type ([5:4])
+               ((U32)1 << 2) |   // Reset read pointer
+               ((U32)1 << 0);    // Enable RAM
 
     // Reset RAM read pointer
     for (i = 0; i < StnCount; i++)
@@ -2764,6 +2807,19 @@ PlxPciPerformanceGetCounters(
     i = 0;
     while (i < NumOfObjects)
     {
+        // Verify the station & port numbers are within valid range
+        if ( (pTmpPerfProps[i].Station >= StnCount) ||
+             (pTmpPerfProps[i].StationPort >= RamStnPortCount) )
+        {
+            ErrorPrintf((
+                "ERROR - Station or station port invalid in perf object %d\n",
+                i
+                ));
+            // Skip to next object
+            i++;
+            continue;
+        }
+
         // Make a copy of the previous values before overwriting them
         RtlCopyMemory(
             Counter_PrevTmp,
@@ -2782,27 +2838,38 @@ PlxPciPerformanceGetCounters(
         IndexBase = pTmpPerfProps[i].Station * (NumCounters * RamStnPortCount);
 
         // Ingress counters start at index 0 from base
-        index = IndexBase + 0 + (pTmpPerfProps[i].StationPort * 5);
+        index = IndexBase + 0 + (pTmpPerfProps[i].StationPort * InEgPerPortCount);
 
-        // Get Ingress counters (5 DW/port)
-        pTmpPerfProps[i].IngressPostedHeader = pCounters[index + 0];
-        pTmpPerfProps[i].IngressPostedDW     = pCounters[index + 1];
-        pTmpPerfProps[i].IngressNonpostedDW  = pCounters[index + 2];
-        pTmpPerfProps[i].IngressCplHeader    = pCounters[index + 3];
-        pTmpPerfProps[i].IngressCplDW        = pCounters[index + 4];
+        // Get ingress counters (5 or 6 DW/port)
+        pTmpPerfProps[i].IngressPostedHeader = pCounters[index++];  // 0
+        pTmpPerfProps[i].IngressPostedDW     = pCounters[index++];  // 1
+        if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+        {
+            // NP header added in Atlas
+            pTmpPerfProps[i].IngressNonpostedHdr  = pCounters[index++];  // 2
+        }
+        pTmpPerfProps[i].IngressNonpostedDW  = pCounters[index++];  // 2 or 3
+        pTmpPerfProps[i].IngressCplHeader    = pCounters[index++];  // 3 or 4
+        pTmpPerfProps[i].IngressCplDW        = pCounters[index];    // 4 or 5
 
         // Egress counters start after ingress
-        index = IndexBase + (5 * RamStnPortCount) + (pTmpPerfProps[i].StationPort * 5);
+        index = IndexBase + (InEgPerPortCount * RamStnPortCount)
+                          + (pTmpPerfProps[i].StationPort * InEgPerPortCount);
 
-        // Get Egress counters (5 DW/port)
-        pTmpPerfProps[i].EgressPostedHeader = pCounters[index + 0];
-        pTmpPerfProps[i].EgressPostedDW     = pCounters[index + 1];
-        pTmpPerfProps[i].EgressNonpostedDW  = pCounters[index + 2];
-        pTmpPerfProps[i].EgressCplHeader    = pCounters[index + 3];
-        pTmpPerfProps[i].EgressCplDW        = pCounters[index + 4];
+        // Get egress counters (5 or 6 DW/port)
+        pTmpPerfProps[i].EgressPostedHeader = pCounters[index++];   // 0
+        pTmpPerfProps[i].EgressPostedDW     = pCounters[index++];   // 1
+        if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+        {
+            // NP header added in Atlas
+            pTmpPerfProps[i].EgressNonpostedHdr  = pCounters[index++];  // 2
+        }
+        pTmpPerfProps[i].EgressNonpostedDW  = pCounters[index++];   // 2 or 3
+        pTmpPerfProps[i].EgressCplHeader    = pCounters[index++];   // 3 or 4
+        pTmpPerfProps[i].EgressCplDW        = pCounters[index++];   // 4 or 5
 
-        // DLLP Ingress counters start after egress
-        index = IndexBase + (10 * RamStnPortCount);
+        // DLLP ingress counters start after egress
+        index = IndexBase + ((InEgPerPortCount * 2) * RamStnPortCount);
 
         // DLLP counter location depends upon chip
         if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
@@ -2821,7 +2888,7 @@ PlxPciPerformanceGetCounters(
             index += pTmpPerfProps[i].StationPort;
         }
 
-        // Get DLLP Ingress counters (1 DW/port)
+        // Get DLLP ingress counters (1 DW/port)
         pTmpPerfProps[i].IngressDllp = pCounters[index];
 
         // Egress DLLP counters follow Ingress
@@ -2835,19 +2902,15 @@ PlxPciPerformanceGetCounters(
             index += RamStnPortCount;
         }
 
-        // For Capella, Egress DLLP skips one offset & port 4 is lost
+        // For Capella, egress DLLP skips one offset & port 4 is lost
         if ((pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
             (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
         {
             index++;
         }
 
-        // Get DLLP Egress counters (1 DW/port)
+        // Get DLLP egress counters (1 DW/port)
         pTmpPerfProps[i].EgressDllp = pCounters[index];
-
-        // Any PHY counters are always 0, so ignore any values
-        pTmpPerfProps[i].IngressPhy = 0;
-        pTmpPerfProps[i].EgressPhy  = 0;
 
         /**********************************************************
          * In some cases on Draco 1 chips, device may incorrectly
@@ -2961,7 +3024,7 @@ PlxMH_GetProperties(
     RegVSEnable = PLX_8000_REG_READ( pdx, 0x358 );
 
     // Device properties are only available from the management port
-    if ((RegValue == 0) && ((RegVSEnable & ~(1 << 0)) == 0))
+    if ((RegValue == 0) && ((RegVSEnable & ~((U32)1 << 0)) == 0))
     {
         // In VS mode, but not management port
         pMHProp->SwitchMode = PLX_CHIP_MODE_VIRT_SW;
@@ -2977,12 +3040,12 @@ PlxMH_GetProperties(
     pMHProp->MgmtPortNumRedundant = (U8)((RegValue >> 8) & 0x1F);
 
     // Determine which management ports are active
-    if (RegValue & (1 << 5))
+    if (RegValue & ((U32)1 << 5))
     {
         pMHProp->bMgmtPortActiveEn = TRUE;
     }
 
-    if (RegValue & (1 << 13))
+    if (RegValue & ((U32)1 << 13))
     {
         pMHProp->bMgmtPortRedundantEn = TRUE;
     }
@@ -2996,7 +3059,7 @@ PlxMH_GetProperties(
     for (i = 0; i < 8; i++)
     {
         // Check if VS is active
-        if (RegVSEnable & (1 << i))
+        if (RegVSEnable & ((U32)1 << i))
         {
             // Increment count
             TotalVS++;
@@ -3020,7 +3083,7 @@ PlxMH_GetProperties(
             pMHProp->VS_DownstreamPorts[i] = RegValue & 0x00FFFFFF;
 
             // Remove upstream port from downstream vectors
-            pMHProp->VS_DownstreamPorts[i] &= ~(1 << pMHProp->VS_UpstreamPortNum[i]);
+            pMHProp->VS_DownstreamPorts[i] &= ~((U32)1 << pMHProp->VS_UpstreamPortNum[i]);
         }
     }
 
@@ -3111,7 +3174,7 @@ PlxMH_MigrateDsPorts(
     }
 
     // Verify source VS is enabled
-    if ((MHProp.VS_EnabledMask & (1 << VS_Source)) == 0)
+    if ((MHProp.VS_EnabledMask & ((U32)1 << VS_Source)) == 0)
     {
         DebugPrintf(("ERROR - Source VS (%d) not enabled\n", VS_Source));
         return PLX_STATUS_DISABLED;
@@ -3125,16 +3188,16 @@ PlxMH_MigrateDsPorts(
     }
 
     // Migrate DS ports
-    for (i = 0; i < PERF_MAX_PORTS; i++)
+    for (i = 0; i < (sizeof(U32) * 8); i++)
     {
         // Migrate port from source to destination if requested
-        if (DsPortMask & (1 << i))
+        if (DsPortMask & ((U32)1 << i))
         {
             // Remove port from source
-            MHProp.VS_DownstreamPorts[VS_Source] &= ~(1 << i);
+            MHProp.VS_DownstreamPorts[VS_Source] &= ~((U32)1 << i);
 
             // Add port to destination
-            MHProp.VS_DownstreamPorts[VS_Dest] |= (1 << i);
+            MHProp.VS_DownstreamPorts[VS_Dest] |= ((U32)1 << i);
         }
     }
 
@@ -3152,13 +3215,13 @@ PlxMH_MigrateDsPorts(
         );
 
     // Make sure destination VS is enabled
-    if ((MHProp.VS_EnabledMask & (1 << VS_Dest)) == 0)
+    if ((MHProp.VS_EnabledMask & ((U32)1 << VS_Dest)) == 0)
     {
         DebugPrintf(("Enable destination VS%d\n", VS_Dest));
         PLX_8000_REG_WRITE(
             pdx,
             0x358,
-            MHProp.VS_EnabledMask | (1 << VS_Dest)
+            MHProp.VS_EnabledMask | ((U32)1 << VS_Dest)
             );
     }
 
@@ -3175,7 +3238,7 @@ PlxMH_MigrateDsPorts(
         PLX_8000_REG_WRITE(
             pdx,
             0x3A0,
-            RegValue | (1 << VS_Source)
+            RegValue | ((U32)1 << VS_Source)
             );
 
         // Keep in reset for a short time

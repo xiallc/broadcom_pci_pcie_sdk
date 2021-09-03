@@ -2,7 +2,7 @@
 #define __PLX_API_DEBUG_H
 
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *     09-01-10 : PLX SDK v6.40
+ *     03-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -72,6 +72,8 @@ extern "C" {
 #if defined(DebugPrintf)
     #undef DebugPrintf
     #undef DebugPrintf_Cont
+    #undef InfoPrintf
+    #undef InfoPrintf_Cont
     #undef ErrorPrintf
     #undef ErrorPrintf_Cont
     #undef _PlxDbgFunc
@@ -113,6 +115,8 @@ extern "C" {
     #define DebugPrintf(arg)                do { } while(0)
     #define DebugPrintf_Cont(arg)           do { } while(0)
 #endif
+#define InfoPrintf(arg)                     _Debug_Print_Macro(arg)
+#define InfoPrintf_Cont(arg)                _PlxDbgFunc arg
 #define ErrorPrintf(arg)                    _Debug_Print_Macro(arg)
 #define ErrorPrintf_Cont(arg)               _PlxDbgFunc arg
 

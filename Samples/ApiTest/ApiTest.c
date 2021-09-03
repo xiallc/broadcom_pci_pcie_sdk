@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,13 +43,13 @@
  *
  * Revision History:
  *
- *      07-01-14 : PLX SDK v7.20
+ *      03-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
 
 #include <time.h>
-#include "Plx.h"
+#include "PciRegs.h"
 #include "PlxApi.h"
 
 #if defined(_WIN32)
@@ -1622,8 +1622,7 @@ TestPortInfo(
         );
 
     Cons_printf(
-        "      Link Speed : %s Gbps (Max=%s Gbps)\n",
-        (PortProp.LinkSpeed == PLX_LINK_SPEED_5_0_GBPS) ? "5.0" : "2.5",
-        (PortProp.MaxLinkSpeed == PLX_LINK_SPEED_5_0_GBPS) ? "5.0" : "2.5"
+        "      Link Speed : G%d / G%s\n",
+        PortProp.LinkSpeed, PortProp.MaxLinkSpeed
         );
 }

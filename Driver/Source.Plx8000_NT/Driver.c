@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  *****************************************************************************/
 
@@ -891,7 +891,7 @@ StartDevice(
     else
     {
         // Attempt to enable MSI interrupt
-        rc = Plx_pci_enable_msi_exact( pdx->pPciDevice, 1 );
+        rc = Plx_pci_enable_msi( pdx->pPciDevice );
         if (rc == 0)
         {
             DebugPrintf((
@@ -942,7 +942,7 @@ StartDevice(
             ErrorPrintf(("ERROR - Unable to install ISR\n"));
             if (pdx->IrqType == PLX_IRQ_TYPE_MSI)
             {
-                pci_disable_msi( pdx->pPciDevice );
+                Plx_pci_disable_msi( pdx->pPciDevice );
             }
             pdx->IrqType = PLX_IRQ_TYPE_NONE;
         }
@@ -1050,7 +1050,7 @@ StopDevice(
         if (pdx->IrqType == PLX_IRQ_TYPE_MSI)
         {
             DebugPrintf(("Disable MSI..."));
-            pci_disable_msi( pdx->pPciDevice );
+            Plx_pci_disable_msi( pdx->pPciDevice );
             DebugPrintf_Cont(("Ok (Restored IRQ=%02d)\n", pdx->pPciDevice->irq));
         }
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      02-01-14 : PLX SDK v7.20
+ *      01-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -179,10 +179,10 @@ PlxChipSetInterruptStatusFlags(
     if (pIntData->Source_Ints & INTR_TYPE_LOCAL_1)
         pPlxIntr->LocalToPci = (1 << 0);
 
-    if (pIntData->Source_Ints & INTR_TYPE_DMA_0) 
+    if (pIntData->Source_Ints & INTR_TYPE_DMA_0)
         pPlxIntr->DmaDone |= (1 << 0);
 
-    if (pIntData->Source_Ints & INTR_TYPE_DMA_1) 
+    if (pIntData->Source_Ints & INTR_TYPE_DMA_1)
         pPlxIntr->DmaDone |= (1 << 1);
 
     if (pIntData->Source_Ints & INTR_TYPE_OUTBOUND_POST)
@@ -221,7 +221,7 @@ PlxChipTypeDetect(
             0x70
             );
 
-    if ((RegValue & 0xFFFF) == PLX_VENDOR_ID)
+    if ((RegValue & 0xFFFF) == PLX_PCI_VENDOR_ID_PLX)
     {
         pdx->Key.PlxChip = (U16)(RegValue >> 16);
 
@@ -312,7 +312,7 @@ PlxChipGetRemapOffset(
                 return;
             }
             break;
-            
+
         case 2:
             // BAR 2 could be Space 0 or Space 1 if shifted
             if (bBarsShifted)

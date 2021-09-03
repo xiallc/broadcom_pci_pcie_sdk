@@ -2,7 +2,7 @@
 #define __PCI_REGS_H
 
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2019 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,18 +46,37 @@
  *
  * Revision:
  *
- *      02-01-17 : PLX SDK v7.25
+ *      08-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
 
 
+// PCI location max counts
+#define PCI_MAX_BUS                             256     // Max PCI Buses
+#define PCI_MAX_DEV                             32      // Max PCI Slots
+#define PCI_MAX_FUNC                            8       // Max PCI Functions
+
+// PCI config space sizes
+#define PCI_CONFIG_SPACE_SIZE                   0x100   // PCI = 256B
+#define PCIE_CONFIG_SPACE_SIZE                  0x1000  // PCIe = 4K
+
+// PCI register read error values return to software
+#define PCI_CFG_RD_ERR_VAL_8                    ((U8)-1)
+#define PCI_CFG_RD_ERR_VAL_16                   ((U16)-1)
+#define PCI_CFG_RD_ERR_VAL_32                   ((U32)-1)
+#define PCI_CFG_RD_ERR_VAL                      PCI_CFG_RD_ERR_VAL_32
+
+// Special values returned for ID read if CRS SW visibility enabled
+#define PCIE_CFG_RD_CRS_VAL_16                  (U16)0x0001
+#define PCIE_CFG_RD_CRS_VAL_32                  (U32)0xFFFF0001
 
 // PCI Header types
-#define PCI_HDR_TYPE_0                          0           // Endpoint
-#define PCI_HDR_TYPE_1                          1           // PCI-to-PCI bridge
-#define PCI_HDR_TYPE_2                          2           // Cardbus
-
+#define PCI_HDR_TYPE_0                          0       // Endpoint
+#define PCI_HDR_TYPE_1                          1       // PCI-to-PCI bridge
+#define PCI_HDR_TYPE_2                          2       // Cardbus
+#define PCI_NUM_BARS_TYPE_00                    6       // Type 0 total PCI BARs
+#define PCI_NUM_BARS_TYPE_01                    2       // Type 1 total PCI BARs
 
 // Standard PCI registers
 #define PCI_REG_DEV_VEN_ID                      0x00
@@ -158,9 +177,19 @@
 #define PCIE_CAP_ID_DATA_LINK_FEATURE           0x025       // Data Link Feature
 #define PCIE_CAP_ID_PHYS_LAYER_16GT             0x026       // Physical Layer 16 GT/s
 #define PCIE_CAP_ID_PHYS_LAYER_16GT_MARGINING   0x027       // Physical Layer 16 GT/s Margining
+#define PCIE_CAP_ID_HIERARCHY_ID                0x028       // Hierarchy ID
+#define PCIE_CAP_ID_NATIVE_PCIE_ENCL_MGMT       0x029       // Native PCIe Enclosure Management (NPEM)
 
 // Convert encoding of MPS/MRR to bytes (128 * (2 ^ encoded_val))
 #define PCIE_MPS_MRR_TO_BYTES(val)              ( 128 * (1 << (val)) )
+
+
+// PCI device Power Management states (PM Cntrl/Stat [1:0])
+#define PCI_CAP_PM_STATE_D0                     0x00
+#define PCI_CAP_PM_STATE_D1                     0x01
+#define PCI_CAP_PM_STATE_D2                     0x02
+#define PCI_CAP_PM_STATE_D3_HOT                 0x03
+
 
 // Function codes for PCI BIOS operations
 #define PCI_FUNC_ID                             0xb1
@@ -176,6 +205,21 @@
 #define PCI_FUNC_WRITE_CONFIG_DWORD             0x0d
 #define PCI_FUNC_GET_IRQ_ROUTING_OPTS           0x0e
 #define PCI_FUNC_SET_PCI_HW_INT                 0x0f
+
+
+// PCI SIG Vendor IDs
+#define PLX_PCI_VENDOR_ID_LSI                   0x1000
+#define PLX_PCI_VENDOR_ID_PLX                   0x10B5
+#define PLX_PCI_VENDOR_ID_BROADCOM              0x14E4
+#define PLX_PCI_VENDOR_ID_INTEL                 0x8086
+#define PLX_PCI_VENDOR_ID_NVIDIA                0x10DE
+
+
+// PCIe ReqID support macros
+#define PCIE_REQID_BUILD(bus,dev,fn)            (((U16)(bus) << 8) | ((dev) << 3) | ((fn) << 0))
+#define PCIE_REQID_BUS(ReqId)                   ((U8)((ReqId) >> 8) & 0xFF)
+#define PCIE_REQID_DEV(ReqId)                   ((U8)((ReqId) >> 3) & 0x1F)
+#define PCIE_REQID_FN(ReqId)                    ((U8)((ReqId) >> 0) & 0x7)
 
 
 

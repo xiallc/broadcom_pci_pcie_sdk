@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      07-01-16 : PLX SDK v7.25
+ *      05-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -194,11 +194,7 @@ Plx9000_EepromReadByOffset(
     RegValue &= ~(1 << 31);
 
     // Clear Chip Select and all other EEPROM bits
-    PLX_9000_REG_WRITE(
-        pdx,
-        REG_EEPROM_CTRL,
-        RegValue & ~(0xF << 24)
-        );
+    PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue & ~(0xF << 24) );
 
     return PLX_STATUS_OK;
 }
@@ -247,7 +243,7 @@ Plx9000_EepromWriteByOffset(
     }
 
     // Write EEPROM 16-bits at a time
-    for (i = 0; i < 2; i++)
+    for (i = 0; i < sizeof(U16); i++)
     {
         // Set 16-bit value to write
         if (i == 0)
@@ -293,19 +289,11 @@ Plx9000_EepromWriteByOffset(
             // Get bit value and shift into result
             if (EepromValue & (1 << BitPos))
             {
-                PLX_9000_REG_WRITE(
-                    pdx,
-                    REG_EEPROM_CTRL,
-                    RegValue | (1 << 26)
-                    );
+                PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue | (1 << 26) );
             }
             else
             {
-                PLX_9000_REG_WRITE(
-                    pdx,
-                    REG_EEPROM_CTRL,
-                    RegValue
-                    );
+                PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue );
             }
 
             // Trigger the EEPROM clock
@@ -313,18 +301,10 @@ Plx9000_EepromWriteByOffset(
         }
 
         // Deselect Chip
-        PLX_9000_REG_WRITE(
-            pdx,
-            REG_EEPROM_CTRL,
-            RegValue & ~(1 << 25)
-            );
+        PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue & ~(1 << 25) );
 
         // Re-select Chip
-        PLX_9000_REG_WRITE(
-            pdx,
-            REG_EEPROM_CTRL,
-            RegValue | (1 << 25)
-            );
+        PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue | (1 << 25) );
 
         /*****************************************************
          * Note: After the clocking in the last data bit, a
@@ -357,11 +337,7 @@ Plx9000_EepromWriteByOffset(
             );
 
         // Clear Chip Select and all other EEPROM bits
-        PLX_9000_REG_WRITE(
-            pdx,
-            REG_EEPROM_CTRL,
-            RegValue & ~(0xF << 24)
-            );
+        PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue & ~(0xF << 24) );
     }
 
     return PLX_STATUS_OK;
@@ -402,24 +378,16 @@ Plx9000_EepromSendCommand(
     PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue );
 
     // Send EEPROM command - one bit at a time
-    for (BitPos = (S8)(DataLengthInBits-1); BitPos >= 0; BitPos--)
+    for (BitPos = (S8)(DataLengthInBits - 1); BitPos >= 0; BitPos--)
     {
         // Check if current bit is 0 or 1
         if (EepromCommand & (1 << BitPos))
         {
-            PLX_9000_REG_WRITE(
-                pdx,
-                REG_EEPROM_CTRL,
-                RegValue | (1 << 26)
-                );
+            PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue | (1 << 26) );
         }
         else
         {
-            PLX_9000_REG_WRITE(
-                pdx,
-                REG_EEPROM_CTRL,
-                RegValue
-                );
+            PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue );
         }
 
         Plx9000_EepromClock( pdx );
@@ -448,11 +416,7 @@ Plx9000_EepromClock(
     RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
 
     // Set EEPROM clock High
-    PLX_9000_REG_WRITE(
-        pdx,
-        REG_EEPROM_CTRL,
-        RegValue | (1 << 24)
-        );
+    PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue | (1 << 24) );
 
     // Need a small delay, perform dummy register reads
     for (i = 0; i < 20; i++)
@@ -461,9 +425,5 @@ Plx9000_EepromClock(
     }
 
     // Set EEPROM clock Low
-    PLX_9000_REG_WRITE(
-        pdx,
-        REG_EEPROM_CTRL,
-        RegValue & ~(1 << 24)
-        );
+    PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue & ~(1 << 24) );
 }

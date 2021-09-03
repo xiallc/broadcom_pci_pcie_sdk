@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      02-01-14 : PLX SDK v7.20
+ *      05-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -64,7 +64,7 @@
  ******************************************************************************/
 PLX_STATUS
 Plx6000_EepromReadByOffset_16(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32              offset,
     U16             *pValue
     )
@@ -74,7 +74,7 @@ Plx6000_EepromReadByOffset_16(
     U32 RegValue;
 
 
-    switch (pNode->Key.PlxChip)
+    switch (pdx->Key.PlxChip)
     {
         case 0x6152:
         case 0x6156:
@@ -94,28 +94,20 @@ Plx6000_EepromReadByOffset_16(
         default:
             DebugPrintf((
                 "ERROR - Unsupported PLX chip type (%04X)\n",
-                pNode->Key.PlxChip
+                pdx->Key.PlxChip
                 ));
             return PLX_STATUS_UNSUPPORTED;
     }
 
     // For Non-transparent mode chips, enable shadow registers
-    if ((pNode->Key.PlxChip == 0x6254) ||
-        (pNode->Key.PlxChip == 0x6540))
+    if ((pdx->Key.PlxChip == 0x6254) ||
+        (pdx->Key.PlxChip == 0x6540))
     {
         // Save the chip control register
-        PLX_PCI_REG_READ(
-            pNode,
-            0xD8,
-            &RegSave
-            );
+        PLX_PCI_REG_READ( pdx, 0xD8, &RegSave );
 
         // Enable shadow register access
-        PLX_PCI_REG_WRITE(
-            pNode,
-            0xD8,
-            RegSave | (1 << 6)
-            );
+        PLX_PCI_REG_WRITE( pdx, 0xD8, RegSave | (1 << 6) );
     }
 
     // Offset can only be 8-bits
@@ -125,34 +117,22 @@ Plx6000_EepromReadByOffset_16(
     RegValue = ((U32)offset << 8) | (1 << 0);
 
     // Write EEPROM command
-    PLX_PCI_REG_WRITE(
-        pNode,
-        Offset_EepromCtrl,
-        RegValue
-        );
+    PLX_PCI_REG_WRITE( pdx, Offset_EepromCtrl, RegValue );
 
     // Insert a small delay
     Plx_sleep(50);
 
     // Read data
-    PLX_PCI_REG_READ(
-        pNode,
-        Offset_EepromCtrl,
-        &RegValue
-        );
+    PLX_PCI_REG_READ( pdx, Offset_EepromCtrl, &RegValue );
 
     // Store data
     *pValue = (U16)(RegValue >> 16);
 
-    if ((pNode->Key.PlxChip == 0x6254) ||
-        (pNode->Key.PlxChip == 0x6540))
+    if ((pdx->Key.PlxChip == 0x6254) ||
+        (pdx->Key.PlxChip == 0x6540))
     {
         // Restore chip control register
-        PLX_PCI_REG_WRITE(
-            pNode,
-            0xD8,
-            RegSave
-            );
+        PLX_PCI_REG_WRITE( pdx, 0xD8, RegSave );
     }
 
     return PLX_STATUS_OK;
@@ -170,7 +150,7 @@ Plx6000_EepromReadByOffset_16(
  ******************************************************************************/
 PLX_STATUS
 Plx6000_EepromWriteByOffset_16(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32              offset,
     U16              value
     )
@@ -180,7 +160,7 @@ Plx6000_EepromWriteByOffset_16(
     U32 RegValue;
 
 
-    switch (pNode->Key.PlxChip)
+    switch (pdx->Key.PlxChip)
     {
         case 0x6152:
         case 0x6156:
@@ -200,28 +180,20 @@ Plx6000_EepromWriteByOffset_16(
         default:
             DebugPrintf((
                 "ERROR - Unsupported PLX chip type (%04X)\n",
-                pNode->Key.PlxChip
+                pdx->Key.PlxChip
                 ));
             return PLX_STATUS_UNSUPPORTED;
     }
 
     // For Non-transparent mode chips, enable shadow registers
-    if ((pNode->Key.PlxChip == 0x6254) ||
-        (pNode->Key.PlxChip == 0x6540))
+    if ((pdx->Key.PlxChip == 0x6254) ||
+        (pdx->Key.PlxChip == 0x6540))
     {
         // Save the chip control register
-        PLX_PCI_REG_READ(
-            pNode,
-            0xD8,
-            &RegSave
-            );
+        PLX_PCI_REG_READ( pdx, 0xD8, &RegSave );
 
         // Enable shadow register access
-        PLX_PCI_REG_WRITE(
-            pNode,
-            0xD8,
-            RegSave | (1 << 6)
-            );
+        PLX_PCI_REG_WRITE( pdx, 0xD8, RegSave | (1 << 6) );
     }
 
     // Offset can only be 8-bits
@@ -231,24 +203,16 @@ Plx6000_EepromWriteByOffset_16(
     RegValue = (value << 16) | ((U32)offset << 8) | (1 << 1) | (1 << 0);
 
     // Write EEPROM command
-    PLX_PCI_REG_WRITE(
-        pNode,
-        Offset_EepromCtrl,
-        RegValue
-        );
+    PLX_PCI_REG_WRITE( pdx, Offset_EepromCtrl, RegValue );
 
     // Insert a small delay
     Plx_sleep(100);
 
-    if ((pNode->Key.PlxChip == 0x6254) ||
-        (pNode->Key.PlxChip == 0x6540))
+    if ((pdx->Key.PlxChip == 0x6254) ||
+        (pdx->Key.PlxChip == 0x6540))
     {
         // Restore chip control register
-        PLX_PCI_REG_WRITE(
-            pNode,
-            0xD8,
-            RegSave
-            );
+        PLX_PCI_REG_WRITE( pdx, 0xD8, RegSave );
     }
 
     return PLX_STATUS_OK;

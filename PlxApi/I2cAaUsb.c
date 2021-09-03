@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2018 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -35,15 +35,15 @@
  *
  * File Name:
  *
- *      PlxApiI2cAa.c
+ *      I2cAaUsb.c
  *
  * Description:
  *
- *      Implements the PLX API functions over an I2C interface
+ *      Implements PLX API support functions over an Aardark I2C interface
  *
  * Revision History:
  *
- *      02-01-17 : PLX SDK v7.25
+ *      11-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -53,18 +53,24 @@
  *
  *  ApiIndex        - I2C USB device number (0,1,etc)
  *  DeviceNumber    - PLX chip I2C slave address
- *  PlxPort         - PLX port # or port type (NTL,NTV,DMA,etc)
+ *  PlxPort         - PLX port number or port type (NTL,NTV,DMA,etc)
  *  PlxPortType     - PLX-specific port type (PLX_PORT_TYPE)
  *  NTPortNum       - NT port numbers if enabled (NT1=[7:4] NT0=[3:0])
- *  DeviceMode      - Current PLX chip mode (Std,NT,VS,Fabric,etc)
+ *  DeviceMode      - Current chip mode (Std,NT,VS,Fabric,etc)
  *  ApiInternal[0]  - I2C bus speed in KHz
- *  ApiInternal[1]  - Port-specific base register address from BAR
+ *  ApiInternal[1]  - Port-specific base address for registers
  *
  ******************************************************************************/
 
 /*******************************************************************************
  *
  * PLX chip I2C port access table
+ *
+ * Mira
+ *              Transp  NTV0 NTV1 NTL0 NTL1 DMA0 DMA1 DMA2 DMA3 DMA_RAM PCI2USB USB
+ *   Mode         --     --   --   --   --   --   --   --   --    --       --    -
+ *   Stn_Sel      --     --   --   --   --   --   --   --   --    --       --    -
+ *   Port_Sel     P#     --   --   --   --   --   --   --   --    --        3    4
  *
  * Vega-Lite
  *              Transp  NTV0 NTV1 NTL0 NTL1 P2P DMA0 DMA1 DMA2 DMA3 DMA_RAM
@@ -88,7 +94,7 @@
  *              Transp  NTV0 NTV1 NTL0 NTL1 P2P DMA0 DMA1 DMA2 DMA3 DMA_RAM
  *   Mode          0      0   --    1   --    1   1   --   --   --     1
  *   Stn_Sel      --     --   --   --   --   --  --   --   --   --    --
- *   Port_Sel     P#     P#   --   10   --   11  12   --   --   --    13
+ *   Port_Sel     P#     P#   --   10h  --   11h 12h  --   --   --    13h
  *
  * Cygnus
  *              Transp  NTV0 NTV1 NTL0 NTL1 P2P DMA0 DMA1 DMA2 DMA3 DMA_RAM
@@ -108,23 +114,29 @@
  *   Stn_Sel      S#      0    0    0    0    0    0    0    0     0      2
  *   Port_Sel     P#      0    1    0    1    0    1    2    3     4     R#
  *
- * Capella 1 / Capella 2 (Standard mode)            | C2 Fabric Mode (*Reg 26C=R[22:18])
- *              Transp  NTV0 NTV1 NTL0 NTL1 ALUT    |
- *   Mode          0      2    2    1    1    3     |        2
- *   Stn_Sel      S#      0    0    0    0    2     |     R[17:15]
- *   Port_Sel     P#      0    1    0    1   R#     |     R[14:12]
+ * Capella 1 / Capella 2 (Mode 0)                 |
+ *              Transp  NTV0 NTV1 NTL0 NTL1 ALUT  | C2 Full address (Mode 2)
+ *   Mode          0      2    2    1    1    3   |        2     (*P0 2CCh=R[22:18])
+ *   Stn_Sel      S#      0    0    0    0    2   |     R[17:15]
+ *   Port_Sel     P#      0    1    0    1   R#   |     R[14:12]
  *
- * Mira
- *              Transp  NTV0 NTV1 NTL0 NTL1 DMA0 DMA1 DMA2 DMA3 DMA_RAM PCI2USB USB
- *   Mode         --     --   --   --   --   --   --   --   --    --       --    -
- *   Stn_Sel      --     --   --   --   --   --   --   --   --    --       --    -
- *   Port_Sel     P#     --   --   --   --   --   --   --   --    --        3    4
+ * Atlas (Mode 0)                       |
+ *              Transp                  | Full address (Mode 2)
+ *   Mode          0                    |        2     (*P0 2CCh=R[22:18])
+ *   Stn_Sel      S#  (Only ports 0-63) |     R[17:16]
+ *   Port_Sel     P#                    |     R[15:12]
  *
  ******************************************************************************/
 
 /*******************************************************************************
  *
  * PLX chip I2C port access command
+ *
+ * Mira
+ *      31   27 26     24 23  20  19       15 14  13     10 9          0
+ *      ----------------------------------------------------------------
+ *     | Resvd | I2C_Cmd | Rsvd |  Port_Sel  | R | Byte_En |  DW_Offset |
+ *      ----------------------------------------------------------------
  *
  * Vega-Lite
  *      31   27 26     24 23          19   18   17   15  14 13     10 9          0
@@ -168,62 +180,24 @@
  *     | Resvd | I2C_Cmd | R | Mode | StnSel | PtSel | R | Byte_En |  DW_Offset |
  *      ------------------------------------------------------------------------
  *
- * Mira
- *      31   27 26     24 23  20  19       15 14  13     10 9          0
- *      ----------------------------------------------------------------
- *     | Resvd | I2C_Cmd | Rsvd |  Port_Sel  | R | Byte_En |  DW_Offset |
- *      ----------------------------------------------------------------
+ * Atlas
+ *      31   27 26     24 23  22  21 20    19 18   15 14  13     10 9          0
+ *      ------------------------------------------------------------------------
+ *     | Resvd | I2C_Cmd | R | Mode | StnSel | PtSel | R | Byte_En |  DW_Offset |
+ *      ------------------------------------------------------------------------
  *
  ******************************************************************************/
 
 
-#if defined(_WIN32)
-    /*******************************************************************
-     * Some standard C functions (e.g. strcpy) have recently been declared
-     * deprecated in favor of new secure counterparts (e.g. strcpy_s).
-     * Currently, the PLX API still uses some deprecated functions.  To
-     * avoid numerous warnings during Visual Studio compilation, the
-     * items below were added.  These may be removed in future.
-     *******************************************************************/
-    #define _CRT_SECURE_NO_DEPRECATE        // Prevents deprecation warnings during compile
-    #pragma warning( once : 4996 )          // Limits deprecation warnings to display only once
-#endif
-
-
-#include <malloc.h>
-#include <math.h>
 #include "Eep_8000.h"
 #include "PciRegs.h"
 #include "PexApi.h"
-#include "PlxIoctl.h"
 #include "PlxApiDebug.h"
-#include "PlxApiI2cAa.h"
+#include "PlxApiDirect.h"
+#include "I2cAaUsb.h"
 
 #if !defined(PLX_DOS)
     #include "Aardvark.h"
-#endif
-
-#if defined(PLX_LINUX)
-    #include <pthread.h>    // For mutex support
-#endif
-
-
-
-
-/**********************************************
- *           Portability Functions
- *********************************************/
-#if defined(PLX_LINUX)
-
-    #define CRITICAL_SECTION                        pthread_mutex_t
-    #define InitializeCriticalSection(pCS)          pthread_mutex_init   ( (pCS), NULL )
-    #define DeleteCriticalSection(pCS)              pthread_mutex_destroy( (pCS) )
-    #define EnterCriticalSection(pCS)               pthread_mutex_lock   ( (pCS) )
-    #define LeaveCriticalSection(pCS)               pthread_mutex_unlock ( (pCS) )
-
-    #define InterlockedIncrement( pVal )            ++(*(pVal))
-    #define InterlockedDecrement( pVal )            --(*(pVal))
-
 #endif
 
 
@@ -233,17 +207,24 @@
  *           Global Variables
  *********************************************/
 #if !defined(PLX_DOS)
+    // Global count of number of current open I2C devices
+    static U8 Gbl_OpenCount = 0;
 
-    BOOLEAN Gbl_bInitialized = FALSE;
-
-    static struct _PLX_I2C_API_PROP
+    static struct _I2C_API_PROP
     {
-        CRITICAL_SECTION  Lock_I2cRegAccess;
+        CRITICAL_SECTION  Lock_RegAccess;
         PLX_DRIVER_HANDLE hDevice;
         S32               OpenCount;
         U8                UpstreamBus;
-        U8                NTPortNum[PLX_I2C_MAX_NT_PORTS];
-    } Gbl_PlxI2cProp[PLX_I2C_MAX_DEVICES];
+        U8                NTPortNum[I2C_MAX_NT_PORTS];
+        U8                LastHighBits;
+        U32               IdxLastAddr;
+    } Gbl_I2cProp[I2C_MAX_DEVICES];
+
+    // Macros for store/retrieval of I2C high address bits
+    #define I2C_KEY_HIGH_ADDR_GET(pDev)         Gbl_I2cProp[(pDev)->Key.ApiIndex].LastHighBits
+    #define I2C_KEY_HIGH_ADDR_SAVE(pDev,addr)   Gbl_I2cProp[(pDev)->Key.ApiIndex].LastHighBits = (addr)
+    #define I2C_KEY_HIGH_ADDR_RESET(pDev)       I2C_KEY_HIGH_ADDR_SAVE( (pDev), I2C_HIGH_ADDR_INIT )
 #endif
 
 
@@ -263,7 +244,7 @@ PlxI2c_I2cGetPorts(
     )
 {
     U8  i;
-    U16 Ports[PLX_I2C_MAX_DEVICES];
+    U16 Ports[I2C_MAX_DEVICES];
     int PortCount;
 
 
@@ -277,7 +258,7 @@ PlxI2c_I2cGetPorts(
     }
 
     // Find all I2C ports
-    PortCount = aa_find_devices( PLX_I2C_MAX_DEVICES, Ports );
+    PortCount = aa_find_devices( I2C_MAX_DEVICES, Ports );
     if (PortCount <= 0)
     {
         return PLX_STATUS_NO_DRIVER;
@@ -333,7 +314,7 @@ PlxI2c_DeviceOpen(
     ObjectValidate( pDevice );
 
     // Fill in chip version information
-    PlxChipTypeDetect( pDevice );
+    PlxDir_ChipTypeDetect( pDevice );
 
     return PLX_STATUS_OK;
 }
@@ -353,14 +334,14 @@ PlxI2c_DeviceClose(
     PLX_DEVICE_OBJECT *pDevice
     )
 {
-    if (Gbl_PlxI2cProp[pDevice->Key.ApiIndex].OpenCount <= 0)
+    if (Gbl_I2cProp[pDevice->Key.ApiIndex].OpenCount <= 0)
     {
         return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Decrement open count and close device if no longer referenced
     if (InterlockedDecrement(
-            &Gbl_PlxI2cProp[pDevice->Key.ApiIndex].OpenCount
+            &Gbl_I2cProp[pDevice->Key.ApiIndex].OpenCount
             ) == 0)
     {
         // Close the device (aa_close() returns num handles closed)
@@ -370,12 +351,19 @@ PlxI2c_DeviceClose(
         }
 
         // Mark device is closed
-        Gbl_PlxI2cProp[pDevice->Key.ApiIndex].hDevice = 0;
+        Gbl_I2cProp[pDevice->Key.ApiIndex].hDevice = 0;
+
+        // Reset saved values
+        I2C_KEY_HIGH_ADDR_RESET( pDevice );
+        Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr = (U32)-1;
 
         // Delete the register access lock
         DeleteCriticalSection(
-            &(Gbl_PlxI2cProp[pDevice->Key.ApiIndex].Lock_I2cRegAccess)
+            &(Gbl_I2cProp[pDevice->Key.ApiIndex].Lock_RegAccess)
             );
+
+        // Decrement global open count
+        Gbl_OpenCount--;
     }
 
     return PLX_STATUS_OK;
@@ -402,7 +390,7 @@ PlxI2c_DeviceFindEx(
     int               PortCount;
     U16               NumMatched;
     U16               TotalMatches;
-    U16               Ports[PLX_I2C_MAX_DEVICES];
+    U16               Ports[I2C_MAX_DEVICES];
     U32               RegValue;
     BOOLEAN           bFound;
     BOOLEAN           bAutoProbe;
@@ -412,7 +400,7 @@ PlxI2c_DeviceFindEx(
 
 
     // Find all I2C ports
-    PortCount = aa_find_devices( PLX_I2C_MAX_DEVICES, Ports );
+    PortCount = aa_find_devices( I2C_MAX_DEVICES, Ports );
     if (PortCount <= 0)
     {
         return PLX_STATUS_NO_DRIVER;
@@ -451,7 +439,7 @@ PlxI2c_DeviceFindEx(
     // Use default clock rate if not specified
     if (pModeProp->I2c.ClockRate == 0)
     {
-        pModeProp->I2c.ClockRate = PLX_I2C_DEFAULT_CLOCK_RATE;
+        pModeProp->I2c.ClockRate = I2C_DEFAULT_CLOCK_RATE;
     }
 
     // Open connection to driver
@@ -496,7 +484,7 @@ PlxI2c_DeviceFindEx(
         RegValue =
             PlxI2c_PlxRegisterRead(
                 &DeviceTemp,
-                0,                  // Port 0 Device/Vendor ID
+                PCI_REG_DEV_VEN_ID, // Port 0 Device/Vendor ID
                 &status,
                 FALSE,              // Adjust for port?
                 FALSE               // Retry on error?
@@ -504,21 +492,36 @@ PlxI2c_DeviceFindEx(
 
         if (status == PLX_STATUS_OK)
         {
-            if ((RegValue & 0xFFFF) == PLX_VENDOR_ID)
+            if ( ((RegValue & 0xFFFF) == PLX_PCI_VENDOR_ID_PLX) ||
+                 ((RegValue & 0xFFFF) == PLX_PCI_VENDOR_ID_LSI) )
             {
                 DebugPrintf((
-                    "I2C - Detected device %08X at %02Xh\n",
+                    "I2C: Detected device %08X at %02Xh\n",
                     RegValue, Device.Key.DeviceNumber
                     ));
 
-                // PLX device found, determine active ports and compare
-                status =
-                    PlxI2c_ProbeSwitch(
-                        &DeviceTemp,
-                        pKey,
-                        (U16)(DeviceNumber - TotalMatches),
-                        &NumMatched
-                        );
+                if ((RegValue & 0xFFFF) == PLX_PCI_VENDOR_ID_LSI)
+                {
+                    // Device found, probe for active ports and compare
+                    status =
+                        PlxDir_ProbeSwitch(
+                            &DeviceTemp,
+                            pKey,
+                            (U16)(DeviceNumber - TotalMatches),
+                            &NumMatched
+                            );
+                }
+                else
+                {
+                    // Legacy device found, determine active ports and compare
+                    status =
+                        PlxI2c_ProbeSwitch(
+                            &DeviceTemp,
+                            pKey,
+                            (U16)(DeviceNumber - TotalMatches),
+                            &NumMatched
+                            );
+                }
 
                 if (status == PLX_STATUS_OK)
                 {
@@ -614,7 +617,7 @@ PlxI2c_I2cVersion(
     RtlZeroMemory( pVersion, sizeof(PLX_VERSION) );
 
     // Check if device is already opened by the PLX API
-    if (Gbl_PlxI2cProp[I2cPort].hDevice == 0)
+    if (Gbl_I2cProp[I2cPort].hDevice == 0)
     {
         // Select the device
         hI2cDev = aa_open( I2cPort );
@@ -626,7 +629,7 @@ PlxI2c_I2cVersion(
     else
     {
         // Re-use existing handle
-        hI2cDev = (Aardvark)PLX_PTR_TO_INT( Gbl_PlxI2cProp[I2cPort].hDevice );
+        hI2cDev = (Aardvark)PLX_PTR_TO_INT( Gbl_I2cProp[I2cPort].hDevice );
     }
 
     // Get I2C version information
@@ -636,7 +639,7 @@ PlxI2c_I2cVersion(
     I2cProp.features = aa_features( hI2cDev );
 
     // Release device only if not already open
-    if (Gbl_PlxI2cProp[I2cPort].hDevice == 0)
+    if (Gbl_I2cProp[I2cPort].hDevice == 0)
     {
         aa_close( hI2cDev );
     }
@@ -697,262 +700,6 @@ PlxI2c_ChipTypeGet(
 
 /*******************************************************************************
  *
- * Function   :  PlxI2c_ChipTypeSet
- *
- * Description:  Sets the PLX chip type dynamically
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_ChipTypeSet(
-    PLX_DEVICE_OBJECT *pDevice,
-    U16                ChipType,
-    U8                 Revision
-    )
-{
-    PLX_PORT_PROP PortProp;
-
-
-    // Attempt auto-detection if requested
-    if (ChipType == 0)
-    {
-        PlxChipTypeDetect( pDevice );
-        ChipType = pDevice->Key.PlxChip;
-    }
-
-    // Verify chip type
-    switch (ChipType & 0xFF00)
-    {
-        case 0:         // Used to clear chip type
-        case 0x2300:
-        case 0x3300:
-        case 0x8500:
-        case 0x8600:
-        case 0x8700:
-        case 0x9700:
-            // Get port properties to ensure upstream node
-            PlxI2c_GetPortProperties( pDevice, &PortProp );
-
-            if (PortProp.PortType != PLX_PORT_UPSTREAM)
-            {
-                DebugPrintf(("ERROR - Chip type may only be changed on upstream port\n"));
-                return PLX_STATUS_UNSUPPORTED;
-            }
-            break;
-
-        default:
-            DebugPrintf((
-                "ERROR - Invalid or unsupported chip type (%04X)\n",
-                ChipType
-                ));
-            return PLX_STATUS_INVALID_DATA;
-    }
-
-    // Set the new chip type
-    pDevice->Key.PlxChip = ChipType;
-
-    // Check if we should update the revision or use the default
-    if ((Revision == (U8)-1) || (Revision == 0))
-    {
-        // Attempt to detect Revision ID
-        PlxChipRevisionDetect( pDevice );
-    }
-    else
-    {
-        pDevice->Key.PlxRevision = Revision;
-    }
-
-    DebugPrintf((
-        "Set device (%04X_%04X) type to %04X rev %02X\n",
-        pDevice->Key.DeviceId, pDevice->Key.VendorId,
-        pDevice->Key.PlxChip, pDevice->Key.PlxRevision
-        ));
-
-    return PLX_STATUS_OK;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxI2c_GetPortProperties
- *
- * Description:  Returns the current port information and status
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_GetPortProperties(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PORT_PROP     *pPortProp
-    )
-{
-    U16 MaxSize;
-    U16 Offset_PcieCap;
-    U32 RegValue;
-
-
-    // Set default properties
-    RtlZeroMemory( pPortProp, sizeof(PLX_PORT_PROP) );
-
-    // Get the offset of the PCI Express capability
-    Offset_PcieCap =
-        PlxPciFindCapability(
-            pDevice,
-            PCI_CAP_ID_PCI_EXPRESS,
-            FALSE,
-            0
-            );
-    if (Offset_PcieCap == 0)
-    {
-        DebugPrintf((
-            "[D%d %02X:%02X.%X] Does not contain PCIe capability\n",
-            pDevice->Key.domain, pDevice->Key.bus, pDevice->Key.slot, pDevice->Key.function
-            ));
-
-        // Mark device as non-PCIe
-        pPortProp->bNonPcieDevice = TRUE;
-        pPortProp->PortType       = PLX_PORT_UNKNOWN;
-        return PLX_STATUS_OK;
-    }
-
-    // Get PCIe Capability
-    PLX_PCI_REG_READ(
-        pDevice,
-        Offset_PcieCap,
-        &RegValue
-        );
-
-    // Get port type
-    pPortProp->PortType = (U8)((RegValue >> 20) & 0xF);
-
-    // Get PCIe Device Capabilities
-    PLX_PCI_REG_READ(
-        pDevice,
-        Offset_PcieCap + 0x04,
-        &RegValue
-        );
-
-    // Get max payload size supported field
-    MaxSize = (U8)(RegValue >> 0) & 0x7;
-
-    // Set max payload size (=128 * (2 ^ MaxPaySizeField))
-    pPortProp->MaxPayloadSupported = PCIE_MPS_MRR_TO_BYTES( MaxSize );
-
-    // Get PCIe Device Control
-    PLX_PCI_REG_READ(
-        pDevice,
-        Offset_PcieCap + 0x08,
-        &RegValue
-        );
-
-    // Get max payload size field
-    MaxSize = (U8)(RegValue >> 5) & 0x7;
-
-    // Set max payload size (=128 * (2 ^ MaxPaySizeField))
-    pPortProp->MaxPayloadSize = PCIE_MPS_MRR_TO_BYTES( MaxSize );
-
-    // Get max read request size field
-    MaxSize = (U8)(RegValue >> 12) & 0x7;
-
-    // Set max read request size (=128 * (2 ^ MaxReadReqSizeField))
-    pPortProp->MaxReadReqSize = PCIE_MPS_MRR_TO_BYTES( MaxSize );
-
-    // Get PCIe Link Capabilities
-    PLX_PCI_REG_READ(
-        pDevice,
-        Offset_PcieCap + 0x0C,
-        &RegValue
-        );
-
-    // Get port number
-    pPortProp->PortNumber = (U8)((RegValue >> 24) & 0xFF);
-
-    // Get max link width
-    pPortProp->MaxLinkWidth = (U8)((RegValue >> 4) & 0x3F);
-
-    // Get max link speed
-    pPortProp->MaxLinkSpeed = (U8)((RegValue >> 0) & 0xF);
-
-    // Get PCIe Link Status/Control
-    PLX_PCI_REG_READ(
-        pDevice,
-        Offset_PcieCap + 0x10,
-        &RegValue
-        );
-
-    // Get link width
-    pPortProp->LinkWidth = (U8)((RegValue >> 20) & 0x3F);
-
-    // Get link speed
-    pPortProp->LinkSpeed = (U8)((RegValue >> 16) & 0xF);
-
-    /**********************************************************
-     * In MIRA 3300 Enhanced mode, link width for the DS port & USB EP
-     * is incorrectly reported as x0. Override with Max Width.
-     *********************************************************/
-    if ((pDevice->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-        ((pDevice->Key.PlxChip & 0xFF00) == 0x3300) &&
-        (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD) &&
-        (pPortProp->LinkWidth == 0))
-    {
-        DebugPrintf((
-            "NOTE - Override reported link width (x%d) with Max width (x%d)\n",
-            pPortProp->LinkWidth, pPortProp->MaxLinkWidth
-            ));
-        pPortProp->LinkWidth = pPortProp->MaxLinkWidth;
-    }
-
-    /**********************************************************
-     * If using port bifurication, Draco 2 DS ports may report
-     * incorrect port numbers. Override with PLX port number.
-     *********************************************************/
-    if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) &&
-        (pPortProp->PortType == PLX_PORT_DOWNSTREAM) &&
-        (pPortProp->PortNumber != pDevice->Key.PlxPort))
-    {
-        DebugPrintf((
-            "NOTE - Override reported port num (%d) with probed port num (%d)\n",
-            pPortProp->PortNumber, pDevice->Key.PlxPort
-            ));
-        pPortProp->PortNumber = pDevice->Key.PlxPort;
-    }
-
-    DebugPrintf((
-        "P=%d T=%d MPS=%d/%d MRR=%d L=G%dx%d/G%dx%d\n",
-        pPortProp->PortNumber, pPortProp->PortType,
-        pPortProp->MaxPayloadSize, pPortProp->MaxPayloadSupported,
-        pPortProp->MaxReadReqSize,
-        pPortProp->LinkSpeed, pPortProp->LinkWidth,
-        pPortProp->MaxLinkSpeed, pPortProp->MaxLinkWidth
-        ));
-
-    return PLX_STATUS_OK;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxI2c_DeviceReset
- *
- * Description:  Resets a device using software reset feature of PLX chip
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_DeviceReset(
-    PLX_DEVICE_OBJECT *pDevice
-    )
-{
-    // Device reset not implemented
-    return PLX_STATUS_UNSUPPORTED;
-}
-
-
-
-
-/*******************************************************************************
- *
  * Function   :  PlxI2c_PlxRegisterRead
  *
  * Description:  Reads a PLX-specific register
@@ -967,18 +714,17 @@ PlxI2c_PlxRegisterRead(
     U16                bRetryOnError
     )
 {
-    int Status_AA;
-    U8  bSetUpper;
+    int status_AA;
     U16 nBytesRead;
     U16 nBytesWritten;
-    U32 Command;
-    U32 RegValue;
+    U32 command;
+    U32 regVal;
 
 
     // Set max retry count
     if (bRetryOnError)
     {
-        bRetryOnError = PLX_I2C_RETRY_MAX_COUNT;
+        bRetryOnError = I2C_RETRY_MAX_COUNT;
     }
     else
     {
@@ -1002,17 +748,57 @@ PlxI2c_PlxRegisterRead(
         *pStatus = PLX_STATUS_FAILED;
     }
 
+    // If outside PEX region (60800000-60FFFFFF), must use indexing method
+    if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+         (bAdjustForPort == FALSE) &&
+         ((offset & I2C_PEX_BASE_ADDR_MASK) != ATLAS_REGS_AXI_BASE_ADDR) )
+    {
+        // Set AXI address to read (1F0100h) if has changed
+        if (offset != Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr)
+        {
+            PlxI2c_PlxRegisterWrite(
+                pDevice,
+                ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_ADDR,
+                offset,
+                FALSE        // Adjust for port?
+                );
+
+            // Store address to avoid future write if no change
+            Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr = offset;
+        }
+
+        // Issue read command (1F0108h[1]=1)
+        PlxI2c_PlxRegisterWrite(
+            pDevice,
+            ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_CTRL,
+            PEX_IDX_CTRL_CMD_READ,
+            FALSE        // Adjust for port?
+            );
+
+        // Get the data (1F0104h)
+        regVal =
+            PlxI2c_PlxRegisterRead(
+                pDevice,
+                ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_DATA,
+                pStatus,
+                FALSE,                    // Adjust for port?
+                (U8)(bRetryOnError != 0)  // Retry on error?
+                );
+
+        return regVal;
+    }
+
     // Generate the I2C command
-    Command =
+    command =
         PlxI2c_GenerateCommand(
             pDevice,
-            PLX_I2C_CMD_REG_READ,
+            I2C_CMD_REG_READ,
             offset,
             bAdjustForPort
             );
 
     // Some I2C commands cannot be sent to chip
-    if (Command == PLX_I2C_CMD_SKIP)
+    if (command == I2C_CMD_SKIP)
     {
         if (pStatus != NULL)
         {
@@ -1021,58 +807,42 @@ PlxI2c_PlxRegisterRead(
         return 0;
     }
 
-    if (Command == PLX_I2C_CMD_ERROR)
+    if (command == I2C_CMD_ERROR)
     {
         return 0;
     }
 
-    // Default to not modify upper bits
-    bSetUpper = FALSE;
-
-    // For fabric mode, offset[22:18] is taken from 2CC[4:0]
-    if ((pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) &&
-        (offset >= ((U32)1 << 18)))
-    {
-        bSetUpper = TRUE;
-        PlxI2c_PlxRegisterWrite(
-            pDevice,
-            0x2CC,
-            ((offset >> 18) & 0x3F),
-            FALSE               // Adjust for port?
-            );
-    }
-
     // Set default return value
-    RegValue = 0;
+    regVal = 0;
 
     do
     {
         // Get the register access lock
         EnterCriticalSection(
-            &(Gbl_PlxI2cProp[pDevice->Key.ApiIndex].Lock_I2cRegAccess)
+            &(Gbl_I2cProp[pDevice->Key.ApiIndex].Lock_RegAccess)
             );
 
         // Issue read command and get data
-        Status_AA =
+        status_AA =
             aa_i2c_write_read(
                 (Aardvark)PLX_PTR_TO_INT( pDevice->hDevice ),
                 pDevice->Key.DeviceNumber,
                 AA_I2C_NO_FLAGS,
                 sizeof(U32),                    // Num write bytes
-                (U8*)&Command,                  // Write data
+                (U8*)&command,                  // Write data
                 &nBytesWritten,                 // Bytes written
                 sizeof(U32),                    // Num bytes to read
-                (U8*)&RegValue,                 // Read data buffer
+                (U8*)&regVal,                 // Read data buffer
                 &nBytesRead                     // Bytes read
                 );
 
         // Release the register access lock
         LeaveCriticalSection(
-            &(Gbl_PlxI2cProp[pDevice->Key.ApiIndex].Lock_I2cRegAccess)
+            &(Gbl_I2cProp[pDevice->Key.ApiIndex].Lock_RegAccess)
             );
 
         // Read status in [15:8] and write status in [7:0]
-        if (((Status_AA >> 8) == AA_OK) && ((Status_AA & 0xFF) == AA_OK) &&
+        if (((status_AA >> 8) == AA_OK) && ((status_AA & 0xFF) == AA_OK) &&
             (nBytesRead == sizeof(U32)) && (nBytesWritten == sizeof(U32)))
         {
             if (pStatus != NULL)
@@ -1081,12 +851,12 @@ PlxI2c_PlxRegisterRead(
             }
 
             // Convert to Big Endian format since data is returned in BE
-            RegValue = PLX_BE_DATA_32( RegValue );
+            regVal = PLX_BE_DATA_32( regVal );
 
             if (bRetryOnError)
             {
                 // Get retry count
-                bRetryOnError = PLX_I2C_RETRY_MAX_COUNT - bRetryOnError;
+                bRetryOnError = I2C_RETRY_MAX_COUNT - bRetryOnError;
 
                 // Log a note if had to retry I2C access
                 if (bRetryOnError)
@@ -1113,7 +883,7 @@ PlxI2c_PlxRegisterRead(
             if (bRetryOnError > 0)
             {
                 // Small delay to let chip state machine get ready for next command
-                Plx_sleep( PLX_I2C_RETRY_DELAY_MS );
+                Plx_sleep( I2C_RETRY_DELAY_MS );
 
                 // Decrement retry count
                 bRetryOnError--;
@@ -1123,23 +893,17 @@ PlxI2c_PlxRegisterRead(
                 {
                     ErrorPrintf((
                         "ERROR: I2C READ failed (St_Rd:%02d %dB St_Wr:%02d %dB O:%02Xh)\n",
-                        (Status_AA >> 8) & 0xFF, nBytesRead,
-                        (Status_AA & 0xFF), nBytesWritten, offset
+                        (status_AA >> 8) & 0xFF, nBytesRead,
+                        (status_AA & 0xFF), nBytesWritten, offset
                         ));
                 }
             }
-            RegValue = 0;
+            regVal = 0;
         }
     }
     while (bRetryOnError);
 
-    // Clear upper address reg if modified
-    if (bSetUpper)
-    {
-        PlxI2c_PlxRegisterWrite( pDevice, 0x2CC, 0, FALSE );
-    }
-
-    return RegValue;
+    return regVal;
 }
 
 
@@ -1160,11 +924,10 @@ PlxI2c_PlxRegisterWrite(
     BOOLEAN            bAdjustForPort
     )
 {
-    int        Status_AA;
-    U8         bSetUpper;
+    int        status_AA;
     U16        bRetryOnError;
-    U32        Command;
-    U32        DataStream[2];
+    U32        command;
+    U32        dataStream[2];
     PLX_STATUS status;
 
 
@@ -1175,51 +938,86 @@ PlxI2c_PlxRegisterWrite(
         return PLX_STATUS_INVALID_OFFSET;
     }
 
+    // If outside PEX region (60800000-60FFFFFF), must use indexing method
+    if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+         (bAdjustForPort == FALSE) &&
+         ((offset & I2C_PEX_BASE_ADDR_MASK) != ATLAS_REGS_AXI_BASE_ADDR) )
+    {
+        // Set AXI address to write (1F0100h) if has changed
+        if (offset != Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr)
+        {
+            status =
+                PlxI2c_PlxRegisterWrite(
+                    pDevice,
+                    ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_ADDR,
+                    offset,
+                    FALSE        // Adjust for port?
+                    );
+        }
+        else
+        {
+            status = PLX_STATUS_OK;
+        }
+
+        // Set data to write the data (1F0104h)
+        if (status == PLX_STATUS_OK)
+        {
+            // Store address to avoid future write if no change
+            Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr = offset;
+
+            status =
+                PlxI2c_PlxRegisterWrite(
+                    pDevice,
+                    ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_DATA,
+                    value,
+                    FALSE        // Adjust for port?
+                    );
+        }
+
+        // Issue read command (1F0108h[1]=1)
+        if (status == PLX_STATUS_OK)
+        {
+            status =
+                PlxI2c_PlxRegisterWrite(
+                    pDevice,
+                    ATLAS_REGS_AXI_BASE_ADDR + PEX_REG_IDX_AXI_CTRL,
+                    PEX_IDX_CTRL_CMD_WRITE,
+                    FALSE        // Adjust for port?
+                    );
+        }
+
+        return status;
+    }
+
     // Generate the I2C command
-    Command =
+    command =
         PlxI2c_GenerateCommand(
             pDevice,
-            PLX_I2C_CMD_REG_WRITE,
+            I2C_CMD_REG_WRITE,
             offset,
             bAdjustForPort
             );
 
     // Some I2C commands cannot be sent to chip
-    if (Command == PLX_I2C_CMD_SKIP)
+    if (command == I2C_CMD_SKIP)
     {
         return PLX_STATUS_OK;
     }
 
-    if (Command == PLX_I2C_CMD_ERROR)
+    if (command == I2C_CMD_ERROR)
     {
         return PLX_STATUS_FAILED;
-    }
-
-    // Default to not modify upper bits
-    bSetUpper = FALSE;
-
-    // For fabric mode, offset[22:18] is taken from 2CC[4:0]
-    if ((pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) &&
-        (offset >= ((U32)1 << 18)))
-    {
-        bSetUpper = TRUE;
-        PlxI2c_PlxRegisterWrite(
-            pDevice,
-            0x2CC,
-            ((offset >> 18) & 0x3F),
-            FALSE               // Adjust for port?
-            );
     }
 
     // Convert register value to Big Endian format
     value = PLX_BE_DATA_32( value );
 
     // Copy command and value into data stream
-    DataStream[0] = Command;
-    DataStream[1] = value;
+    dataStream[0] = command;
+    dataStream[1] = value;
 
     // Set max retry count
-    bRetryOnError = PLX_I2C_RETRY_MAX_COUNT;
+    bRetryOnError = I2C_RETRY_MAX_COUNT;
 
     // Default to success
     status = PLX_STATUS_OK;
@@ -1228,30 +1026,30 @@ PlxI2c_PlxRegisterWrite(
     {
         // Get the register access lock
         EnterCriticalSection(
-            &(Gbl_PlxI2cProp[pDevice->Key.ApiIndex].Lock_I2cRegAccess)
+            &(Gbl_I2cProp[pDevice->Key.ApiIndex].Lock_RegAccess)
             );
 
         // Issue command & register value
-        Status_AA =
+        status_AA =
             aa_i2c_write(
                 (Aardvark)PLX_PTR_TO_INT( pDevice->hDevice ),
                 pDevice->Key.DeviceNumber,
                 AA_I2C_NO_FLAGS,
                 2 * sizeof(U32),
-                (U8*)DataStream
+                (U8*)dataStream
                 );
 
         // Release the register access lock
         LeaveCriticalSection(
-            &(Gbl_PlxI2cProp[pDevice->Key.ApiIndex].Lock_I2cRegAccess)
+            &(Gbl_I2cProp[pDevice->Key.ApiIndex].Lock_RegAccess)
             );
 
-        if (Status_AA == (2 * sizeof(U32)))
+        if (status_AA == (2 * sizeof(U32)))
         {
             if (bRetryOnError)
             {
                 // Get retry count
-                bRetryOnError = PLX_I2C_RETRY_MAX_COUNT - bRetryOnError;
+                bRetryOnError = I2C_RETRY_MAX_COUNT - bRetryOnError;
 
                 // Log a note if had to retry I2C access
                 if (bRetryOnError)
@@ -1278,7 +1076,7 @@ PlxI2c_PlxRegisterWrite(
             if (bRetryOnError > 0)
             {
                 // Small delay to let chip state machine get ready for next command
-                Plx_sleep( PLX_I2C_RETRY_DELAY_MS );
+                Plx_sleep( I2C_RETRY_DELAY_MS );
 
                 // Decrement retry count
                 bRetryOnError--;
@@ -1288,7 +1086,7 @@ PlxI2c_PlxRegisterWrite(
                 {
                     ErrorPrintf((
                         "ERROR: I2C WRITE failed (%04X@%02X St:%dB/8B O:%02Xh V:%08X)\n",
-                        pDevice->Key.PlxChip, pDevice->Key.DeviceNumber, Status_AA, offset, value
+                        pDevice->Key.PlxChip, pDevice->Key.DeviceNumber, status_AA, offset, value
                         ));
                     status = PLX_STATUS_FAILED;
                 }
@@ -1297,190 +1095,7 @@ PlxI2c_PlxRegisterWrite(
     }
     while (bRetryOnError);
 
-    // Clear upper address reg if modified
-    if (bSetUpper)
-    {
-        PlxI2c_PlxRegisterWrite( pDevice, 0x2CC, 0, FALSE );
-    }
-
     return status;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxI2c_PciBarProperties
- *
- * Description:  Returns the properties of a PCI BAR space
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_PciBarProperties(
-    PLX_DEVICE_OBJECT *pDevice,
-    U8                 BarIndex,
-    PLX_PCI_BAR_PROP  *pBarProperties
-    )
-{
-    U32 PciBar;
-    U32 Size;
-    U32 PciHeaderType;
-
-
-    // Get PCI header type
-    PLX_PCI_REG_READ(
-        pDevice,
-        PCI_REG_HDR_CACHE_LN,
-        &PciHeaderType
-        );
-
-    PciHeaderType = (U8)((PciHeaderType >> 16) & 0x7F);
-
-    // Verify BAR index
-    switch (PciHeaderType)
-    {
-        case 0:
-            if ((BarIndex != 0) && (BarIndex > 5))
-            {
-                return PLX_STATUS_INVALID_ACCESS;
-            }
-            break;
-
-        case 1:
-            if ((BarIndex != 0) && (BarIndex != 1))
-            {
-                DebugPrintf(("BAR %d does not exist on PCI type 1 header\n", BarIndex));
-                return PLX_STATUS_INVALID_ACCESS;
-            }
-            break;
-
-        default:
-            return PLX_STATUS_INVALID_ACCESS;
-    }
-
-    // Get BAR properties if not probed yet
-    if (pDevice->PciBar[BarIndex].BarValue == 0)
-    {
-        // Read PCI BAR
-        PLX_PCI_REG_READ(
-            pDevice,
-            PCI_REG_BAR_0 + (BarIndex * sizeof(U32)),
-            &PciBar
-            );
-
-        // Query BAR range
-        PLX_PCI_REG_WRITE(
-            pDevice,
-            PCI_REG_BAR_0 + (BarIndex * sizeof(U32)),
-            (U32)-1
-            );
-
-        // Read size
-        PLX_PCI_REG_READ(
-            pDevice,
-            PCI_REG_BAR_0 + (BarIndex * sizeof(U32)),
-            &Size
-            );
-
-        // Restore BAR
-        PLX_PCI_REG_WRITE(
-            pDevice,
-            PCI_REG_BAR_0 + (BarIndex * sizeof(U32)),
-            PciBar
-            );
-
-        // If upper 32-bit of 64-bit BAR, all bits will be set, which is not supported
-        if (Size == (U32)-1)
-        {
-            Size = 0;
-        }
-
-        // Store BAR properties
-        pDevice->PciBar[BarIndex].BarValue = PciBar;
-
-        // Determine BAR address & size based on space type
-        if (PciBar & (1 << 0))
-        {
-            // Some devices may not report upper 16-bits as FFFF
-            Size |= 0xFFFF0000;
-
-            pDevice->PciBar[BarIndex].Physical = PciBar & ~0x3;
-            pDevice->PciBar[BarIndex].Size     = (~(Size & ~0x3)) + 1;
-            pDevice->PciBar[BarIndex].Flags    = PLX_BAR_FLAG_IO;
-        }
-        else
-        {
-            pDevice->PciBar[BarIndex].Physical = PciBar & ~0xF;
-            pDevice->PciBar[BarIndex].Size     = (~(Size & ~0xF)) + 1;
-            pDevice->PciBar[BarIndex].Flags    = PLX_BAR_FLAG_MEM;
-        }
-
-        // Set BAR flags
-        if (pDevice->PciBar[BarIndex].Flags & PLX_BAR_FLAG_MEM)
-        {
-            if ((PciBar & (3 << 1)) == 0)
-            {
-                pDevice->PciBar[BarIndex].Flags |= PLX_BAR_FLAG_32_BIT;
-            }
-            else if ((PciBar & (3 << 1)) == 1)
-            {
-                pDevice->PciBar[BarIndex].Flags |= PLX_BAR_FLAG_BELOW_1MB;
-            }
-            else if ((PciBar & (3 << 1)) == 2)
-            {
-                pDevice->PciBar[BarIndex].Flags |= PLX_BAR_FLAG_64_BIT;
-            }
-
-            if (PciBar & (1 << 3))
-            {
-                pDevice->PciBar[BarIndex].Flags |= PLX_BAR_FLAG_PREFETCHABLE;
-            }
-        }
-    }
-
-    // Return BAR properties
-    *pBarProperties = pDevice->PciBar[BarIndex];
-
-    // Display BAR properties if enabled
-    if (pDevice->PciBar[BarIndex].Size == 0)
-    {
-        DebugPrintf(("BAR %d is disabled\n", BarIndex));
-        return PLX_STATUS_OK;
-    }
-
-    DebugPrintf((
-        "    PCI BAR %d: %08lX\n",
-        BarIndex, (PLX_UINT_PTR)pDevice->PciBar[BarIndex].BarValue
-        ));
-
-    DebugPrintf((
-        "    Phys Addr: %08lX\n",
-        (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Physical
-        ));
-
-    DebugPrintf((
-        "    Size     : %08lX (%ld %s)\n",
-        (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size,
-        (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size > ((U64)1 << 30) ?
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size >> 30 :
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size > ((U64)1 << 20) ?
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size >> 20 :
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size > ((U64)1 << 10) ?
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size >> 10 :
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size,
-        (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size > ((U64)1 << 30) ? "GB" :
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size > ((U64)1 << 20) ? "MB" :
-          (PLX_UINT_PTR)pDevice->PciBar[BarIndex].Size > ((U64)1 << 20) ? "KB" : "B"
-        ));
-
-    DebugPrintf((
-        "    Property : %sPrefetchable %d-bit\n",
-        (pDevice->PciBar[BarIndex].Flags & PLX_BAR_FLAG_PREFETCHABLE) ? "" : "Non-",
-        (pDevice->PciBar[BarIndex].Flags & PLX_BAR_FLAG_64_BIT) ? 64 : 32
-        ));
-
-    return PLX_STATUS_OK;
 }
 
 
@@ -2099,909 +1714,6 @@ PlxI2c_EepromWriteByOffset_16(
 
 /*******************************************************************************
  *
- * Function   :  PlxI2c_PerformanceInitializeProperties
- *
- * Description:  Initializes the performance properties for a device
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_PerformanceInitializeProperties(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PERF_PROP     *pPerfProp
-    )
-{
-    U8            StnPortCount;
-    PLX_PORT_PROP PortProp;
-
-
-    // Clear performance object
-    RtlZeroMemory( pPerfProp, sizeof(PLX_PERF_PROP) );
-
-    // Verify supported device & set number of ports per station
-    switch (pDevice->Key.PlxFamily)
-    {
-        case PLX_FAMILY_DENEB:
-        case PLX_FAMILY_CYGNUS:
-        case PLX_FAMILY_MIRA:
-        case PLX_FAMILY_CAPELLA_1:
-        case PLX_FAMILY_CAPELLA_2:
-            StnPortCount = 4;
-            break;
-
-        case PLX_FAMILY_SIRIUS:
-            StnPortCount = 16;
-            break;
-
-        case PLX_FAMILY_DRACO_1:
-        case PLX_FAMILY_DRACO_2:
-            StnPortCount = 8;    // Device actually only uses 6 ports out of 8
-            break;
-
-        default:
-            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pDevice->Key.PlxChip));
-            return PLX_STATUS_UNSUPPORTED;
-    }
-
-    // Get port properties
-    PlxI2c_GetPortProperties(
-        pDevice,
-        &PortProp
-        );
-
-    if (PortProp.PortNumber >= PERF_MAX_PORTS)
-    {
-        DebugPrintf(("ERROR - Port number exceeds maximum (%d)\n", (PERF_MAX_PORTS-1)));
-        return PLX_STATUS_UNSUPPORTED;
-    }
-
-    // Store PLX chip family
-    pPerfProp->PlxFamily = pDevice->Key.PlxFamily;
-
-    // Store relevant port properties for later calculations
-    pPerfProp->PortNumber = PortProp.PortNumber;
-    pPerfProp->LinkWidth  = PortProp.LinkWidth;
-    pPerfProp->LinkSpeed  = PortProp.LinkSpeed;
-
-    // Determine station and port number within station
-    pPerfProp->Station     = (U8)(PortProp.PortNumber / StnPortCount);
-    pPerfProp->StationPort = (U8)(PortProp.PortNumber % StnPortCount);
-
-    return PLX_STATUS_OK;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxI2c_PerformanceMonitorControl
- *
- * Description:  Controls PLX Performance Monitor
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_PerformanceMonitorControl(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PERF_CMD       command
-    )
-{
-    U8  Bit_EgressEn;
-    U8  bStationBased;
-    U8  bEgressAllPorts;
-    U32 i;
-    U32 offset;
-    U32 RegValue;
-    U32 RegCommand;
-    U32 StnCount;
-    U32 StnPortCount;
-    U32 Offset_Control;
-
-
-    // Verify supported device
-    switch (pDevice->Key.PlxFamily)
-    {
-        case PLX_FAMILY_DENEB:
-        case PLX_FAMILY_SIRIUS:
-        case PLX_FAMILY_MIRA:
-            Offset_Control = 0x568;
-
-            // Offset changes for MIRA in legacy EP mode
-            if ((pDevice->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-                (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER))
-            {
-                Offset_Control = 0x1568;
-            }
-            break;
-
-        case PLX_FAMILY_CYGNUS:
-        case PLX_FAMILY_DRACO_1:
-        case PLX_FAMILY_DRACO_2:
-        case PLX_FAMILY_CAPELLA_1:
-        case PLX_FAMILY_CAPELLA_2:
-            Offset_Control = 0x3E0;
-            break;
-
-        default:
-            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pDevice->Key.PlxChip));
-            return PLX_STATUS_UNSUPPORTED;
-    }
-
-    switch (command)
-    {
-        case PLX_PERF_CMD_START:
-            DebugPrintf(("Reset & enable monitor with infinite sampling\n"));
-            RegCommand = (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27);
-            break;
-
-        case PLX_PERF_CMD_STOP:
-            DebugPrintf(("Reset & disable monitor\n"));
-            RegCommand = (1 << 30);
-            break;
-
-        default:
-            return PLX_STATUS_INVALID_DATA;
-    }
-
-    // Added to avoid compiler warning
-    Bit_EgressEn = 0;
-    StnCount     = 0;
-    StnPortCount = 0;
-
-    // Default to single station access
-    bStationBased   = FALSE;
-    bEgressAllPorts = FALSE;
-
-    // Set control offset & enable/disable counters in stations
-    switch (pDevice->Key.PlxFamily)
-    {
-        case PLX_FAMILY_MIRA:
-            /*************************************************************
-             * For MIRA, there are filters available to control counting
-             * of different packet types. The PLX API doesn't currently
-             * support this filtering so all are enabled.
-             *
-             * PCIe filters in 664h[29:20] of P0
-             *   20: Disable MWr 32 TLP counter
-             *   21: Disable MWr 64 TLP counter
-             *   22: Disable Msg TLP counter
-             *   23: Disable MRd 32 TLP counter
-             *   24: Disable MRd 64 TLP counter
-             *   25: Disable other NP TLP counter
-             *   26: Disable ACK DLLP counting
-             *   27: Disable Update-FC P DLLP counter
-             *   28: Disable Update-FC NP DLLP counter
-             *   29: Disable Update-FC CPL DLLP counter
-             ************************************************************/
-            // In MIRA legacy EP mode, PCIe registers start at 1000h
-            if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER)
-            {
-                offset = 0x1664;
-            }
-            else
-            {
-                offset = 0x664;
-            }
-
-            // Clear 664[29:20] to enable all counters
-            RegValue = PLX_8000_REG_READ( pDevice, offset );
-            PLX_8000_REG_WRITE( pDevice, offset, RegValue & ~(0x3FF << 20) );
-            break;
-
-        case PLX_FAMILY_CYGNUS:
-        case PLX_FAMILY_DRACO_1:
-        case PLX_FAMILY_DRACO_2:
-        case PLX_FAMILY_CAPELLA_1:
-        case PLX_FAMILY_CAPELLA_2:
-            // Set device configuration
-            if (pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS)
-            {
-                Bit_EgressEn = 7;
-                StnCount     = 6;
-                StnPortCount = 4;
-            }
-            else if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
-                     (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2))
-            {
-                Bit_EgressEn = 6;
-                StnCount     = 3;
-                StnPortCount = 8;    // Device actually only uses 6 ports out of 8
-
-                // Set 3F0[9:8] to disable probe mode interval timer
-                // & avoid RAM pointer corruption
-                if (command == PLX_PERF_CMD_START)
-                {
-                    RegValue = PLX_8000_REG_READ( pDevice, 0x3F0 );
-                    PLX_8000_REG_WRITE( pDevice, 0x3F0, RegValue | (3 << 8) );
-                }
-            }
-            else if ((pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
-                     (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
-            {
-                Bit_EgressEn    = 6;
-                StnCount        = 6;
-                StnPortCount    = 4;
-                bStationBased   = TRUE;
-                bEgressAllPorts = TRUE;
-            }
-
-            // Enable/Disable Performance Counter in each station (or ports if applicable)
-            for (i = 0; i < (StnCount * StnPortCount); i++)
-            {
-                // Set port base offset
-                offset = (i * 0x1000);
-
-                // Ingress ports (in station port 0 only)
-                if ((i % StnPortCount) == 0)
-                {
-                    RegValue = PLX_8000_REG_READ( pDevice, offset + 0x768 );
-
-                    if (command == PLX_PERF_CMD_START)
-                    {
-                        PLX_8000_REG_WRITE( pDevice, offset + 0x768, RegValue | (1 << 29) );
-                    }
-                    else
-                    {
-                        PLX_8000_REG_WRITE( pDevice, offset + 0x768, RegValue & ~(1 << 29) );
-                    }
-                }
-
-                // Egress ports
-                if (bEgressAllPorts || ((i % StnPortCount) == 0))
-                {
-                    RegValue = PLX_8000_REG_READ( pDevice, offset + 0xF30 );
-
-                    if (command == PLX_PERF_CMD_START)
-                    {
-                        PLX_8000_REG_WRITE( pDevice, offset + 0xF30, RegValue | (1 << Bit_EgressEn) );
-                    }
-                    else
-                    {
-                        PLX_8000_REG_WRITE( pDevice, offset + 0xF30, RegValue & ~(1 << Bit_EgressEn) );
-                    }
-                }
-            }
-            break;
-    }
-
-    // Update monitor
-    for (i = 0; i < StnCount; i++)
-    {
-        if ((i == 0) || bStationBased)
-        {
-            PLX_8000_REG_WRITE(
-                pDevice,
-                Offset_Control + (i * StnPortCount * 0x1000),
-                RegCommand
-                );
-        }
-    }
-
-    return PLX_STATUS_OK;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxI2c_PerformanceResetCounters
- *
- * Description:  Resets the internal performance counters
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_PerformanceResetCounters(
-    PLX_DEVICE_OBJECT *pDevice
-    )
-{
-    U32 i;
-    U32 StnCount;
-    U32 StnPortCount;
-    U16 Offset_Control;
-
-
-    // Verify supported device
-    switch (pDevice->Key.PlxFamily)
-    {
-        case PLX_FAMILY_DENEB:
-        case PLX_FAMILY_SIRIUS:
-        case PLX_FAMILY_MIRA:
-            Offset_Control = 0x568;
-
-            // Offset changes for MIRA in legacy EP mode
-            if ((pDevice->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-                (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER))
-            {
-                Offset_Control = 0x1568;
-            }
-            break;
-
-        case PLX_FAMILY_CYGNUS:
-        case PLX_FAMILY_DRACO_1:
-        case PLX_FAMILY_DRACO_2:
-        case PLX_FAMILY_CAPELLA_1:
-        case PLX_FAMILY_CAPELLA_2:
-            Offset_Control = 0x3E0;
-            break;
-
-        default:
-            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pDevice->Key.PlxChip));
-            return PLX_STATUS_UNSUPPORTED;
-    }
-
-    // Set station counts for station-based monitor chips
-    if ((pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
-        (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
-    {
-        StnCount     = 6;
-        StnPortCount = 4;
-    }
-    else
-    {
-        StnCount     = 1;
-        StnPortCount = 0;
-    }
-
-    for (i = 0; i < StnCount; i++)
-    {
-        // Reset (30) & enable monitor (31) & infinite sampling (28) & start (27)
-        PLX_8000_REG_WRITE(
-            pDevice,
-            Offset_Control + (i * StnPortCount * 0x1000),
-            (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27)
-            );
-    }
-
-    return PLX_STATUS_OK;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxI2c_PerformanceGetCounters
- *
- * Description:  Retrieves a snapshot of the Performance Counters for selected ports
- *
- * Notes      :  The counters are retrieved from the PLX chip as a preset structure.
- *               Each register read returns the next value from the sequence.  The
- *               structure varies between some PLX chips.  Below is a diagram of each.
- *
- *   IN    = Ingress port
- *   EG    = Egress port
- *   PH    = Number of Posted Headers (Write TLPs)
- *   PDW   = Number of Posted DWords
- *   NPDW  = Non-Posted DWords (Read TLP Dwords)
- *   CPLH  = Number of Completion Headers (CPL TLPs)
- *   CPLDW = Number of Completion DWords
- *   DLLP  = Number of DLLPs
- *   PHY   = PHY Layer (always 0)
- *   PLD   = USB endpoint payload count
- *   RAW   = USB endpoint raw byte count
- *   PKT   = USB endpoint packet count
- *
- *          Deneb & Cygnus                  Draco                     Sirius
- *     --------------------------   -----------------------   -------------------------
- *         14 counters/port           14 counters/port          13 counters/port
- *          4 ports/station            6 ports/station          16 ports/station
- *   Deneb: 3 stations (12 ports)      3 stations (18 ports)     1 station (16 ports)
- *  Cygnus: 6 stations (24 ports)
- *         56 counters/station        84 counters/station      208 counters/station
- * Deneb: 168 counters (56 * 3)      252 counters (84 * 3)     208 counters (208 * 1)
- *Cygnus: 336 counters (56 * 6)
- *
- *       off     Counter            off     Counter            off      Counter
- *           -----------------          -----------------          ------------------
- *         0| Port 0 IN PH    |       0| Port 0 IN PH    |       0| Port 0 IN PH     |
- *         4| Port 0 IN PDW   |       4| Port 0 IN PDW   |       4| Port 0 IN PDW    |
- *         8| Port 0 IN NPDW  |       8| Port 0 IN NPDW  |       8| Port 0 IN NPDW   |
- *         C| Port 0 IN CPLH  |       C| Port 0 IN CPLH  |       C| Port 0 IN CPLH   |
- *        10| Port 0 IN CPLDW |      10| Port 0 IN CPLDW |      10| Port 0 IN CPLDW  |
- *          |-----------------|        |-----------------|        |------------------|
- *        14| Port 1 IN PH    |      14| Port 1 IN PH    |      14| Port 1 IN PH     |
- *          |       :         |        |       :         |        |       :          |
- *          |       :         |        |       :         |        |       :          |
- *        24| Port 1 IN CPLDW |      24| Port 1 IN CPLDW |      24| Port 1 IN CPLDW  |
- *          |-----------------|        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
- *        28| Port 2 IN PH    |        |       :         |        |       :          |
- *          |       :         |        |       :         |        |       :          |
- *          |       :         |        |       :         |        |       :          |
- *        38| Port 2 IN CPLDW |        |       :         |        |       :          |
- *          |-----------------|        |       :         |        |       :          |
- *        3C| Port 3 IN PH    |        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
- *          |       :         |      64| Port 5 IN PH    |     12C| Port 15 IN PH    |
- *          |       :         |        |       :         |        |       :          |
- *        4C| Port 3 IN CPLDW |        |       :         |        |       :          |
- *          |-----------------|      74| Port 5 IN CPLDW |     13C| Port 15 IN CPLDW |
- *        50| Port 0 EG PH    |        |-----------------|        |------------------|
- *        54| Port 0 EG PDW   |      78| Port 0 EG PH    |     140| Port 0 EG PH     |
- *        58| Port 0 EG NPDW  |      7C| Port 0 EG PDW   |     144| Port 0 EG PDW    |
- *        5C| Port 0 EG CPLH  |      80| Port 0 EG NPDW  |     148| Port 0 EG NPDW   |
- *        60| Port 0 EG CPLDW |      84| Port 0 EG CPLH  |     14C| Port 0 EG CPLH   |
- *          |-----------------|      88| Port 0 EG CPLDW |     150| Port 0 EG CPLDW  |
- *        64| Port 1 EG PH    |        |-----------------|        |------------------|
- *          |       :         |      8C| Port 1 EG PH    |     154| Port 1 EG PH     |
- *          |       :         |        |       :         |        |       :          |
- *        74| Port 1 EG CPLDW |        |       :         |        |       :          |
- *          |-----------------|      9C| Port 1 EG CPLDW |     164| Port 1 EG CPLDW  |
- *        78| Port 2 EG PH    |        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
- *          |       :         |        |       :         |        |       :          |
- *          |       :         |        |       :         |        |       :          |
- *        88| Port 2 EG CPLDW |        |       :         |        |       :          |
- *          |-----------------|        |       :         |        |       :          |
- *        8C| Port 3 EG PH    |        |       :         |        |       :          |
- *          |       :         |        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
- *          |       :         |      DC| Port 5 EG PH    |     26C| Port 15 EG PH    |
- *        9C| Port 3 EG CPLDW |        |       :         |        |       :          |
- *          |-----------------|        |       :         |        |       :          |
- *        A0| Port 0 IN DLLP  |      EC| Port 5 EG CPLDW |     27C| Port 15 EG CPLDW |
- *        A4| Port 1 IN DLLP  |        |-----------------|        |------------------|
- *        A8| Port 2 IN DLLP  |      F0| Port 0 IN DLLP  |     280| Port  0 IN DLLP  |
- *        AC| Port 3 IN DLLP  |      F4| Port 1 IN DLLP  |     284| Port  2 IN DLLP  |
- *          |-----------------|      F8| Port 2 IN DLLP  |     288| Port  4 IN DLLP  |
- *        B0| Port 0 EG DLLP  |      FC| Port 3 IN DLLP  |     28C| Port  6 IN DLLP  |
- *        B4| Port 1 EG DLLP  |     100| Port 4 IN DLLP  |     290| Port  8 IN DLLP  |
- *        B8| Port 2 EG DLLP  |     104| Port 5 IN DLLP  |     294| Port 10 IN DLLP  |
- *        BC| Port 3 EG DLLP  |        |-----------------|     298| Port 12 IN DLLP  |
- *          |-----------------|     108| Port 0 EG DLLP  |     29C| Port 14 IN DLLP  |
- *        C0| Port 0 IN PHY   |     10C| Port 1 EG DLLP  |        |------------------|
- *        C4| Port 1 IN PHY   |     110| Port 2 EG DLLP  |     2A0| Port  0 EG DLLP  |
- *        C8| Port 2 IN PHY   |     114| Port 3 EG DLLP  |     2A4| Port  2 EG DLLP  |
- *        CC| Port 3 IN PHY   |     118| Port 4 EG DLLP  |     2A8| Port  4 EG DLLP  |
- *          |-----------------|     11C| Port 5 EG DLLP  |     2AC| Port  6 EG DLLP  |
- *        D0| Port 0 EG PHY   |        |-----------------|     2B0| Port  8 EG DLLP  |
- *        D4| Port 1 EG PHY   |     120| Port 0 IN PHY   |     2B4| Port 10 EG DLLP  |
- *        D8| Port 2 EG PHY   |     124| Port 1 IN PHY   |     2B8| Port 12 EG DLLP  |
- *        DC| Port 3 EG PHY   |     128| Port 2 IN PHY   |     2BC| Port 14 EG DLLP  |
- *           -----------------      12C| Port 3 IN PHY   |        |------------------|
- *                                  130| Port 4 IN PHY   |     2C0| Port  1 IN DLLP  |
- *                                  134| Port 5 IN PHY   |     2C4| Port  3 IN DLLP  |
- *                                     |-----------------|     2C8| Port  5 IN DLLP  |
- *                                  138| Port 0 EG PHY   |     2CC| Port  7 IN DLLP  |
- *                                  13C| Port 1 EG PHY   |     2D0| Port  9 IN DLLP  |
- *                                  140| Port 2 EG PHY   |     2D4| Port 11 IN DLLP  |
- *                                  144| Port 3 EG PHY   |     2D8| Port 13 IN DLLP  |
- *                                  148| Port 4 EG PHY   |     2DC| Port 15 IN DLLP  |
- *                                  14C| Port 5 EG PHY   |        |------------------|
- *                                      -----------------      2E0| Port  1 EG DLLP  |
- *                                                             2E4| Port  3 EG DLLP  |
- *                                                             2E8| Port  5 EG DLLP  |
- *                                                             2EC| Port  7 EG DLLP  |
- *                                                             2F0| Port  9 EG DLLP  |
- *                                                             2F4| Port 11 EG DLLP  |
- *                                                             2F8| Port 13 EG DLLP  |
- *                                                             2FC| Port 15 EG DLLP  |
- *                                                                |------------------|
- *                                                             300| Port 0 PHY       |
- *                                                                |       :          |
- *                                                                |       :          |
- *                                                             33C| Port 15 PHY      |
- *                                                                 ------------------
- *
- *             Mira                        Capella-1/2
- *     --------------------------    -----------------------
- *        14 PCIe counters/port      14 counters/port
- *         4 ports/station            4 pts/stn but 5 in RAM
- *         1 stations (4 ports)       6 stn (24 ports)
- *                                  *SW uses 30 pts to read all
- *        86 counters/station
- *        86 counters (86 * 1)        70 counters/station
- *                                   420 counters (70 * 6)
- *
- *       off     Counter             off     Counter
- *           -----------------           -----------------
- *         0| Port 0 IN PH    |        0| Port 0 IN PH    |
- *         4| Port 0 IN PDW   |        4| Port 0 IN PDW   |
- *         8| Port 0 IN NPDW  |        8| Port 0 IN NPDW  |
- *         C| Port 0 IN CPLH  |        C| Port 0 IN CPLH  |
- *        10| Port 0 IN CPLDW |       10| Port 0 IN CPLDW |
- *          |-----------------|         |-----------------|
- *        14| Port 1 IN PH    |       14| Port 1 IN PH    |
- *          |       :         |         |       :         |
- *          |       :         |         |       :         |
- *        24| Port 1 IN CPLDW |       24| Port 1 IN CPLDW |
- *          |-----------------|         |/\/\/\/\/\/\/\/\/|
- *        28| Port 2 IN PH    |         |       :         |
- *          |       :         |         |       :         |
- *          |       :         |         |       :         |
- *        38| Port 2 IN CPLDW |         |       :         |
- *          |-----------------|         |       :         |
- *        3C| Port 3 IN PH    |         |/\/\/\/\/\/\/\/\/|
- *          |       :         |       50| Port 4 IN PH    |
- *          |       :         |         |       :         |
- *        4C| Port 3 IN CPLDW |         |       :         |
- *          |-----------------|       60| Port 4 IN CPLDW |
- *        50| Port 0 EG PH    |         |-----------------|
- *        54| Port 0 EG PDW   |       64| Port 0 EG PH    |
- *        58| Port 0 EG NPDW  |       68| Port 0 EG PDW   |
- *        5C| Port 0 EG CPLH  |       6c| Port 0 EG NPDW  |
- *        60| Port 0 EG CPLDW |       70| Port 0 EG CPLH  |
- *          |-----------------|       74| Port 0 EG CPLDW |
- *        64| Port 1 EG PH    |         |-----------------|
- *          |       :         |       78| Port 1 EG PH    |
- *          |       :         |         |       :         |
- *        74| Port 1 EG CPLDW |         |       :         |
- *          |-----------------|       88| Port 1 EG CPLDW |
- *        78| Port 2 EG PH    |         |/\/\/\/\/\/\/\/\/|
- *          |       :         |         |       :         |
- *          |       :         |         |       :         |
- *        88| Port 2 EG CPLDW |         |       :         |
- *          |-----------------|         |       :         |
- *        8C| Port 3 EG PH    |         |       :         |
- *          |       :         |         |/\/\/\/\/\/\/\/\/|
- *          |       :         |         |-----------------|
- *        9C| Port 3 EG CPLDW |       B4| Port 4 EG PH    |
- *          |-----------------|         |       :         |
- *        A0| Port 0 IN DLLP  |         |       :         |
- *        A4| Port 1 IN DLLP  |       C4| Port 4 EG CPLDW |
- *        A8| Port 2 IN DLLP  |         |-----------------|
- *        AC| Port 3 IN DLLP  |       C8| Port 0 IN DLLP  |
- *          |-----------------|       CC| Port 1 IN DLLP  |
- *        B0| Port 0 EG DLLP  |       D0| Port 2 IN DLLP  |
- *        B4| Port 1 EG DLLP  |       D4| Port 3 IN DLLP  |
- *        B8| Port 2 EG DLLP  |       D8| Port 4 IN DLLP  |
- *        BC| Port 3 EG DLLP  |         |-----------------|
- *          |-----------------|       DC| -- Invalid --   |
- *        C0| GPEP_0 IN PLD   |       E0| Port 0 EG DLLP  |
- *        C4| GPEP_0 IN RAW   |       E4| Port 1 EG DLLP  |
- *        C8| GPEP_0 IN PKT   |       E8| Port 2 EG DLLP  |
- *          |-----------------|       EC| Port 3 EG DLLP  |*P4 EG DLLP missing
- *        CC| GPEP_1 IN PLD   |         |-----------------|
- *        D0| GPEP_1 IN RAW   |       F0| Port 0 IN PHY   |
- *        D4| GPEP_1 IN PKT   |       F4| Port 1 IN PHY   |
- *          |-----------------|       F8| Port 2 IN PHY   |
- *        D8| GPEP_2 IN PLD   |       FC| Port 3 IN PHY   |
- *        DC| GPEP_2 IN RAW   |      100| Port 4 IN PHY   |
- *        E0| GPEP_2 IN PKT   |         |-----------------|
- *          |-----------------|      104| Port 0 EG PHY   |
- *        E4| GPEP_3 IN PLD   |      108| Port 1 EG PHY   |
- *        E8| GPEP_3 IN RAW   |      10C| Port 2 EG PHY   |
- *        EC| GPEP_3 IN PKT   |      110| Port 3 EG PHY   |
- *          |-----------------|      114| Port 4 EG PHY   |
- *        F0| GPEP_0 OUT PLD  |          -----------------
- *        F4| GPEP_0 OUT RAW  |
- *        F8| GPEP_0 OUT PKT  |
- *          |-----------------|
- *        FC| GPEP_1 OUT PLD  |
- *       100| GPEP_1 OUT RAW  |
- *       104| GPEP_1 OUT PKT  |
- *          |-----------------|
- *       108| GPEP_2 OUT PLD  |
- *       10C| GPEP_2 OUT RAW  |
- *       110| GPEP_2 OUT PKT  |
- *          |-----------------|
- *       114| GPEP_3 OUT PLD  |
- *       118| GPEP_3 OUT RAW  |
- *       11C| GPEP_3 OUT PKT  |
- *          |-----------------|
- *       120| EP_0 IN PLD     |
- *       124| EP_0 IN RAW     |
- *       128| EP_0 IN PKT     |
- *          |-----------------|
- *       12C| EP_0 OUT PLD    |
- *       130| EP_0 OUT RAW    |
- *       134| EP_0 OUT PKT    |
- *          |-----------------|
- *       138| PHY (always 0)  |
- *       13C| PHY (always 0)  |
- *           -----------------
- *
- ******************************************************************************/
-PLX_STATUS
-PlxI2c_PerformanceGetCounters(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PERF_PROP     *pPerfProps,
-    U8                 NumOfObjects
-    )
-{
-    U8   NumCounters;
-    U8   CurrStation;
-    U8   StnCount;
-    U8   StnPortCount;
-    U8   bStationBased;
-    U8   RamStnPortCount;
-    U16  i;
-    U16  index;
-    U16  IndexBase;
-    U32  Offset_Fifo;
-    U32  Offset_RamCtrl;
-    U32  RegValue;
-    U32 *pCounters;
-    U32 *pCounter;
-    U32 *pCounter_Prev;
-    U32  Counter_PrevTmp[14];
-    S64  TmpValue;
-
-
-    // Default to single station access
-    bStationBased = FALSE;
-
-    // Assume station port count in RAM is identical to station port count
-    RamStnPortCount = 0;
-
-    // Setup parameters for reading counters
-    switch (pDevice->Key.PlxFamily)
-    {
-        case PLX_FAMILY_DENEB:
-            Offset_RamCtrl = 0x618;
-            Offset_Fifo    = 0x628;
-            NumCounters    = 14;
-            StnCount       = 3;
-            StnPortCount   = 4;
-            break;
-
-        case PLX_FAMILY_SIRIUS:
-            Offset_RamCtrl = 0x618;
-            Offset_Fifo    = 0x628;
-            NumCounters    = 13;
-            StnCount       = 1;
-            StnPortCount   = 16;
-            break;
-
-        case PLX_FAMILY_CYGNUS:
-            Offset_RamCtrl = 0x3F0;
-            Offset_Fifo    = 0x3E4;
-            NumCounters    = 14;
-            StnCount       = 6;
-            StnPortCount   = 4;
-            break;
-
-        case PLX_FAMILY_MIRA:
-            Offset_RamCtrl = 0x618;
-            Offset_Fifo    = 0x628;
-            NumCounters    = 12;
-            StnCount       = 1;
-            StnPortCount   = 4;
-
-            // In MIRA legacy EP mode, PCIe registers start at 1000h
-            if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER)
-            {
-                Offset_RamCtrl += 0x1000;
-                Offset_Fifo    += 0x1000;
-            }
-            break;
-
-        case PLX_FAMILY_DRACO_1:
-        case PLX_FAMILY_DRACO_2:
-            Offset_RamCtrl = 0x3F0;
-            Offset_Fifo    = 0x3E4;
-            NumCounters    = 14;
-            StnCount       = 3;
-            StnPortCount   = 6;
-            break;
-
-        case PLX_FAMILY_CAPELLA_1:
-        case PLX_FAMILY_CAPELLA_2:
-            Offset_RamCtrl  = 0x3F0;
-            Offset_Fifo     = 0x3E4;
-            NumCounters     = 14;
-            StnCount        = 6;
-            StnPortCount    = 4;
-            RamStnPortCount = 5;
-            bStationBased   = TRUE;
-            break;
-
-        default:
-            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pDevice->Key.PlxChip));
-            return PLX_STATUS_UNSUPPORTED;
-    }
-
-    // Allocate buffer to contain counter data for all ports (Max = 14 counters/port)
-    pCounters = malloc( PERF_MAX_PORTS * PERF_COUNTERS_PER_PORT * sizeof(U32) );
-    if (pCounters == NULL)
-    {
-        return PLX_STATUS_INSUFFICIENT_RES;
-    }
-
-    // Set RAM station port count if matches station port count
-    if (RamStnPortCount == 0)
-    {
-        RamStnPortCount = StnPortCount;
-    }
-
-    // RAM control
-    RegValue = (2 << 4) |   // Capture type ([5:4])
-               (1 << 2) |   // Reset read pointer
-               (1 << 0);    // Enable RAM
-
-    // Reset RAM read pointer
-    for (i = 0; i < StnCount; i++)
-    {
-        if ((i == 0) || bStationBased)
-        {
-            PLX_8000_REG_WRITE(
-                pDevice,
-                Offset_RamCtrl + (i * StnPortCount * 0x1000),
-                RegValue
-                );
-        }
-    }
-
-    // Read in all counters
-    i           = 0;
-    CurrStation = 0;
-    while (i < (StnCount * RamStnPortCount * NumCounters))
-    {
-        // Check if reached station boundary
-        if ((i % (NumCounters * RamStnPortCount)) == 0)
-        {
-            DebugPrintf_Cont(("\n"));
-            if (i == 0)
-            {
-                DebugPrintf(("           Counters\n"));
-                DebugPrintf(("----------------------------------\n"));
-            }
-            else
-            {
-                // Increment to next station
-                CurrStation++;
-
-                // For station based counters use register in station port 0
-                if (bStationBased)
-                {
-                    Offset_Fifo += (StnPortCount * 0x1000);
-                }
-            }
-
-            DebugPrintf(("Station %d:\n", CurrStation));
-            DebugPrintf(("%03X:", (U16)(i * sizeof(U32))));
-        }
-        else if ((i % 4) == 0)
-        {
-            DebugPrintf_Cont(("\n"));
-            DebugPrintf(("%03X:", (U16)(i * sizeof(U32))));
-        }
-
-        // Get next counter
-        pCounters[i] = PLX_8000_REG_READ( pDevice, Offset_Fifo );
-        DebugPrintf_Cont((" %08X", pCounters[i]));
-
-        // Jump to next counter
-        i++;
-    }
-    DebugPrintf_Cont(("\n"));
-
-    // Assign counter values to enabled ports
-    i = 0;
-    while (i < NumOfObjects)
-    {
-        // Make a copy of the previous values before overwriting them
-        RtlCopyMemory(
-            Counter_PrevTmp,
-            &(pPerfProps[i].Prev_IngressPostedHeader),
-            PERF_COUNTERS_PER_PORT * sizeof(U32)    // All 14 counters in structure
-            );
-
-        // Save current values to previous
-        RtlCopyMemory(
-            &(pPerfProps[i].Prev_IngressPostedHeader),
-            &(pPerfProps[i].IngressPostedHeader),
-            PERF_COUNTERS_PER_PORT * sizeof(U32)    // All 14 counters in structure
-            );
-
-        // Calculate starting index for counters based on port in station
-        IndexBase = pPerfProps[i].Station * (NumCounters * RamStnPortCount);
-
-        // Ingress counters start at index 0 from base
-        index = IndexBase + 0 + (pPerfProps[i].StationPort * 5);
-
-        // Get Ingress counters (5 DW/port)
-        pPerfProps[i].IngressPostedHeader = pCounters[index + 0];
-        pPerfProps[i].IngressPostedDW     = pCounters[index + 1];
-        pPerfProps[i].IngressNonpostedDW  = pCounters[index + 2];
-        pPerfProps[i].IngressCplHeader    = pCounters[index + 3];
-        pPerfProps[i].IngressCplDW        = pCounters[index + 4];
-
-        // Egress counters start after ingress
-        index = IndexBase + (5 * RamStnPortCount) + (pPerfProps[i].StationPort * 5);
-
-        // Get Egress counters (5 DW/port)
-        pPerfProps[i].EgressPostedHeader = pCounters[index + 0];
-        pPerfProps[i].EgressPostedDW     = pCounters[index + 1];
-        pPerfProps[i].EgressNonpostedDW  = pCounters[index + 2];
-        pPerfProps[i].EgressCplHeader    = pCounters[index + 3];
-        pPerfProps[i].EgressCplDW        = pCounters[index + 4];
-
-        // DLLP Ingress counters start after egress
-        index = IndexBase + (10 * RamStnPortCount);
-
-        // DLLP counter location depends upon chip
-        if (pDevice->Key.PlxFamily == PLX_FAMILY_SIRIUS)
-        {
-            // Even port number DLLP counters are first
-            index += (pPerfProps[i].StationPort / 2);
-
-            // Odd port number DLLP counters follow even ports
-            if (pPerfProps[i].StationPort & (1 << 0))
-            {
-                index += RamStnPortCount;
-            }
-        }
-        else
-        {
-            index += pPerfProps[i].StationPort;
-        }
-
-        // Get DLLP Ingress counters (1 DW/port)
-        pPerfProps[i].IngressDllp = pCounters[index];
-
-        // Egress DLLP counters follow Ingress
-        if (pDevice->Key.PlxFamily == PLX_FAMILY_SIRIUS)
-        {
-            // Even ports are grouped together
-            index += (RamStnPortCount / 2);
-        }
-        else
-        {
-            index += RamStnPortCount;
-        }
-
-        // For Capella, Egress DLLP skips one offset & port 4 is lost
-        if ((pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
-            (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
-        {
-            index++;
-        }
-
-        // Get DLLP Egress counters (1 DW/port)
-        pPerfProps[i].EgressDllp = pCounters[index];
-
-        // Any PHY counters are always 0, so ignore any values
-        pPerfProps[i].IngressPhy = 0;
-        pPerfProps[i].EgressPhy  = 0;
-
-        /**********************************************************
-         * In some cases on Draco 1 chips, device may incorrectly
-         * report a counter as 0. The following code checks the
-         * current & previous counters to detect this case. If the
-         * issue is present, the previous value is used instead to
-         * minimize data reporting errors.
-         *********************************************************/
-        if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_1) &&
-            (pPerfProps[i].LinkWidth != 0))
-        {
-            // Setup initial pointers to stored counters
-            pCounter      = &pPerfProps[i].IngressPostedHeader;
-            pCounter_Prev = &pPerfProps[i].Prev_IngressPostedHeader;
-
-            // Verify each counter & use previous on error
-            for (index = 0; index < PERF_COUNTERS_PER_PORT; index++)
-            {
-                if (((*pCounter == 0) && (*pCounter_Prev != 0)) || (*pCounter == 0x4C041301))
-                {
-                    // Store 64-bit counter in case of wrapping
-                    TmpValue = *pCounter_Prev;
-                    if (*pCounter_Prev < Counter_PrevTmp[index])
-                    {
-                        TmpValue += ((S64)1 << 32);
-                    }
-
-                    // Re-use difference between previous 2 counter values
-                    *pCounter = *pCounter_Prev + (U32)(TmpValue - Counter_PrevTmp[index]);
-                }
-
-                // Increment to next counter
-                pCounter++;
-                pCounter_Prev++;
-            }
-        }
-
-        // Go to next performance object
-        i++;
-    }
-
-    // Release temporary buffers
-    free( pCounters );
-
-    return PLX_STATUS_OK;
-}
-
-
-
-
-/*******************************************************************************
- *
  * Function   :  PlxI2c_MH_GetProperties
  *
  * Description:  Controls PLX Performance Monitor
@@ -3041,10 +1753,10 @@ PlxI2c_MH_GetProperties(
     }
 
     // Attempt to read management port configuration
-    RegValue = PLX_8000_REG_READ( pDevice, 0x354 );
+    RegValue = PlxPci_PlxMappedRegisterRead( pDevice, 0x354, NULL );
 
     // Get active VS mask
-    RegVSEnable = PLX_8000_REG_READ( pDevice, 0x358 );
+    RegVSEnable = PlxPci_PlxMappedRegisterRead( pDevice, 0x358, NULL );
 
     // Device properties are only available from the management port
     if ((RegValue == 0) && ((RegVSEnable & ~(1 << 0)) == 0))
@@ -3089,18 +1801,20 @@ PlxI2c_MH_GetProperties(
 
             // Get VS upstream port ([4:0])
             RegValue =
-                PLX_8000_REG_READ(
+                PlxPci_PlxMappedRegisterRead(
                     pDevice,
-                    0x360 + (i * sizeof(U32))
+                    0x360 + (i * sizeof(U32)),
+                    NULL
                     );
 
             pMHProp->VS_UpstreamPortNum[i] = (U8)((RegValue >> 0) & 0x1F);
 
             // Get VS downstream port vector ([23:0])
             RegValue =
-                PLX_8000_REG_READ(
+                PlxPci_PlxMappedRegisterRead(
                     pDevice,
-                    0x380 + (i * sizeof(U32))
+                    0x380 + (i * sizeof(U32)),
+                    NULL
                     );
 
             pMHProp->VS_DownstreamPorts[i] = RegValue & 0x00FFFFFF;
@@ -3225,13 +1939,13 @@ PlxI2c_MH_MigrateDsPorts(
     }
 
     // Update source & destination ports
-    PLX_8000_REG_WRITE(
+    PlxPci_PlxMappedRegisterWrite(
         pDevice,
         0x380 + (VS_Source * sizeof(U32)),
         MHProp.VS_DownstreamPorts[VS_Source]
         );
 
-    PLX_8000_REG_WRITE(
+    PlxPci_PlxMappedRegisterWrite(
         pDevice,
         0x380 + (VS_Dest * sizeof(U32)),
         MHProp.VS_DownstreamPorts[VS_Dest]
@@ -3241,7 +1955,7 @@ PlxI2c_MH_MigrateDsPorts(
     if ((MHProp.VS_EnabledMask & (1 << VS_Dest)) == 0)
     {
         DebugPrintf(("Enable destination VS%d\n", VS_Dest));
-        PLX_8000_REG_WRITE(
+        PlxPci_PlxMappedRegisterWrite(
             pDevice,
             0x358,
             MHProp.VS_EnabledMask | (1 << VS_Dest)
@@ -3252,13 +1966,14 @@ PlxI2c_MH_MigrateDsPorts(
     if (bResetSrc)
     {
         RegValue =
-            PLX_8000_REG_READ(
+            PlxPci_PlxMappedRegisterRead(
                 pDevice,
-                0x3A0
+                0x3A0,
+                NULL
                 );
 
         // Put VS into reset
-        PLX_8000_REG_WRITE(
+        PlxPci_PlxMappedRegisterWrite(
             pDevice,
             0x3A0,
             RegValue | (1 << VS_Source)
@@ -3268,7 +1983,7 @@ PlxI2c_MH_MigrateDsPorts(
         Plx_sleep( 10 );
 
         // Take VS out of reset
-        PLX_8000_REG_WRITE(
+        PlxPci_PlxMappedRegisterWrite(
             pDevice,
             0x3A0,
             RegValue & ~((U32)1 << VS_Source)
@@ -3283,62 +1998,9 @@ PlxI2c_MH_MigrateDsPorts(
 
 /***********************************************************
  *
- *               PRIVATE I2C SUPPORT FUNCTIONS
+ *               PRIVATE SUPPORT FUNCTIONS
  *
  **********************************************************/
-
-
-/******************************************************************
- *
- * Function   :  Plx_delay_us
- *
- * Description:  Delay for specific number of microseconds
- *
- *****************************************************************/
-VOID
-Plx_delay_us(
-    U32 Time_us
-    )
-{
-#if defined(PLX_LINUX) || defined(PLX_DOS)
-
-    usleep( Time_us );
-
-#elif defined(PLX_MSWINDOWS)
-
-    BOOL     status;
-    LONGLONG Tick_End;
-    LONGLONG Tick_Start;
-    LONGLONG TicksToWait;
-    LONGLONG TicksPerSecond;
-
-
-    // Get current counter
-    status = QueryPerformanceCounter( (LARGE_INTEGER*)&Tick_Start );
-
-    if (status == FALSE)
-    {
-        // If system doesn't support HRT, revert to sleep in ms
-        Plx_sleep( Time_us / 1000 );
-        return;
-    }
-
-    // Get the high resolution counter's accuracy
-    QueryPerformanceFrequency( (LARGE_INTEGER*)&TicksPerSecond );
-
-    // Calculate number of ticks to wait based on µs delay time
-    TicksToWait = ((U64)Time_us * TicksPerSecond) / (1000 * 1000);
-
-    do
-    {
-        QueryPerformanceCounter( (LARGE_INTEGER*)&Tick_End );
-    }
-    while ((Tick_End - Tick_Start) < TicksToWait);
-
-#endif
-}
-
-
 
 
 /******************************************************************************
@@ -3352,63 +2014,75 @@ U32
 PlxI2c_GenerateCommand(
     PLX_DEVICE_OBJECT *pDevice,
     U8                 I2cOperation,
-    U32                offset,
+    U32                Address,
     BOOLEAN            bAdjustForPort
     )
 {
+    U8  portType;
     U8  bMultiNt;
-    U8  Bit_Mode;
-    U8  Bit_StnSel;
-    U8  Bit_PortSel;
-    U8  PortType;
-    U8  PortsPerStn;
-    U32 StnSel;
-    U32 PortSel;
-    U32 Mode;
-    U32 Command;
-    U32 Offset_Base;            // Provided offset port base
-    U32 Offset_NTV0Base;        // NT 0 Virtual regs base offset
-    U32 Offset_DmaBase;         // DMA regs base offset
-    U32 Offset_Stn0Base;        // Station 0 regs base offset
+    U8  bitPosMode;
+    U8  bitPosStnSel;
+    U8  bitPosPtSel;
+    U8  portsPerStn;
+    U8  highAddr;
+    U32 mode;
+    U32 stnSel;
+    U32 portSel;
+    U32 command;
+    U32 regOffset;
+    U32 highAddrOffset;
+    U32 addr_Base;            // Provided offset port base
+    U32 addr_NTV0Base;        // NT 0 Virtual regs base offset
+    U32 addr_DmaBase;         // DMA regs base offset
+    U32 addr_Stn0Base;        // Station 0 regs base offset
 
 
     // If port-based, add port base address to offset
     if (bAdjustForPort)
     {
-        offset += pDevice->Key.ApiInternal[1];
+        Address += pDevice->Key.ApiInternal[1];
     }
 
-    // Determine port base offset
-    Offset_Base = offset & ~(U32)0xFFF;
+    // If within PEX region (60800000-60FFFFFF), remove base address
+    if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+         (bAdjustForPort == FALSE) &&
+         ((Address & I2C_PEX_BASE_ADDR_MASK) == ATLAS_REGS_AXI_BASE_ADDR) )
+    {
+        Address &= I2C_PEX_MAX_OFFSET_MASK;
+    }
+
+    // Determine port base address
+    addr_Base = Address & ~(U32)0xFFF;
 
     // Default special port base addresses to an always invalid address
-    Offset_NTV0Base = 0xE0000000;
-    Offset_DmaBase  = 0xE0000000;
-    Offset_Stn0Base = 0xE0000000;
+    addr_NTV0Base = 0xFFFFFFFF;
+    addr_DmaBase  = 0xFFFFFFFF;
+    addr_Stn0Base = 0xFFFFFFFF;
 
     // Added to avoid compiler warning
-    Bit_Mode = 0;
+    bitPosMode = 0;
 
     // Set default bit positions
-    Bit_StnSel  = 0;
-    Bit_PortSel = 15;
+    bitPosStnSel = 0;
+    bitPosPtSel  = 15;
 
     // Set whether multi-NT is supported
-    if ((pDevice->Key.PlxChip & 0xFF00) == 0x8600)
+    if ( ((pDevice->Key.PlxChip & 0xFF00) == 0x8700) ||
+         ((pDevice->Key.PlxChip & 0xFF00) == 0x9700) )
     {
-        bMultiNt = FALSE;
+        bMultiNt = TRUE;
     }
     else
     {
-        bMultiNt = TRUE;
+        bMultiNt = FALSE;
     }
 
     // Set bit positions & address traps
     switch (pDevice->Key.PlxFamily)
     {
         case PLX_FAMILY_VEGA_LITE:
-            Bit_Mode        = 18;
-            Offset_NTV0Base = 0x10000;
+            bitPosMode    = 18;
+            addr_NTV0Base = 0x10000;
             break;
 
         case PLX_FAMILY_ALTAIR:
@@ -3419,129 +2093,127 @@ PlxI2c_GenerateCommand(
 
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_SIRIUS:
-            Bit_Mode        = 19;
-            Bit_StnSel      = 17;
-            Offset_NTV0Base = 0x10000;
-            Offset_DmaBase  = 0x20000;
+            bitPosMode    = 19;
+            bitPosStnSel  = 17;
+            addr_NTV0Base = 0x10000;
+            addr_DmaBase  = 0x20000;
             break;
 
         case PLX_FAMILY_CYGNUS:
-            Bit_Mode        = 20;
-            Bit_StnSel      = 17;
-            Offset_NTV0Base = 0x3E000;
+            bitPosMode    = 20;
+            bitPosStnSel  = 17;
+            addr_NTV0Base = 0x3E000;
             break;
 
         case PLX_FAMILY_SCOUT:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
-            Bit_Mode        = 20;
-            Bit_StnSel      = 18;
-            Offset_NTV0Base = 0x3E000;
-            Offset_DmaBase  = 0x20000;
+            bitPosMode    = 20;
+            bitPosStnSel  = 18;
+            addr_NTV0Base = 0x3E000;
+            addr_DmaBase  = 0x20000;
             break;
 
         case PLX_FAMILY_CAPELLA_1:
         case PLX_FAMILY_CAPELLA_2:
-            Bit_Mode        = 21;
-            Bit_StnSel      = 18;
-            Offset_NTV0Base = 0x3E000;
-            Offset_Stn0Base = 0x80000;
+            bitPosMode    = 21;
+            bitPosStnSel  = 18;
+            addr_NTV0Base = 0x3E000;
+            addr_Stn0Base = 0x80000;
+            break;
+
+        case PLX_FAMILY_ATLAS:
+            bitPosMode   = 21;
+            bitPosStnSel = 19;
             break;
 
         default:
             // Port will not have family set during initial probe
-            Bit_Mode   = 0;
-            Bit_StnSel = 0;
+            bitPosMode   = 0;
+            bitPosStnSel = 0;
             break;
     }
 
-    Mode    = 0;
-    StnSel  = 0;
-    PortSel = 0;
+    mode    = I2C_ADDR_MODE_STD;
+    stnSel  = 0;
+    portSel = 0;
 
     // Default to transparent port
-    PortType = 0;
+    portType = 0;
 
     // Trap offsets for special ports
-    if (Offset_Base == (Offset_NTV0Base + 0x0))
+    if (addr_Base == (addr_NTV0Base + 0x0))
     {
-        PortType = PLX_FLAG_PORT_NT_VIRTUAL_0;          // NTV 0
+        portType = PLX_FLAG_PORT_NT_VIRTUAL_0;          // NTV 0
     }
-    else if (Offset_Base == (Offset_NTV0Base + 0x1000))
+    else if (addr_Base == (addr_NTV0Base + 0x1000))
     {
-        PortType = PLX_FLAG_PORT_NT_LINK_0;             // NTL 0
+        portType = PLX_FLAG_PORT_NT_LINK_0;             // NTL 0
     }
-    else if (bMultiNt && (Offset_Base == (Offset_NTV0Base - 0x2000)))
+    else if (bMultiNt && (addr_Base == (addr_NTV0Base - 0x2000)))
     {
-        PortType = PLX_FLAG_PORT_NT_VIRTUAL_1;          // NTV 1
+        portType = PLX_FLAG_PORT_NT_VIRTUAL_1;          // NTV 1
     }
-    else if (bMultiNt && (Offset_Base == (Offset_NTV0Base - 0x1000)))
+    else if (bMultiNt && (addr_Base == (addr_NTV0Base - 0x1000)))
     {
-        PortType = PLX_FLAG_PORT_NT_LINK_1;             // NTL 1
+        portType = PLX_FLAG_PORT_NT_LINK_1;             // NTL 1
     }
-    else if (Offset_Base == (Offset_DmaBase + 0x0))
+    else if (addr_Base == (addr_DmaBase + 0x0))
     {
-        PortType = PLX_FLAG_PORT_DMA_RAM;               // DMA RAM
+        portType = PLX_FLAG_PORT_DMA_RAM;               // DMA RAM
     }
-    else if (Offset_Base == (Offset_DmaBase + 0x1000))
+    else if (addr_Base == (addr_DmaBase + 0x1000))
     {
-        PortType = PLX_FLAG_PORT_DMA_0;                 // DMA 0
+        portType = PLX_FLAG_PORT_DMA_0;                 // DMA 0
     }
-    else if (Offset_Base == (Offset_DmaBase + 0x2000))
+    else if (addr_Base == (addr_DmaBase + 0x2000))
     {
-        PortType = PLX_FLAG_PORT_DMA_1;                 // DMA 1
+        portType = PLX_FLAG_PORT_DMA_1;                 // DMA 1
     }
-    else if (Offset_Base == (Offset_DmaBase + 0x3000))
+    else if (addr_Base == (addr_DmaBase + 0x3000))
     {
-        PortType = PLX_FLAG_PORT_DMA_2;                 // DMA 2
+        portType = PLX_FLAG_PORT_DMA_2;                 // DMA 2
     }
-    else if (Offset_Base == (Offset_DmaBase + 0x4000))
+    else if (addr_Base == (addr_DmaBase + 0x4000))
     {
-        PortType = PLX_FLAG_PORT_DMA_3;                 // DMA 3
+        portType = PLX_FLAG_PORT_DMA_3;                 // DMA 3
     }
-    else if (Offset_Base == (Offset_Stn0Base + 0x0))
+    else if (addr_Base == (addr_Stn0Base + 0x0))
     {
-        PortType = PLX_FLAG_PORT_STN_REGS_S0;           // Station 0
+        portType = PLX_FLAG_PORT_STN_REGS_S0;           // Station 0
     }
-    else if (Offset_Base == (Offset_Stn0Base + 0x10000))
+    else if (addr_Base == (addr_Stn0Base + 0x10000))
     {
-        PortType = PLX_FLAG_PORT_STN_REGS_S1;           // Station 1
+        portType = PLX_FLAG_PORT_STN_REGS_S1;           // Station 1
     }
-    else if (Offset_Base == (Offset_Stn0Base + 0x20000))
+    else if (addr_Base == (addr_Stn0Base + 0x20000))
     {
-        PortType = PLX_FLAG_PORT_STN_REGS_S2;           // Station 2
+        portType = PLX_FLAG_PORT_STN_REGS_S2;           // Station 2
     }
-    else if (Offset_Base == (Offset_Stn0Base + 0x30000))
+    else if (addr_Base == (addr_Stn0Base + 0x30000))
     {
-        PortType = PLX_FLAG_PORT_STN_REGS_S3;           // Station 3
+        portType = PLX_FLAG_PORT_STN_REGS_S3;           // Station 3
     }
-    else if (Offset_Base == (Offset_Stn0Base + 0x40000))
+    else if (addr_Base == (addr_Stn0Base + 0x40000))
     {
-        PortType = PLX_FLAG_PORT_STN_REGS_S4;           // Station 4
+        portType = PLX_FLAG_PORT_STN_REGS_S4;           // Station 4
     }
-    else if (Offset_Base == (Offset_Stn0Base + 0x50000))
+    else if (addr_Base == (addr_Stn0Base + 0x50000))
     {
-        PortType = PLX_FLAG_PORT_STN_REGS_S5;           // Station 5
+        portType = PLX_FLAG_PORT_STN_REGS_S5;           // Station 5
     }
-    else if ((offset >> 12) > PLX_FLAG_PORT_MAX)
+    else if ((Address & ~(U32)I2C_PEX_MAX_OFFSET_MASK) != 0)
     {
-        // Fabric mode: registers other than standard port use full addressing
-        if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC)
-        {
-            PortType = PLX_FLAG_PORT_STN_REGS_S0;
-        }
-        else
-        {
-            ErrorPrintf(("ERROR: Port type %d not implemented\n", (offset >> 12)));
-        }
+        // Address outside max I2C of 23-bits, default to station type
+        portType = PLX_FLAG_PORT_STN_REGS_S0;
     }
     else
     {
-        PortSel = (offset >> 12);
+        portSel = (Address >> 12);
     }
 
     // Handle chips where NT Virtual is accessed as transparent port
-    if (PortType == PLX_FLAG_PORT_NT_VIRTUAL_0)
+    if (portType == PLX_FLAG_PORT_NT_VIRTUAL_0)
     {
         if ((pDevice->Key.PlxFamily == PLX_FAMILY_VEGA_LITE) ||
             (pDevice->Key.PlxFamily == PLX_FAMILY_DENEB)     ||
@@ -3553,10 +2225,10 @@ PlxI2c_GenerateCommand(
                 (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_LEGACY_NT))
             {
                 // Revert back to standard port
-                PortType = 0;
+                portType = 0;
 
                 // Select NT port
-                PortSel = pDevice->Key.NTPortNum;
+                portSel = pDevice->Key.NTPortNum;
             }
         }
     }
@@ -3566,19 +2238,19 @@ PlxI2c_GenerateCommand(
     {
         case PLX_FAMILY_VEGA_LITE:
             // Check if NT-Link port or within NT-Virtual port
-            if ((PortType == PLX_FLAG_PORT_NT_LINK_0) ||
-                (PortType == PLX_FLAG_PORT_NT_VIRTUAL_0) ||
-                (Offset_Base == ((U32)pDevice->Key.NTPortNum * 0x1000)))
+            if ((portType == PLX_FLAG_PORT_NT_LINK_0) ||
+                (portType == PLX_FLAG_PORT_NT_VIRTUAL_0) ||
+                (addr_Base == ((U32)pDevice->Key.NTPortNum * 0x1000)))
             {
-                if (PortType == PLX_FLAG_PORT_NT_LINK_0)
+                if (portType == PLX_FLAG_PORT_NT_LINK_0)
                 {
-                    Mode = 1;
+                    mode = I2C_ADDR_MODE_NTL;
                 }
 
                 // Bypass offsets F8h or FCh of NT port to avoid persistent I2C failure
-                if (((offset & 0xFFF) == 0x0F8) || ((offset & 0xFFF) == 0x0FC))
+                if (((Address & 0xFFF) == 0x0F8) || ((Address & 0xFFF) == 0x0FC))
                 {
-                    return PLX_I2C_CMD_SKIP;
+                    return I2C_CMD_SKIP;
                 }
             }
             break;
@@ -3589,7 +2261,7 @@ PlxI2c_GenerateCommand(
             break;
 
         case PLX_FAMILY_MIRA:
-            if (PortType == PLX_FLAG_PORT_PCIE_TO_USB)
+            if (portType == PLX_FLAG_PORT_PCIE_TO_USB)
             {
                 /*****************************************
                  * For MIRA special case, if the USB EP is
@@ -3597,69 +2269,69 @@ PlxI2c_GenerateCommand(
                  * expectation is to access the USB device
                  * registers which are at offset 4000h.
                  ****************************************/
-                if (Offset_Base == 0x4000)
+                if (addr_Base == 0x4000)
                 {
-                    PortSel = 4;
+                    portSel = 4;
                 }
                 else
                 {
-                    PortSel = 3;
+                    portSel = 3;
                 }
             }
-            else if (PortType == PLX_FLAG_PORT_USB)
+            else if (portType == PLX_FLAG_PORT_USB)
             {
-                PortSel = 4;
+                portSel = 4;
             }
             break;
 
         case PLX_FAMILY_DENEB:
-            if (PortType == PLX_FLAG_PORT_NT_LINK_0)
+            if (portType == PLX_FLAG_PORT_NT_LINK_0)
             {
-                Mode = 1;
+                mode = I2C_ADDR_MODE_NTL;
             }
             break;
 
         case PLX_FAMILY_SIRIUS:
             // Default to special mode
-            Mode = 1;
+            mode = I2C_ADDR_MODE_NON_STD;
 
-            if (PortType == PLX_FLAG_PORT_NT_LINK_0)
+            if (portType == PLX_FLAG_PORT_NT_LINK_0)
             {
-                PortSel = 0x10;
+                portSel = 0x10;
             }
-            else if (PortType == PLX_FLAG_PORT_NT_DS_P2P)
+            else if (portType == PLX_FLAG_PORT_NT_DS_P2P)
             {
-                PortSel = 0x11;
+                portSel = 0x11;
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_0)
+            else if (portType == PLX_FLAG_PORT_DMA_0)
             {
-                PortSel = 0x12;
+                portSel = 0x12;
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_RAM)
+            else if (portType == PLX_FLAG_PORT_DMA_RAM)
             {
-                PortSel = 0x13;
+                portSel = 0x13;
             }
             else
             {
-                Mode = 0;   // Revert to transparent mode
+                mode = I2C_ADDR_MODE_STD;   // Revert to transparent mode
             }
             break;
 
         case PLX_FAMILY_CYGNUS:
-            if (PortType == PLX_FLAG_PORT_NT_VIRTUAL_0)
+            if (portType == PLX_FLAG_PORT_NT_VIRTUAL_0)
             {
-                StnSel  = 6;    // 110b
-                PortSel = 3;    // 11b
+                stnSel  = 6;    // 110b
+                portSel = 3;    // 11b
             }
-            else if (PortType == PLX_FLAG_PORT_NT_LINK_0)
+            else if (portType == PLX_FLAG_PORT_NT_LINK_0)
             {
-                Mode    = 1;
-                PortSel = 0;    // 00b
+                mode    = I2C_ADDR_MODE_NTL;
+                portSel = 0;    // 00b
             }
             else
             {
-                StnSel  = PortSel / 4;  // 6 stations (0-5), 4 ports each
-                PortSel = PortSel % 4;  // Port in station (0-3)
+                stnSel  = portSel / 4;  // 6 stations (0-5), 4 ports each
+                portSel = portSel % 4;  // Port in station (0-3)
             }
             break;
 
@@ -3673,135 +2345,154 @@ PlxI2c_GenerateCommand(
                 (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
                 (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2))
             {
-                PortsPerStn = 8;    // Only 6 ports per stn, but numbered as 8
+                portsPerStn = 8;    // Only 6 ports per stn, but numbered as 8
             }
             else if ((pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
                      (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
             {
-                PortsPerStn = 4;
+                portsPerStn = 4;
             }
             else
             {
                 ErrorPrintf(("ERRROR: Ports/Station not set for %04X\n", pDevice->Key.PlxChip));
-                return PLX_I2C_CMD_ERROR;
+                return I2C_CMD_ERROR;
             }
 
             // For Draco 1, some register cause problems if accessed
             if (pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_1)
             {
-                if ((offset == 0x856C)  || (offset == 0x8570) ||
-                    (offset == 0x1056C) || (offset == 0x10570))
+                if ((Address == 0x856C)  || (Address == 0x8570) ||
+                    (Address == 0x1056C) || (Address == 0x10570))
                 {
-                    return PLX_I2C_CMD_SKIP;
+                    return I2C_CMD_SKIP;
                 }
             }
 
             // For Draco 2, reads of ALUT registers cause problems if accessed
             if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) &&
-                (I2cOperation == PLX_I2C_CMD_REG_READ))
+                (I2cOperation == I2C_CMD_REG_READ))
             {
-                if ((PortType == PLX_FLAG_PORT_ALUT_0) ||
-                    (PortType == PLX_FLAG_PORT_ALUT_1) ||
-                    (PortType == PLX_FLAG_PORT_ALUT_2) ||
-                    (PortType == PLX_FLAG_PORT_ALUT_3))
+                if ((portType == PLX_FLAG_PORT_ALUT_0) ||
+                    (portType == PLX_FLAG_PORT_ALUT_1) ||
+                    (portType == PLX_FLAG_PORT_ALUT_2) ||
+                    (portType == PLX_FLAG_PORT_ALUT_3))
                 {
-                    DebugPrintf(("I2C - ALUT read causes issues, skipping\n"));
-                    return PLX_I2C_CMD_SKIP;
+                    DebugPrintf(("I2C: ALUT read causes issues, skipping\n"));
+                    return I2C_CMD_SKIP;
                 }
             }
 
             // GEP will show up as NTV0, so must use full address
             if ((pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC) &&
-                (PortType == PLX_FLAG_PORT_NT_VIRTUAL_0))
+                (portType == PLX_FLAG_PORT_NT_VIRTUAL_0))
             {
-                offset   = Offset_NTV0Base | (offset & 0xFFF);
-                PortType = PLX_FLAG_PORT_STN_REGS_S0;
+                Address  = addr_NTV0Base | (Address & 0xFFF);
+                portType = PLX_FLAG_PORT_STN_REGS_S0;
             }
 
-            if (PortType == PLX_FLAG_PORT_NT_VIRTUAL_0)
+            if (portType == PLX_FLAG_PORT_NT_VIRTUAL_0)
             {
-                Mode    = 2;    // 10b
-                PortSel = 0;    // NT 0
+                mode    = I2C_ADDR_MODE_NTV;
+                portSel = 0;    // NT 0
             }
-            else if (PortType == PLX_FLAG_PORT_NT_VIRTUAL_1)
+            else if (portType == PLX_FLAG_PORT_NT_VIRTUAL_1)
             {
-                Mode    = 2;    // 10b
-                PortSel = 1;    // NT 1
+                mode    = I2C_ADDR_MODE_NTV;
+                portSel = 1;    // NT 1
             }
-            else if (PortType == PLX_FLAG_PORT_NT_LINK_0)
+            else if (portType == PLX_FLAG_PORT_NT_LINK_0)
             {
-                Mode    = 1;    // 01b
-                PortSel = 0;    // NT 0
+                mode    = I2C_ADDR_MODE_NTL;
+                portSel = 0;    // NT 0
             }
-            else if (PortType == PLX_FLAG_PORT_NT_LINK_1)
+            else if (portType == PLX_FLAG_PORT_NT_LINK_1)
             {
-                Mode    = 1;    // 01b
-                PortSel = 1;    // NT 1
+                mode    = I2C_ADDR_MODE_NTL;
+                portSel = 1;    // NT 1
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_0)
+            else if (portType == PLX_FLAG_PORT_DMA_0)
             {
-                Mode    = 3;    // 11b
-                PortSel = 0;    // DMA 0
+                mode    = I2C_ADDR_MODE_DMA;
+                portSel = 0;    // DMA 0
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_1)
+            else if (portType == PLX_FLAG_PORT_DMA_1)
             {
-                Mode    = 3;    // 11b
-                PortSel = 1;    // DMA 1
+                mode    = I2C_ADDR_MODE_DMA;
+                portSel = 1;    // DMA 1
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_2)
+            else if (portType == PLX_FLAG_PORT_DMA_2)
             {
-                Mode    = 3;    // 11b
-                PortSel = 2;    // DMA 2
+                mode    = I2C_ADDR_MODE_DMA;
+                portSel = 2;    // DMA 2
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_3)
+            else if (portType == PLX_FLAG_PORT_DMA_3)
             {
-                Mode    = 3;    // 11b
-                PortSel = 3;    // DMA 3
+                mode    = I2C_ADDR_MODE_DMA;
+                portSel = 3;    // DMA 3
             }
-            else if (PortType == PLX_FLAG_PORT_DMA_RAM)
+            else if (portType == PLX_FLAG_PORT_DMA_RAM)
             {
-                Mode    = 3;    // 11b
-                PortSel = 4;    // DMA RAM
+                mode    = I2C_ADDR_MODE_DMA;
+                portSel = 4;    // DMA RAM
             }
-            else if (PortType == PLX_FLAG_PORT_ALUT_0)
+            else if (portType == PLX_FLAG_PORT_ALUT_0)
             {
-                Mode    = 3;    // 11b
-                StnSel  = 2;    // 010b
-                PortSel = 0;    // ALUT RAM 0
+                mode    = I2C_ADDR_MODE_ALUT;
+                stnSel  = 2;    // 010b
+                portSel = 0;    // ALUT RAM 0
             }
-            else if (PortType == PLX_FLAG_PORT_ALUT_1)
+            else if (portType == PLX_FLAG_PORT_ALUT_1)
             {
-                Mode    = 3;    // 11b
-                StnSel  = 2;    // 010b
-                PortSel = 1;    // ALUT RAM 1
+                mode    = I2C_ADDR_MODE_ALUT;
+                stnSel  = 2;    // 010b
+                portSel = 1;    // ALUT RAM 1
             }
-            else if (PortType == PLX_FLAG_PORT_ALUT_2)
+            else if (portType == PLX_FLAG_PORT_ALUT_2)
             {
-                Mode    = 3;    // 11b
-                StnSel  = 2;    // 010b
-                PortSel = 2;    // ALUT RAM 2
+                mode    = I2C_ADDR_MODE_ALUT;
+                stnSel  = 2;    // 010b
+                portSel = 2;    // ALUT RAM 2
             }
-            else if (PortType == PLX_FLAG_PORT_ALUT_3)
+            else if (portType == PLX_FLAG_PORT_ALUT_3)
             {
-                Mode    = 3;    // 11b
-                StnSel  = 2;    // 010b
-                PortSel = 3;    // ALUT RAM 3
+                mode    = I2C_ADDR_MODE_ALUT;
+                stnSel  = 2;    // 010b
+                portSel = 3;    // ALUT RAM 3
             }
-            else if ((PortType == PLX_FLAG_PORT_STN_REGS_S0) ||
-                     (PortType == PLX_FLAG_PORT_STN_REGS_S1) ||
-                     (PortType == PLX_FLAG_PORT_STN_REGS_S2) ||
-                     (PortType == PLX_FLAG_PORT_STN_REGS_S3) ||
-                     (PortType == PLX_FLAG_PORT_STN_REGS_S4) ||
-                     (PortType == PLX_FLAG_PORT_STN_REGS_S5))
+            else if ((portType == PLX_FLAG_PORT_STN_REGS_S0) ||
+                     (portType == PLX_FLAG_PORT_STN_REGS_S1) ||
+                     (portType == PLX_FLAG_PORT_STN_REGS_S2) ||
+                     (portType == PLX_FLAG_PORT_STN_REGS_S3) ||
+                     (portType == PLX_FLAG_PORT_STN_REGS_S4) ||
+                     (portType == PLX_FLAG_PORT_STN_REGS_S5))
             {
-                Mode    = 2;                    // 10b
-                StnSel  = (offset >> 15) & 0x7; // offset [17:15]
-                PortSel = (offset >> 12) & 0x7; // offset [14:12]
+                mode    = I2C_ADDR_MODE_FULL;
+                stnSel  = (Address >> 15) & 0x7; // Addr [17:15]
+                portSel = (Address >> 12) & 0x7; // Addr [14:12]
             }
             else
             {
-                StnSel  = PortSel / PortsPerStn;    // Station number
-                PortSel = PortSel % PortsPerStn;    // Port in station
+                stnSel  = portSel / portsPerStn; // Station number
+                portSel = portSel % portsPerStn; // Port in station
+            }
+            break;
+
+        case PLX_FAMILY_ATLAS:
+            // Addressing PEX area (6080_0000h -> 60FF_FFFFh)
+            if (addr_Base < (64 * PEX_PORT_REGS_SIZE))
+            {
+                // Accessing ports 0-63 uses standard addressing
+                stnSel  = portSel / 16;    // Station number
+                portSel = portSel % 16;    // Port in station
+            }
+            else
+            {
+                // Use full addressing mode
+                mode = I2C_ADDR_MODE_FULL;
+
+                // I2C commands max addressing is 23 bits for PEX region
+                stnSel  = (addr_Base >> 16) & 0x3; // Addr [17:16]
+                portSel = (addr_Base >> 12) & 0xF; // Addr [15:12]
             }
             break;
 
@@ -3811,30 +2502,57 @@ PlxI2c_GenerateCommand(
 
         default:
             ErrorPrintf(("ERRROR: Mode/PortSel/StnSel not set for %04X\n", pDevice->Key.PlxChip));
-            return PLX_I2C_CMD_ERROR;
+            return I2C_CMD_ERROR;
+    }
+
+    // Check if need to update high address reg in full address mode
+    if (mode == I2C_ADDR_MODE_FULL)
+    {
+        // High address bits [22:18]
+        highAddr = (U8)((addr_Base >> 18) & 0x1F);
+        if (highAddr != I2C_KEY_HIGH_ADDR_GET( pDevice ))
+        {
+            // Set high address bits register (2CCh)
+            highAddrOffset = I2C_HIGH_ADDR_OFFSET;
+            if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+            {
+                // For Atlas, must specify PEX region (608x_xxxx)
+                highAddrOffset += ATLAS_REGS_AXI_BASE_ADDR;
+            }
+
+            PlxI2c_PlxRegisterWrite(
+                pDevice,
+                highAddrOffset,
+                highAddr,
+                FALSE               // Adjust for port?
+                );
+
+            // Store high bits to avoid future write if no change
+            I2C_KEY_HIGH_ADDR_SAVE( pDevice, highAddr );
+        }
     }
 
     // Get offset within 4K port
-    offset = offset & 0xFFF;
+    regOffset = Address & 0xFFF;
 
     // Convert offset to DWORD index
-    offset = offset >> 2;
+    regOffset = regOffset >> 2;
 
     // Build I2C command
-    Command =
-        (0            <<          27) |  // Reserved [31:27]
-        (I2cOperation <<          24) |  // Register operation [26:24]
-        (Mode         <<    Bit_Mode) |  // Mode to select transp, NTV/NTL, DMA, etc
-        (StnSel       <<  Bit_StnSel) |  // Station number if needed
-        (PortSel      << Bit_PortSel) |  // Port # or DMA channel or NT 0/1
-        (0            <<          14) |  // Reserved [14]
-        (0xF          <<          10) |  // Byte enables [13:10]
-        (offset       <<           0);   // Register DWORD address [9:0]
+    command =
+        (0            <<           27) |  // Reserved [31:27]
+        (I2cOperation <<           24) |  // Register operation [26:24]
+        (mode         <<   bitPosMode) |  // Mode to select transp, NTV/NTL, DMA, etc
+        (stnSel       << bitPosStnSel) |  // Station number if needed
+        (portSel      <<  bitPosPtSel) |  // Port # or DMA channel or NT 0/1
+        (0            <<           14) |  // Reserved [14]
+        (0xF          <<           10) |  // Byte enables [13:10]
+        (regOffset    <<            0);   // Register DWORD address [9:0]
 
     // 32-bit command must be in BE format since byte 0 is MSB
-    Command = PLX_BE_DATA_32( Command );
+    command = PLX_BE_DATA_32( command );
 
-    return Command;
+    return command;
 }
 
 
@@ -3866,26 +2584,26 @@ PlxI2c_Driver_Connect(
         pDevice->Key.ApiMode        = PLX_API_MODE_I2C_AARDVARK;
         pDevice->Key.ApiIndex       = (U8)pModeProp->I2c.I2cPort;
         pDevice->Key.ApiInternal[0] = pModeProp->I2c.ClockRate;
+        I2C_KEY_HIGH_ADDR_RESET( pDevice );
     }
 
     // Clear handle in case of failure
     pDevice->hDevice = 0;
 
     // Verify port doesn't exceed limit
-    if (pDevice->Key.ApiIndex >= PLX_I2C_MAX_DEVICES)
+    if (pDevice->Key.ApiIndex >= I2C_MAX_DEVICES)
     {
         return FALSE;
     }
 
-    // Initialize global structure if haven't yet
-    if (Gbl_bInitialized == FALSE)
+    // Reset global properties if first time
+    if (Gbl_OpenCount == 0)
     {
-        Gbl_bInitialized = TRUE;
-        RtlZeroMemory( Gbl_PlxI2cProp, sizeof(Gbl_PlxI2cProp) );
+        memset( Gbl_I2cProp, 0, sizeof(Gbl_I2cProp) );
     }
 
     // Check if device is already opened by the PLX API
-    if (Gbl_PlxI2cProp[pDevice->Key.ApiIndex].hDevice == 0)
+    if (Gbl_I2cProp[pDevice->Key.ApiIndex].hDevice == 0)
     {
         // Open I2C device
         hI2cDev = aa_open_ext( pDevice->Key.ApiIndex, &AaExt );
@@ -3924,30 +2642,40 @@ PlxI2c_Driver_Connect(
         aa_i2c_slave_disable( (Aardvark)PLX_PTR_TO_INT( pDevice->hDevice ) );
 
         // Set I2C bus speed
-        aa_i2c_bitrate( (Aardvark)PLX_PTR_TO_INT( pDevice->hDevice ), pDevice->Key.ApiInternal[0]);
+        aa_i2c_bitrate(
+            (Aardvark)PLX_PTR_TO_INT( pDevice->hDevice ),
+            pDevice->Key.ApiInternal[0]
+            );
 
         // Store the handle for re-use if necessary
-        Gbl_PlxI2cProp[pDevice->Key.ApiIndex].hDevice = pDevice->hDevice;
+        Gbl_I2cProp[pDevice->Key.ApiIndex].hDevice = pDevice->hDevice;
 
         // Reset upstream port bus number
-        Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus = PCI_FIELD_IGNORE;
+        Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = PCI_FIELD_IGNORE;
 
-        // Reset NT port number
-        memset( Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum, PCI_FIELD_IGNORE, PLX_I2C_MAX_NT_PORTS );
+        // Reset NT port numbers
+        memset( Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum, PCI_FIELD_IGNORE, I2C_MAX_NT_PORTS );
+
+        // Reset saved addresses
+        I2C_KEY_HIGH_ADDR_RESET( pDevice );
+        Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr = (U32)-1;
 
         // Initialize the register access lock
         InitializeCriticalSection(
-            &(Gbl_PlxI2cProp[pDevice->Key.ApiIndex].Lock_I2cRegAccess)
+            &(Gbl_I2cProp[pDevice->Key.ApiIndex].Lock_RegAccess)
             );
+
+        // Increment global open count
+        Gbl_OpenCount++;
     }
     else
     {
         // Re-use existing handle
-        pDevice->hDevice = Gbl_PlxI2cProp[pDevice->Key.ApiIndex].hDevice;
+        pDevice->hDevice = Gbl_I2cProp[pDevice->Key.ApiIndex].hDevice;
     }
 
     // Increment open count
-    InterlockedIncrement( &Gbl_PlxI2cProp[pDevice->Key.ApiIndex].OpenCount );
+    InterlockedIncrement( &Gbl_I2cProp[pDevice->Key.ApiIndex].OpenCount );
 
     return TRUE;
 }
@@ -4003,7 +2731,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_CHIP_TYPE_SET\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_ChipTypeSet(
+                PlxDir_ChipTypeSet(
                     pDevice,
                     (U16)pIoBuffer->value[0],
                     (U8)pIoBuffer->value[1]
@@ -4014,7 +2742,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_GET_PORT_PROPERTIES\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_GetPortProperties(
+                PlxDir_GetPortProperties(
                     pDevice,
                     &(pIoBuffer->u.PortProp)
                     );
@@ -4147,7 +2875,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_PCI_BAR_PROPERTIES\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_PciBarProperties(
+                PlxDir_PciBarProperties(
                     pDevice,
                     (U8)(pIoBuffer->value[0]),
                     &(pIoBuffer->u.BarProp)
@@ -4296,7 +3024,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_INIT_PROPERTIES\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_PerformanceInitializeProperties(
+                PlxDir_PerformanceInitializeProperties(
                     pDevice,
                     PLX_INT_TO_PTR(pIoBuffer->value[0])
                     );
@@ -4306,7 +3034,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_MONITOR_CTRL\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_PerformanceMonitorControl(
+                PlxDir_PerformanceMonitorControl(
                     pDevice,
                     (PLX_PERF_CMD)pIoBuffer->value[0]
                     );
@@ -4316,7 +3044,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_RESET_COUNTERS\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_PerformanceResetCounters(
+                PlxDir_PerformanceResetCounters(
                     pDevice
                     );
             break;
@@ -4325,7 +3053,7 @@ PlxI2c_Dispatch_IoControl(
             DebugPrintf_Cont(("PLX_IOCTL_PERFORMANCE_GET_COUNTERS\n"));
 
             pIoBuffer->ReturnCode =
-                PlxI2c_PerformanceGetCounters(
+                PlxDir_PerformanceGetCounters(
                     pDevice,
                     PLX_INT_TO_PTR(pIoBuffer->value[0]),
                     (U8)pIoBuffer->value[1]
@@ -4365,7 +3093,7 @@ PlxI2c_Dispatch_IoControl(
          *****************************************/
         default:
             DebugPrintf_Cont((
-                "Unsupported PLX_IOCTL_Xxx (%d)\n",
+                "Unsupported PLX_IOCTL_Xxx (%08Xh)\n",
                 IoControlCode
                 ));
 
@@ -4426,8 +3154,8 @@ PlxI2c_ProbeSwitch(
     Port_Upstream = (U8)-1;
 
     // Reset upstream bus number & NT port numbers in case chips are daisy-chained
-    Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus = PCI_FIELD_IGNORE;
-    memset( Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum, PCI_FIELD_IGNORE, PLX_I2C_MAX_NT_PORTS );
+    Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = PCI_FIELD_IGNORE;
+    memset( Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum, PCI_FIELD_IGNORE, I2C_MAX_NT_PORTS );
 
     // Always reset key but save I2C properties
     Port     = pDevice->Key.ApiIndex;
@@ -4541,19 +3269,19 @@ PlxI2c_ProbeSwitch(
             DevVenID =
                 PlxI2c_PlxRegisterRead(
                     pDevice,
-                    0,
+                    PCI_REG_DEV_VEN_ID,
                     &status,
                     TRUE,       // Adjust for port?
                     FALSE       // Retry on error?
                     );
         }
 
-        if ((status != PLX_STATUS_OK) || ((DevVenID & 0xFFFF) != PLX_VENDOR_ID))
+        if ((status != PLX_STATUS_OK) || ((DevVenID & 0xFFFF) != PLX_PCI_VENDOR_ID_PLX))
         {
             goto _PlxI2c_ProbeSwitch_Next_Port;
         }
 
-        DebugPrintf(("I2C - Port %d detected (ID=%08X)\n", Port, DevVenID));
+        DebugPrintf(("I2C: Port %d detected (ID=%08X)\n", Port, DevVenID));
 
         // Update possible ports
         if (PlxChip == 0)
@@ -4565,7 +3293,7 @@ PlxI2c_ProbeSwitch(
                 pDevice->Key.DeviceId = (U16)(DevVenID >> 16);
 
                 // Probe to determine chip type
-                PlxChipTypeDetect( pDevice );
+                PlxDir_ChipTypeDetect( pDevice );
             }
 
             // Store connected chip
@@ -4699,7 +3427,7 @@ PlxI2c_ProbeSwitch(
                                 }
 
                                 DebugPrintf((
-                                    "I2C - Chip config: %d station%s, %d ports/stn\n",
+                                    "I2C: Chip config: %d station%s, %d ports/stn\n",
                                     (PortsPerStn == 5) ? 1 : 6,
                                     (PortsPerStn == 5) ? "" : "s",
                                     PortsPerStn
@@ -4725,14 +3453,14 @@ PlxI2c_ProbeSwitch(
                             // Determine if NT0 is enabled & store port number
                             if (RegValue & (1 << 13))
                             {
-                                Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((RegValue >> 8) & 0xF);
+                                Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((RegValue >> 8) & 0xF);
                                 NtMask |= (1 << 0);
                             }
 
                             // Determine if NT1 is enabled & store port number
                             if (RegValue & (1 << 21))
                             {
-                                Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[1] = (U8)((RegValue >> 16) & 0xF);
+                                Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] = (U8)((RegValue >> 16) & 0xF);
                                 NtMask |= (1 << 1);
                             }
 
@@ -4760,7 +3488,7 @@ PlxI2c_ProbeSwitch(
                         RegPciHeader =
                             PlxI2c_PlxRegisterRead(
                                 pDevice,
-                                0xC,        // PCI Header Type
+                                PCI_REG_HDR_CACHE_LN,
                                 NULL,
                                 FALSE,      // Adjust for port?
                                 TRUE        // Retry on error?
@@ -4808,7 +3536,7 @@ PlxI2c_ProbeSwitch(
                         if (NtMask)
                         {
                             // Store NT port number
-                            Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((RegDebugCtrl >> 24) & 0xF);
+                            Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] = (U8)((RegDebugCtrl >> 24) & 0xF);
 
                             // Default to legacy NT
                             pDevice->Key.DeviceMode = PLX_CHIP_MODE_STD_LEGACY_NT;
@@ -4848,7 +3576,7 @@ PlxI2c_ProbeSwitch(
                 }
 
                 DebugPrintf((
-                    "I2C - ChipMode=%s  UP=%d  NT0=%02Xh  NT1=%02Xh\n",
+                    "I2C: ChipMode=%s  UP=%d  NT0=%02Xh  NT1=%02Xh\n",
                     (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD) ? "STD" :
                       (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_LEGACY_NT) ? "STD NT" :
                       (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STD_NT_DS_P2P) ? "NT P2P" :
@@ -4857,14 +3585,14 @@ PlxI2c_ProbeSwitch(
                       (pDevice->Key.DeviceMode == PLX_CHIP_MODE_LEGACY_ADAPTER) ? "LEGACY" :
                       "UNKOWN",
                     Port_Upstream,
-                    NtMask & (1 << 0) ? Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[0] : 0xFF,
-                    NtMask & (1 << 1) ? Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[1] : 0xFF
+                    NtMask & (1 << 0) ? Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] : 0xFF,
+                    NtMask & (1 << 1) ? Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] : 0xFF
                     ));
             }
 
             // Remove disabled ports to avoid probing them
             // NOTE: Must be called after Key.DeviceMode is set since may refer to it
-            PlxChipFilterDisabledPorts(
+            PlxDir_ChipFilterDisabledPorts(
                 pDevice,
                 &PossiblePorts
                 );
@@ -4889,9 +3617,6 @@ PlxI2c_ProbeSwitch(
             // Fabric mode specific settings
             if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_FABRIC)
             {
-                // Initialize upper I2C address to 0
-                PlxI2c_PlxRegisterWrite( pDevice, 0x2CC, 0, FALSE );
-
                 // Always enable NTV0 which is GEP
                 PossiblePorts |= ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
             }
@@ -4901,7 +3626,7 @@ PlxI2c_ProbeSwitch(
         RegPciHeader =
             PlxI2c_PlxRegisterRead(
                 pDevice,
-                0xC,        // PCI Header Type
+                PCI_REG_HDR_CACHE_LN,
                 &status,
                 TRUE,       // Adjust for port?
                 TRUE        // Retry on error?
@@ -4915,17 +3640,17 @@ PlxI2c_ProbeSwitch(
         if (RegPciHeader == (U32)-1)
         {
             // Some chips return FFFF_FFFF when accessing 0Ch of disabled port
-            DebugPrintf(("I2C - Port %d is disabled, PCI[0Ch]=FFFF_FFFF\n", Port));
+            DebugPrintf(("I2C: Port %d is disabled, PCI[0Ch]=FFFF_FFFF\n", Port));
         }
-        else if ((RegPciHeader & 0xFFFF) == PLX_VENDOR_ID)
+        else if ((RegPciHeader & 0xFFFF) == PLX_PCI_VENDOR_ID_PLX)
         {
             // Some chips return value of last register (Dev/Ven ID)
             // read when accessing 0Ch of disabled port
-            DebugPrintf(("I2C - Port %d is disabled, PCI[0Ch]=%08X (Dev/Ven ID)\n", Port, RegPciHeader));
+            DebugPrintf(("I2C: Port %d is disabled, PCI[0Ch]=%08X (Dev/Ven ID)\n", Port, RegPciHeader));
         }
         else
         {
-            DebugPrintf(("I2C - Port %d is enabled, get additional properties\n", Port));
+            DebugPrintf(("I2C: Port %d is enabled, get additional properties\n", Port));
             bCompareDevice = TRUE;
         }
 
@@ -4939,21 +3664,18 @@ PlxI2c_ProbeSwitch(
             PciHeaderType = (U8)((RegPciHeader >> 16) & 0x7F);
 
             // Store NT port numbers if exist
-            if (Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[0] != (U8)PCI_FIELD_IGNORE)
+            if (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0] != (U8)PCI_FIELD_IGNORE)
             {
-                pDevice->Key.NTPortNum |= Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[0];
+                pDevice->Key.NTPortNum |= Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0];
             }
 
-            if (Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[1] != (U8)PCI_FIELD_IGNORE)
+            if (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] != (U8)PCI_FIELD_IGNORE)
             {
-                pDevice->Key.NTPortNum |= (Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[1] << 4);
+                pDevice->Key.NTPortNum |= (Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[1] << 4);
             }
 
             // Get port properties
-            PlxI2c_GetPortProperties(
-                pDevice,
-                &PortProp
-                );
+            PlxDir_GetPortProperties( pDevice, &PortProp );
 
             // Set PLX-specific port type
             if (PortProp.PortType == PLX_PORT_UPSTREAM)
@@ -5009,7 +3731,7 @@ PlxI2c_ProbeSwitch(
 
                 // NT virtual port (Also check for older chips where NTV accessed by port #)
                 if ((Port == PLX_FLAG_PORT_NT_VIRTUAL_0) || (Port == PLX_FLAG_PORT_NT_VIRTUAL_1) ||
-                    (Port == Gbl_PlxI2cProp[pDevice->Key.ApiIndex].NTPortNum[0]))
+                    (Port == Gbl_I2cProp[pDevice->Key.ApiIndex].NTPortNum[0]))
                 {
                     pDevice->Key.PlxPortType = PLX_SPEC_PORT_NT_VIRTUAL;
                 }
@@ -5032,7 +3754,7 @@ PlxI2c_ProbeSwitch(
              * When port 0 is not the upstream port, additional work is needed
              * to probe the upstream port first and determine its bus number.
              *****************************************************************/
-            if ((Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus == (U8)PCI_FIELD_IGNORE) &&
+            if ((Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus == (U8)PCI_FIELD_IGNORE) &&
                 (Port == 0) &&
                 (PortProp.PortType != PLX_PORT_UPSTREAM))
             {
@@ -5044,7 +3766,7 @@ PlxI2c_ProbeSwitch(
                     RegValue =
                         PlxI2c_PlxRegisterRead(
                             pDevice,
-                            Offset_Upstream + 0x18, // Primary/Secondary bus numbers
+                            Offset_Upstream + PCI_REG_T1_PRIM_SEC_BUS,
                             &status,
                             FALSE,                  // Adjust for port?
                             TRUE                    // Retry on error?
@@ -5053,7 +3775,7 @@ PlxI2c_ProbeSwitch(
                     if ((status == PLX_STATUS_OK) && (RegValue != (U32)-1))
                     {
                         // Set the upstream bus number
-                        Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus = (U8)(RegValue >> 0);
+                        Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = (U8)(RegValue >> 0);
                     }
                 }
             }
@@ -5062,12 +3784,12 @@ PlxI2c_ProbeSwitch(
             pDevice->Key.bus = 0;
 
             // Get bus number
-            if (PciHeaderType == 1)
+            if (PciHeaderType == PCI_HDR_TYPE_1)
             {
                 RegValue =
                     PlxI2c_PlxRegisterRead(
                         pDevice,
-                        0x18,       // Primary/Secondary bus numbers
+                        PCI_REG_T1_PRIM_SEC_BUS,
                         NULL,
                         TRUE,       // Adjust for port?
                         TRUE        // Retry on error?
@@ -5079,8 +3801,8 @@ PlxI2c_ProbeSwitch(
                 // Store the upstream port bus number
                 if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_UPSTREAM)
                 {
-                    Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus = pDevice->Key.bus;
-                    DebugPrintf(("I2C - UP bus=%02X\n", pDevice->Key.bus));
+                    Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus = pDevice->Key.bus;
+                    DebugPrintf(("I2C: UP bus=%02X\n", pDevice->Key.bus));
                 }
 
                 // For host/fabric ports, use bus number assigned by manager in [15:8]
@@ -5107,7 +3829,7 @@ PlxI2c_ProbeSwitch(
                         RegValue =
                             PlxI2c_PlxRegisterRead(
                                 pDevice,
-                                (PortProp.PortNumber * 0x1000) + 0x18,
+                                (PortProp.PortNumber * 0x1000) + PCI_REG_T1_PRIM_SEC_BUS,
                                 NULL,
                                 FALSE,      // Adjust for port?
                                 TRUE        // Retry on error?
@@ -5148,9 +3870,9 @@ PlxI2c_ProbeSwitch(
             if ((pDevice->Key.bus == 0) && (pDevice->Key.PlxPortType != PLX_SPEC_PORT_UPSTREAM))
             {
                 // Default to upstream bus if known
-                if (Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus != (U8)PCI_FIELD_IGNORE)
+                if (Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus != (U8)PCI_FIELD_IGNORE)
                 {
-                    pDevice->Key.bus = Gbl_PlxI2cProp[pDevice->Key.ApiIndex].UpstreamBus;
+                    pDevice->Key.bus = Gbl_I2cProp[pDevice->Key.ApiIndex].UpstreamBus;
                 }
 
                 if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM)
@@ -5261,7 +3983,7 @@ PlxI2c_ProbeSwitch(
             RegValue =
                 PlxI2c_PlxRegisterRead(
                     pDevice,
-                    0x08,
+                    PCI_REG_CLASS_REV,
                     &status,
                     TRUE,       // Adjust for port?
                     TRUE        // Retry on error?
@@ -5270,12 +3992,12 @@ PlxI2c_ProbeSwitch(
             pDevice->Key.Revision = (U8)RegValue;
 
             // Get subsystem device ID
-            if (PciHeaderType == 0)
+            if (PciHeaderType == PCI_HDR_TYPE_0)
             {
                 RegValue =
                     PlxI2c_PlxRegisterRead(
                         pDevice,
-                        0x2C,
+                        PCI_REG_TO_SUBSYS_ID,
                         &status,
                         TRUE,       // Adjust for port?
                         TRUE        // Retry on error?
@@ -5285,7 +4007,7 @@ PlxI2c_ProbeSwitch(
             {
                 // Get subsytem ID from capability if supported
                 offset =
-                    PlxPciFindCapability(
+                    PlxDir_PciFindCapability(
                         pDevice,
                         PCI_CAP_ID_BRIDGE_SUB_ID,
                         FALSE,
@@ -5329,28 +4051,14 @@ PlxI2c_ProbeSwitch(
             // Compare device key information
             //
 
-            // Compare Bus number
-            if (pKey->bus != (U8)PCI_FIELD_IGNORE)
+            // Compare Bus, Slot, Fn numbers
+            if ( (pKey->bus      != (U8)PCI_FIELD_IGNORE) ||
+                 (pKey->slot     != (U8)PCI_FIELD_IGNORE) ||
+                 (pKey->function != (U8)PCI_FIELD_IGNORE) )
             {
-                if (pKey->bus != pDevice->Key.bus)
-                {
-                    bMatchLoc = FALSE;
-                }
-            }
-
-            // Compare Slot number
-            if (pKey->slot != (U8)PCI_FIELD_IGNORE)
-            {
-                if (pKey->slot != pDevice->Key.slot)
-                {
-                    bMatchLoc = FALSE;
-                }
-            }
-
-            // Compare Function number
-            if (pKey->function != (U8)PCI_FIELD_IGNORE)
-            {
-                if (pKey->function != pDevice->Key.function)
+                if ( (pKey->bus      != pDevice->Key.bus)  ||
+                     (pKey->slot     != pDevice->Key.slot) ||
+                     (pKey->function != pDevice->Key.function) )
                 {
                     bMatchLoc = FALSE;
                 }
@@ -5440,508 +4148,5 @@ _PlxI2c_ProbeSwitch_Next_Port:
     *pNumMatched = DeviceCount;
 
     DebugPrintf(("Criteria did not match any devices\n"));
-
     return PLX_STATUS_INVALID_OBJECT;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxPciFindCapability
- *
- * Description:  Scans a device's capability list to find the base offset of the
- *               specified PCI or PCIe extended capability. If the capability ID
- *               is PCI or PCIe vendor-specific (VSEC), an optional instance
- *               number can be provided since a device could have multiple VSEC
- *               capabilities. A value of 0 returns the 1st matching instance but
- *               the parameter is ignored for non-VSEC capability search.
- *
- ******************************************************************************/
-U16
-PlxPciFindCapability(
-    PLX_DEVICE_OBJECT *pDevice,
-    U16                CapID,
-    U8                 bPCIeCap,
-    U8                 InstanceNum
-    )
-{
-    U8  matchCount;
-    U16 offset;
-    U16 currID;
-    U32 regVal;
-
-
-    // Get PCI command register (04h)
-    PLX_PCI_REG_READ( pDevice, PCI_REG_CMD_STAT, &regVal );
-
-    // Verify device responds to PCI accesses (in case link down)
-    if (regVal == (U32)-1)
-    {
-        return 0;
-    }
-
-    // Verify device supports extended capabilities (04h[20])
-    if ((regVal & ((U32)1 << 20)) == 0)
-    {
-        return 0;
-    }
-
-    // Set capability pointer offset
-    if (bPCIeCap)
-    {
-        // PCIe capabilities must start at 100h
-        offset = 0x100;
-
-        // Ignore instance number for non-VSEC capabilities
-        if (CapID != PCIE_CAP_ID_VENDOR_SPECIFIC)
-        {
-            InstanceNum = 0;
-        }
-    }
-    else
-    {
-        // Get offset of first capability from capability pointer (34h[7:0])
-        PLX_PCI_REG_READ( pDevice, PCI_REG_CAP_PTR, &regVal );
-
-        // Set first capability offset
-        offset = (U8)regVal;
-
-        // Ignore instance number for non-VSEC capabilities
-        if (CapID != PCI_CAP_ID_VENDOR_SPECIFIC)
-        {
-            InstanceNum = 0;
-        }
-    }
-
-    // Start with 1st match
-    matchCount = 0;
-
-    // Traverse capability list searching for desired ID
-    while ((offset != 0) && (regVal != (U32)-1))
-    {
-        // Get next capability
-        PLX_PCI_REG_READ( pDevice, offset, &regVal );
-
-        // Verify capability is valid
-        if ((regVal == 0) || (regVal == (U32)-1))
-        {
-            return 0;
-        }
-
-        // Extract the capability ID
-        if (bPCIeCap)
-        {
-            // PCIe ID in [15:0]
-            currID = (U16)((regVal >> 0) & 0xFFFF);
-        }
-        else
-        {
-            // PCI ID in [7:0]
-            currID = (U16)((regVal >> 0) & 0xFF);
-        }
-
-        // Compare with desired capability
-        if (currID == CapID)
-        {
-            // Verify correct instance
-            if (InstanceNum == matchCount)
-            {
-                // Capability found, return base offset
-                return offset;
-            }
-
-            // Increment count of matches
-            matchCount++;
-        }
-
-        // Jump to next capability
-        if (bPCIeCap)
-        {
-            // PCIe next cap offset in [31:20]
-            offset = (U16)((regVal >> 20) & 0xFFF);
-        }
-        else
-        {
-            // PCI next cap offset in [15:8]
-            offset = (U8)((regVal >> 8) & 0xFF);
-        }
-    }
-
-    // Capability not found
-    return 0;
-}
-
-
-
-
-/******************************************************************************
- *
- * Function   :  PlxChipTypeDetect
- *
- * Description:  Attempts to determine PLX chip type and revision
- *
- ******************************************************************************/
-BOOLEAN
-PlxChipTypeDetect(
-    PLX_DEVICE_OBJECT *pDevice
-    )
-{
-    U8  i;
-    U16 offset[] = {0xB78,0x958,0xE0,0x0};
-    U32 RegValue;
-
-
-    // Default revision to PCI revision
-    pDevice->Key.PlxRevision = pDevice->Key.Revision;
-
-    i = 0;
-
-    while (offset[i] != 0)
-    {
-        // Check for hard-coded ID
-        PLX_PCI_REG_READ(
-            pDevice,
-            offset[i],
-            &RegValue
-            );
-
-        if ((RegValue & 0xFFFF) == PLX_VENDOR_ID)
-        {
-            pDevice->Key.PlxChip = (U16)(RegValue >> 16);
-
-            // PLX revision should be in next register
-            PLX_PCI_REG_READ(
-                pDevice,
-                offset[i] + sizeof(U32),
-                &RegValue
-                );
-
-            pDevice->Key.PlxRevision = (U8)(RegValue & 0xFF);
-
-            // Some chips have not updated hard-coded revision ID of AA
-            if ((pDevice->Key.PlxRevision == 0xAA) &&
-                ((pDevice->Key.PlxChip == 0x8612) ||
-                 (pDevice->Key.PlxChip == 0x8616) ||
-                 (pDevice->Key.PlxChip == 0x8624) ||
-                 (pDevice->Key.PlxChip == 0x8632) ||
-                 (pDevice->Key.PlxChip == 0x8647) ||
-                 (pDevice->Key.PlxChip == 0x8648)))
-            {
-                // Override hard-coded revision
-                PlxChipRevisionDetect( pDevice );
-            }
-
-            // Skip to assigning family
-            goto _PlxChipAssignFamily;
-        }
-
-        // Go to next offset
-        i++;
-    }
-
-    // Attempt to use Subsytem ID for DMA devices that don't have hard-coded ID
-    if ((pDevice->Key.DeviceId == 0x87D0) || (pDevice->Key.DeviceId == 0x87E0))
-    {
-        // Get PCI Subsystem ID
-        PLX_PCI_REG_READ(
-            pDevice,
-            PCI_REG_TO_SUBSYS_ID,
-            &RegValue
-            );
-
-        if ((RegValue & 0xFF00FFFF) == 0x870010B5)
-        {
-            pDevice->Key.PlxChip = (U16)(RegValue >> 16);
-            goto _PlxChipAssignFamily;
-        }
-    }
-
-    // Hard-coded ID doesn't exist, so use Device/Vendor ID
-    pDevice->Key.PlxChip = pDevice->Key.DeviceId;
-
-    // Detect the PLX chip revision
-    PlxChipRevisionDetect( pDevice );
-
-_PlxChipAssignFamily:
-
-    switch (pDevice->Key.PlxChip)
-    {
-        case 0x9050:        // 9000 series
-        case 0x9030:
-        case 0x9080:
-        case 0x9054:
-        case 0x9056:
-        case 0x9656:
-        case 0x8311:
-            pDevice->Key.PlxFamily = PLX_FAMILY_BRIDGE_P2L;
-            break;
-
-        case 0x6140:        // 6000 series
-        case 0x6150:
-        case 0x6152:
-        case 0x6154:
-        case 0x6156:
-        case 0x6254:
-        case 0x6350:
-        case 0x6520:
-        case 0x6540:
-        case 0x6466:
-            pDevice->Key.PlxFamily = PLX_FAMILY_BRIDGE_PCI_P2P;
-            break;
-
-        case 0x8111:
-        case 0x8112:
-        case 0x8114:
-            pDevice->Key.PlxFamily = PLX_FAMILY_BRIDGE_PCIE_P2P;
-            break;
-
-        case 0x8525:
-        case 0x8533:
-        case 0x8547:
-        case 0x8548:
-            pDevice->Key.PlxFamily = PLX_FAMILY_ALTAIR;
-            break;
-
-        case 0x8505:
-        case 0x8509:
-            pDevice->Key.PlxFamily = PLX_FAMILY_ALTAIR_XL;
-            break;
-
-        case 0x8516:
-        case 0x8524:
-        case 0x8532:
-            pDevice->Key.PlxFamily = PLX_FAMILY_VEGA;
-            break;
-
-        case 0x8508:
-        case 0x8512:
-        case 0x8517:
-        case 0x8518:
-            pDevice->Key.PlxFamily = PLX_FAMILY_VEGA_LITE;
-            break;
-
-        case 0x8612:
-        case 0x8616:
-        case 0x8624:
-        case 0x8632:
-        case 0x8647:
-        case 0x8648:
-            pDevice->Key.PlxFamily = PLX_FAMILY_DENEB;
-            break;
-
-        case 0x8604:
-        case 0x8606:
-        case 0x8608:
-        case 0x8609:
-        case 0x8613:
-        case 0x8614:
-        case 0x8615:
-        case 0x8617:
-        case 0x8618:
-        case 0x8619:
-            pDevice->Key.PlxFamily = PLX_FAMILY_SIRIUS;
-            break;
-
-        case 0x8625:
-        case 0x8636:
-        case 0x8649:
-        case 0x8664:
-        case 0x8680:
-        case 0x8696:
-            pDevice->Key.PlxFamily = PLX_FAMILY_CYGNUS;
-            break;
-
-        case 0x8700:
-            // DMA devices that don't have hard-coded ID
-            if ((pDevice->Key.DeviceId == 0x87D0) || (pDevice->Key.DeviceId == 0x87E0))
-                pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_1;
-            else
-                pDevice->Key.PlxFamily = PLX_FAMILY_SCOUT;
-            break;
-
-        case 0x8712:
-        case 0x8716:
-        case 0x8723:
-        case 0x8724:
-        case 0x8732:
-        case 0x8747:
-        case 0x8748:
-            if (pDevice->Key.PlxRevision == 0xAA)
-                pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_1;
-            else
-                pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_2;
-            break;
-
-        case 0x8713:
-        case 0x8717:
-        case 0x8725:
-        case 0x8733:
-        case 0x8749:
-            pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_2;
-            break;
-
-        case 0x2380:
-        case 0x3380:
-        case 0x3382:
-        case 0x8603:
-        case 0x8605:
-            pDevice->Key.PlxFamily = PLX_FAMILY_MIRA;
-            break;
-
-        case 0x8714:
-        case 0x8718:
-        case 0x8734:
-        case 0x8750:
-        case 0x8764:
-        case 0x8780:
-        case 0x8796:
-            pDevice->Key.PlxFamily = PLX_FAMILY_CAPELLA_1;
-            break;
-
-        case 0x9712:
-        case 0x9713:
-        case 0x9716:
-        case 0x9717:
-        case 0x9733:
-        case 0x9734:
-        case 0x9749:
-        case 0x9750:
-        case 0x9765:
-        case 0x9766:
-        case 0x9781:
-        case 0x9782:
-        case 0x9797:
-        case 0x9798:
-            pDevice->Key.PlxFamily = PLX_FAMILY_CAPELLA_2;
-            break;
-
-        case 0:
-            pDevice->Key.PlxFamily = PLX_FAMILY_NONE;
-            break;
-
-        default:
-            ErrorPrintf(("ERROR - PLX Family not set for %04X\n", pDevice->Key.PlxChip));
-            pDevice->Key.PlxFamily = PLX_FAMILY_UNKNOWN;
-            break;
-    }
-
-    return TRUE;
-}
-
-
-
-
-/******************************************************************************
- *
- * Function   :  PlxChipRevisionDetect
- *
- * Description:  Attempts to detect the PLX chip revision
- *
- ******************************************************************************/
-VOID
-PlxChipRevisionDetect(
-    PLX_DEVICE_OBJECT *pDevice
-    )
-{
-    U32 RegValue;
-
-
-    // Get PCI Class code/Revision ID register
-    PLX_PCI_REG_READ( pDevice, PCI_REG_CLASS_REV, &RegValue );
-
-    // Default revision to value in chip
-    pDevice->Key.PlxRevision = (U8)(RegValue & 0xFF);
-}
-
-
-
-
-/******************************************************************************
- *
- * Function   :  PlxChipFilterDisabledPorts
- *
- * Description:  Probes a chip for disabled ports & removes them from port mask
- *
- ******************************************************************************/
-PLX_STATUS
-PlxChipFilterDisabledPorts(
-    PLX_DEVICE_OBJECT *pDevice,
-    U64               *pPortMask
-    )
-{
-    U8         MaxPorts;
-    U32        Offset;
-    U32        RegValue;
-    U64        ChipMask;
-    PLX_STATUS status;
-
-
-    // Set default max number of ports
-    MaxPorts = 24;
-
-    // Set register to use for port enabled status
-    switch (pDevice->Key.PlxFamily)
-    {
-        case PLX_FAMILY_ALTAIR:
-        case PLX_FAMILY_ALTAIR_XL:
-        case PLX_FAMILY_VEGA:
-        case PLX_FAMILY_VEGA_LITE:
-        case PLX_FAMILY_DENEB:
-        case PLX_FAMILY_SIRIUS:
-            Offset = 0x668;
-            break;
-
-        case PLX_FAMILY_MIRA:
-            Offset = 0x1D8;
-            break;
-
-        case PLX_FAMILY_CYGNUS:
-        case PLX_FAMILY_SCOUT:
-        case PLX_FAMILY_DRACO_1:
-        case PLX_FAMILY_DRACO_2:
-            Offset = 0x314;
-            break;
-
-        case PLX_FAMILY_CAPELLA_1:
-        case PLX_FAMILY_CAPELLA_2:
-            if (pDevice->Key.DeviceMode == PLX_CHIP_MODE_STANDARD)
-            {
-                Offset = 0xF4C;
-            }
-            else
-            {
-                Offset = 0x30C;
-            }
-            break;
-
-        default:
-            ErrorPrintf(("ERROR - Disabled port filter not implemented (%04X)\n", pDevice->Key.PlxChip));
-            return PLX_STATUS_UNSUPPORTED;
-    }
-
-    // Get port enable status
-    RegValue = PlxI2c_PlxRegisterRead( pDevice, Offset, &status, FALSE, TRUE );
-    if (status != PLX_STATUS_OK)
-    {
-        return status;
-    }
-
-    // Set port only mask
-    ChipMask = (((U64)1 << MaxPorts) - 1);
-
-    // Extract only valid ports from register
-    RegValue &= ChipMask;
-
-    // Filter ports that don't exist in this chip
-    RegValue &= PLX_64_LOW_32( *pPortMask );
-
-    // Clear port numbers in mask
-    *pPortMask &= ~(U64)ChipMask;
-
-    // Insert valid ports
-    *pPortMask |= RegValue;
-
-    return PLX_STATUS_OK;
 }

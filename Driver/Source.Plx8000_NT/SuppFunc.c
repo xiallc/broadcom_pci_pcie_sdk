@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,13 +43,13 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <asm/uaccess.h>
-#include <linux/delay.h>
+#include <linux/uaccess.h>   // For user page access
+#include <linux/delay.h>     // For mdelay()
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include "ApiFunc.h"
@@ -659,8 +659,8 @@ Plx_dma_buffer_alloc(
      *                little harder" in the allocation effort.
      ********************************************************/
     pMemObject->pKernelVa =
-        Plx_dma_alloc_coherent(
-            pdx,
+        dma_alloc_coherent(
+            &(pdx->pPciDevice->dev),
             pMemObject->Size,
             &BusAddress,
             GFP_KERNEL | __GFP_NOWARN
@@ -759,8 +759,8 @@ Plx_dma_buffer_free(
     }
 
     // Release the buffer
-    Plx_dma_free_coherent(
-        pdx,
+    dma_free_coherent(
+        &(pdx->pPciDevice->dev),
         pMemObject->Size,
         pMemObject->pKernelVa,
         (dma_addr_t)pMemObject->BusPhysical

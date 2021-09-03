@@ -58,6 +58,7 @@
 #include <linux/version.h>
 #include <linux/workqueue.h>
 #include "Plx.h"
+#include "PciRegs.h"
 #include "PlxTypes.h"
 #include "Plx_sysdep.h"
 

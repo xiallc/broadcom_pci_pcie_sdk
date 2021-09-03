@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,16 +43,14 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <asm/uaccess.h>
-#include <linux/delay.h>
-#include <linux/ioport.h>
-#include <linux/pagemap.h>
-#include <linux/sched.h>
+#include <linux/uaccess.h>   // For user page access
+#include <linux/delay.h>     // For mdelay()
+#include <linux/sched.h>     // For TASK_xxx
 #include "ApiFunc.h"
 #include "PciFunc.h"
 #include "PciRegs.h"
@@ -204,9 +202,7 @@ PlxSignalNotifications(
     PLX_WAIT_OBJECT  *pWaitObject;
 
 
-    spin_lock(
-        &(pdx->Lock_WaitObjectsList)
-        );
+    spin_lock( &(pdx->Lock_WaitObjectsList) );
 
     // Get the interrupt wait list
     pEntry = pdx->List_WaitObjects.next;
@@ -240,18 +236,14 @@ PlxSignalNotifications(
             pWaitObject->Source_Ints |= SourceInt;
 
             // Signal wait object
-            wake_up_interruptible(
-                &(pWaitObject->WaitQueue)
-                );
+            wake_up_interruptible( &(pWaitObject->WaitQueue) );
         }
 
         // Jump to next item in the list
         pEntry = pEntry->next;
     }
 
-    spin_unlock(
-        &(pdx->Lock_WaitObjectsList)
-        );
+    spin_unlock( &(pdx->Lock_WaitObjectsList) );
 }
 
 
@@ -554,9 +546,7 @@ PlxPciPhysicalMemoryFreeAll_ByOwner(
     PLX_PHYS_MEM_OBJECT *pMemObject;
 
 
-    spin_lock(
-        &(pdx->Lock_PhysicalMemList)
-        );
+    spin_lock( &(pdx->Lock_PhysicalMemList) );
 
     pEntry = pdx->List_PhysicalMem.next;
 
@@ -579,9 +569,7 @@ PlxPciPhysicalMemoryFreeAll_ByOwner(
             PciMem.Size         = pMemObject->Size;
 
             // Release list lock
-            spin_unlock(
-                &(pdx->Lock_PhysicalMemList)
-                );
+            spin_unlock( &(pdx->Lock_PhysicalMemList) );
 
             // Release the memory & remove from list
             PlxPciPhysicalMemoryFree(
@@ -589,9 +577,7 @@ PlxPciPhysicalMemoryFreeAll_ByOwner(
                 &PciMem
                 );
 
-            spin_lock(
-                &(pdx->Lock_PhysicalMemList)
-                );
+            spin_lock( &(pdx->Lock_PhysicalMemList) );
 
             // Restart parsing the list from the beginning
             pEntry = pdx->List_PhysicalMem.next;
@@ -603,9 +589,7 @@ PlxPciPhysicalMemoryFreeAll_ByOwner(
         }
     }
 
-    spin_unlock(
-        &(pdx->Lock_PhysicalMemList)
-        );
+    spin_unlock( &(pdx->Lock_PhysicalMemList) );
 }
 
 
@@ -654,8 +638,8 @@ Plx_dma_buffer_alloc(
      *                little harder" in the allocation effort.
      ********************************************************/
     pMemObject->pKernelVa =
-        Plx_dma_alloc_coherent(
-            pdx,
+        dma_alloc_coherent(
+            &(pdx->pPciDevice->dev),
             pMemObject->Size,
             &BusAddress,
             GFP_KERNEL | __GFP_NOWARN
@@ -686,10 +670,7 @@ Plx_dma_buffer_alloc(
             );
 
     // Clear the buffer
-    RtlZeroMemory(
-        pMemObject->pKernelVa,
-        pMemObject->Size
-        );
+    RtlZeroMemory( pMemObject->pKernelVa, pMemObject->Size );
 
     DebugPrintf(("Allocated physical memory...\n"));
 
@@ -754,8 +735,8 @@ Plx_dma_buffer_free(
     }
 
     // Release the buffer
-    Plx_dma_free_coherent(
-        pdx,
+    dma_free_coherent(
+        &(pdx->pPciDevice->dev),
         pMemObject->Size,
         pMemObject->pKernelVa,
         (dma_addr_t)pMemObject->BusPhysical
@@ -850,9 +831,13 @@ PlxSglDmaTransferComplete(
 
     // Detemine which descriptor field contains mapped PCI address
     if (pdx->DmaInfo[channel].direction == DMA_FROM_DEVICE)
+    {
         Index_PciAddr = 0x4;
+    }
     else
+    {
         Index_PciAddr = 0x8;
+    }
 
     // Unmap and unlock user buffer pages
     for (i = 0; i < pdx->DmaInfo[channel].NumPages; i++)
@@ -867,8 +852,8 @@ PlxSglDmaTransferComplete(
         VaSgl += (4 * sizeof(U32));
 
         // Unmap the page
-        Plx_dma_unmap_page(
-            pdx,
+        dma_unmap_page(
+            &(pdx->pPciDevice->dev),
             BusAddr,
             BlockSize,
             pdx->DmaInfo[channel].direction
@@ -880,22 +865,16 @@ PlxSglDmaTransferComplete(
             // Mark page as dirty if necessary
             if (!PageReserved(pdx->DmaInfo[channel].PageList[i]))
             {
-                SetPageDirty(
-                    pdx->DmaInfo[channel].PageList[i]
-                    );
+                SetPageDirty( pdx->DmaInfo[channel].PageList[i] );
             }
         }
 
         // Unlock the page
-        page_cache_release(
-            pdx->DmaInfo[channel].PageList[i]
-            );
+        put_page( pdx->DmaInfo[channel].PageList[i] );
     }
 
     // Release page-list memory
-    kfree(
-        pdx->DmaInfo[channel].PageList
-        );
+    kfree( pdx->DmaInfo[channel].PageList );
 
     // Clear the DMA pending flag
     pdx->DmaInfo[channel].bSglPending = FALSE;
@@ -1012,27 +991,20 @@ PlxLockBufferAndBuildSgl(
     }
 
     // Obtain the mmap reader/writer semaphore
-    down_read(
-        &current->mm->mmap_sem
-        );
+    down_read( &current->mm->mmap_sem );
 
     // Attempt to lock the user buffer into memory
     rc =
-        get_user_pages(
-            current,                          // Task performing I/O
-            current->mm,                      // The tasks memory-management structure
-            UserVa & PAGE_MASK,               // Page-aligned starting address of user buffer
+        Plx_get_user_pages(
+            UserVa & PAGE_MASK,               // Page-aligned user buffer start address
             TotalDescr,                       // Length of the buffer in pages
-            bDirPciToUser,                    // Map for write access (i.e. user app performing a read)?
-            0,                                // Do not force an override of page protections
-            pdx->DmaInfo[channel].PageList,   // Will contain list of page pointers describing buffer
-            NULL                              // Will contain list of associated VMAs
+            (bDirPciToUser ? FOLL_WRITE : 0), // Flags
+            pdx->DmaInfo[channel].PageList,   // List of page pointers describing buffer
+            NULL                              // List of associated VMAs
             );
 
     // Release mmap semaphore
-    up_read(
-        &current->mm->mmap_sem
-        );
+    up_read( &current->mm->mmap_sem );
 
     if (rc != TotalDescr)
     {
@@ -1047,7 +1019,6 @@ PlxLockBufferAndBuildSgl(
                 rc, TotalDescr
                 ));
         }
-
         kfree( pdx->DmaInfo[channel].PageList );
         return PLX_STATUS_PAGE_LOCK_ERROR;
     }
@@ -1169,8 +1140,8 @@ PlxLockBufferAndBuildSgl(
 
         // Get bus address of buffer
         BusAddr =
-            Plx_dma_map_page(
-                pdx,
+            dma_map_page(
+                &(pdx->pPciDevice->dev),
                 pdx->DmaInfo[channel].PageList[i],
                 offset,
                 BlockSize,
@@ -1203,7 +1174,9 @@ PlxLockBufferAndBuildSgl(
 
             // Increment source PCI address unless should remain constant
             if (pDma->bConstAddrSrc == FALSE)
+            {
                 PciAddr += BlockSize;
+            }
         }
 
         // Descriptor upper bits of addresses ([47:32])
@@ -1228,13 +1201,19 @@ PlxLockBufferAndBuildSgl(
                    PLX_LE_DATA_32( BlockSize ); // Transfer count
 
         if (pDma->bConstAddrSrc)
+        {
             TmpValue |= PLX_LE_U32_BIT( 29 );    // Keep source address constant
+        }
 
         if (pDma->bConstAddrDest)
+        {
             TmpValue |= PLX_LE_U32_BIT( 28 );    // Keep destination address constant
+        }
 
         if (BytesRemaining == 0)
+        {
             TmpValue |= PLX_LE_U32_BIT( 30 );    // Interrupt when done
+        }
 
         *(U32*)(VaSgl + 0x0) = TmpValue;
 

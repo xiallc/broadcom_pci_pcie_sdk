@@ -1,8 +1,8 @@
-#ifndef __PLX_API_I2C_AA_H
-#define __PLX_API_I2C_AA_H
+#ifndef __I2C_AA_USB_H
+#define __I2C_AA_USB_H
 
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -38,23 +38,20 @@
  *
  * File Name:
  *
- *     PlxApiI2cAa.h
+ *     I2cAaUsb.h
  *
  * Description:
  *
- *     The PLX API function prototypes for an I2C interface
+ *     The PLX API support function prototypes for Aardark I2C interface
  *
  * Revision:
  *
- *     09-01-16 : PLX SDK v7.25
+ *     01-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
 
 #include "PlxIoctl.h"
-#if defined(PLX_DEMO_API)
-    #include "PexApi.h"
-#endif
 
 
 #ifdef __cplusplus
@@ -67,38 +64,30 @@ extern "C" {
 /******************************************
  *             Definitions
  ******************************************/
-#define PLX_I2C_MAX_DEVICES         10          // Max number of I2C USB devices supported
-#define PLX_I2C_MAX_NT_PORTS        2           // Max number of NT ports in single switch
-#define PLX_I2C_DEFAULT_CLOCK_RATE  100         // I2C default clock rate in Khz
-#define PLX_I2C_CMD_REG_READ        0x04        // I2C read command code
-#define PLX_I2C_CMD_REG_WRITE       0x03        // I2C write command code
-#define PLX_I2C_RETRY_MAX_COUNT     3           // On error, max retry count
-#define PLX_I2C_RETRY_DELAY_MS      300         // Delay in ms to wait before command retry
-#define PLX_I2C_CMD_ERROR           ((U32)-1)
-#define PLX_I2C_CMD_SKIP            ((U32)-2)
+#define I2C_MAX_DEVICES             10          // Max number of I2C USB devices supported
+#define I2C_MAX_NT_PORTS            2           // Max number of NT ports in single switch
+#define I2C_DEFAULT_CLOCK_RATE      100         // I2C default clock rate in Khz
+#define I2C_CMD_REG_READ            0x04        // I2C read command code
+#define I2C_CMD_REG_WRITE           0x03        // I2C write command code
+#define I2C_CMD_ERROR               ((U32)-1)   // Reserved command value to denote error
+#define I2C_CMD_SKIP                ((U32)-2)   // Reserved command value to denote skip operation
+#define I2C_RETRY_MAX_COUNT         3           // On error, max retry count
+#define I2C_RETRY_DELAY_MS          300         // Delay in ms to wait before command retry
+#define I2C_HIGH_ADDR_OFFSET        0x2CC       // Register to contain high address bits
+#define I2C_HIGH_ADDR_INIT          0xFF
 
-#if defined(PLX_MSWINDOWS)
-    #define Plx_sleep               Sleep
-#elif defined(PLX_LINUX)
-    #define Plx_sleep(arg)          usleep((arg) * 1000)
-#endif
+// Various addressing modes, which vary between chips
+#define I2C_ADDR_MODE_STD           0           // Standard (ports only)
+#define I2C_ADDR_MODE_NON_STD       1           // Non-standard
+#define I2C_ADDR_MODE_FULL          2           // Full
+#define I2C_ADDR_MODE_NTV           2           // NT-Virtual
+#define I2C_ADDR_MODE_NTL           1           // NT-Link
+#define I2C_ADDR_MODE_NT_P2P        1           // NT parent P2P
+#define I2C_ADDR_MODE_DMA           3           // DMA & DMA RAM
+#define I2C_ADDR_MODE_ALUT          3           // ALUT
 
-#if !defined(PLX_DOS)
-    // Macros for PLX chip register access
-    #if defined(PLX_DEMO_API)
-        #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxPci_PciRegisterReadFast( (pDevice), (U16)(offset), NULL )
-        #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxPci_PciRegisterWriteFast( (pDevice), (U16)(offset), (value) )
-
-        #define PLX_8000_REG_READ(pDevice, offset)          PlxPci_PlxRegisterRead( (pDevice), (offset), NULL )
-        #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxPci_PlxRegisterWrite( (pDevice), (offset), (value) )
-    #else
-        #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, TRUE, TRUE )
-        #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), TRUE )
-
-        #define PLX_8000_REG_READ(pDevice, offset)          PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, FALSE, TRUE )
-        #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), FALSE )
-    #endif
-#endif
+#define I2C_PEX_BASE_ADDR_MASK      0xFF800000  // PEX region base address mask
+#define I2C_PEX_MAX_OFFSET_MASK     0x007FFFFF  // Max I2C addressing (23 bits)
 
 
 
@@ -139,38 +128,9 @@ PlxI2c_I2cVersion(
     PLX_VERSION *pVersion
     );
 
-PLX_STATUS
-PlxI2c_ChipTypeGet(
-    PLX_DEVICE_OBJECT *pDevice,
-    U16               *pChipType,
-    U8                *pRevision
-    );
-
-PLX_STATUS
-PlxI2c_ChipTypeSet(
-    PLX_DEVICE_OBJECT *pDevice,
-    U16                ChipType,
-    U8                 Revision
-    );
-
-PLX_STATUS
-PlxI2c_GetPortProperties(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PORT_PROP     *pPortProp
-    );
-
 
 /******************************************
- *        Device Control Functions
- *****************************************/
-PLX_STATUS
-PlxI2c_DeviceReset(
-    PLX_DEVICE_OBJECT *pDevice
-    );
-
-
-/******************************************
- * PLX-specific Register Access Functions
+ * Device-specific Register Access Functions
  *****************************************/
 U32
 PlxI2c_PlxRegisterRead(
@@ -187,17 +147,6 @@ PlxI2c_PlxRegisterWrite(
     U32                offset,
     U32                value,
     BOOLEAN            bAdjustForPort
-    );
-
-
-/******************************************
- *           PCI BAR Functions
- *****************************************/
-PLX_STATUS
-PlxI2c_PciBarProperties(
-    PLX_DEVICE_OBJECT *pDevice,
-    U8                 BarIndex,
-    PLX_PCI_BAR_PROP  *pBarProperties
     );
 
 
@@ -272,34 +221,6 @@ PlxI2c_EepromWriteByOffset_16(
 
 
 /******************************************
- *   Performance Monitoring Functions
- *****************************************/
-PLX_STATUS
-PlxI2c_PerformanceInitializeProperties(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PERF_PROP     *pPerfObject
-    );
-
-PLX_STATUS
-PlxI2c_PerformanceMonitorControl(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PERF_CMD       command
-    );
-
-PLX_STATUS
-PlxI2c_PerformanceResetCounters(
-    PLX_DEVICE_OBJECT *pDevice
-    );
-
-PLX_STATUS
-PlxI2c_PerformanceGetCounters(
-    PLX_DEVICE_OBJECT *pDevice,
-    PLX_PERF_PROP     *pPerfProps,
-    U8                 NumOfObjects
-    );
-
-
-/******************************************
  *          Multi-VS Functions
  *****************************************/
 PLX_STATUS
@@ -319,18 +240,13 @@ PlxI2c_MH_MigrateDsPorts(
 
 
 /******************************************
- *      I2C Private Support Functions
+ *      Private Support Functions
  *****************************************/
-VOID
-Plx_delay_us(
-    U32 Time_us
-    );
-
 U32
 PlxI2c_GenerateCommand(
     PLX_DEVICE_OBJECT *pDevice,
     U8                 I2cOperation,
-    U32                offset,
+    U32                Address,
     BOOLEAN            bAdjustForPort
     );
 
@@ -354,30 +270,6 @@ PlxI2c_ProbeSwitch(
     PLX_DEVICE_KEY    *pKey,
     U16                DeviceNumber,
     U16               *pNumMatched
-    );
-
-U16
-PlxPciFindCapability(
-    PLX_DEVICE_OBJECT *pDevice,
-    U16                CapID,
-    U8                 bPCIeCap,
-    U8                 InstanceNum
-    );
-
-BOOLEAN
-PlxChipTypeDetect(
-    PLX_DEVICE_OBJECT *pDevice
-    );
-
-VOID
-PlxChipRevisionDetect(
-    PLX_DEVICE_OBJECT *pDevice
-    );
-
-PLX_STATUS
-PlxChipFilterDisabledPorts(
-    PLX_DEVICE_OBJECT *pDevice,
-    U64               *pPortMask
     );
 
 

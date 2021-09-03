@@ -2,7 +2,7 @@
 #define __DRIVER_DEFS_H
 
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -55,7 +55,7 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
-#include "Plx.h"
+#include "PciRegs.h"
 #include "PlxTypes.h"
 #include "Plx_sysdep.h"
 
@@ -68,6 +68,9 @@
 #define PLX_DRIVER_NAME                     "PlxSvc"
 #define PLX_MNGMT_INTERFACE                 0xff          // Minor number of Management interface
 #define PLX_MAX_NAME_LENGTH                 0x20          // Max length of registered device name
+
+// Atlas PEX registers start at offset 8MB in BAR 0
+#define ATLAS_PEX_REGS_BASE_OFFSET          0x800000
 
 
 
@@ -177,11 +180,11 @@ typedef struct _PLX_DEVICE_NODE
     struct _PLX_DEVICE_NODE  *pParent;                      // The parent P2P port
     struct _PLX_DEVICE_NODE  *pRegNode;                     // The device to use for register access
     PLX_DEVICE_KEY            Key;                          // Device location & identification
+    PLX_PORT_PROP             PortProp;                     // Port properties
     U8                        PciHeaderType;                // PCI header type
     U32                       PciClass;                     // PCI class code
     PLX_PCI_BAR_INFO          PciBar[PCI_NUM_BARS_TYPE_00]; // PCI BARs information
     U8                        bBarKernelMap;                // Flag whether BARs have been mapped to kernel
-    U8                        PortNumber;                   // PCIe Port number of device
     U8                        Default_EepWidth;             // Default width for EEPROM access
     U8                        MapRequestPending;            // Number of pending user mapping requests
     U32                       Offset_NtRegBase;             // The NT register base offset
@@ -197,7 +200,7 @@ typedef struct _DEVICE_EXTENSION
     struct list_head       List_Devices;           // List of detected devices
     struct list_head       List_MapParams;         // Stores information about an upcoming mapping request
     spinlock_t             Lock_MapParamsList;     // Spinlock for map parameters list
-} DEVICE_EXTENSION; 
+} DEVICE_EXTENSION;
 
 
 // Main driver object

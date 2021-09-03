@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  *****************************************************************************/
 
@@ -595,9 +595,9 @@ AddDevice(
      * Although PLX devices can handle 64-bit DMA addressing through
      * dual cycles, this driver does not support that feature.  As
      * a result, the OS is notified to keep this device's DMA mask
-     * to 32-bit, which is the default anyway.
+     * to 32-bit, which is the default.
      ***************************************************************/
-    Plx_dma_set_mask( pdx, PLX_DMA_BIT_MASK(32) );
+    dma_set_mask( &(pdx->pPciDevice->dev), PLX_DMA_BIT_MASK(32) );
 
     // Set buffer allocation mask
     if (Plx_dma_set_coherent_mask( pdx, PLX_DMA_BIT_MASK(32) ) != 0)

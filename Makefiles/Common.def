@@ -15,18 +15,25 @@
 #    CROSS_COMPILE  : Set to GCC prefix of cross-compiler
 #    KDIR           : Set to root folder of kernel source to target
 #=============================================================================
-# Set default architecture if not set
+# Attempt to determine architecture if not set
 ifndef ARCH
-    ARCH := $(shell uname -m | sed 's/i.86/i386/')
+    ARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86_64/ \
+                                   -e s/sun4u/sparc64/ \
+                                   -e s/arm.*/arm/ -e s/sa110/arm/ \
+                                   -e s/s390x/s390/ -e s/parisc64/parisc/ \
+                                   -e s/ppc.*/powerpc/ -e s/mips.*/mips/ \
+                                   -e s/sh[234].*/sh/ -e s/aarch64.*/arm64/ )
+
+    # Starting with 32-bit kernel v3.9, "i386" was replaced with "x86". If
+    # the HW platform is reported as i386, revert to that instead of x86
+    ifeq ($(shell uname -i),i386)
+        ARCH := i386
+    endif
 endif
 
-ifeq ($(ARCH),i386)
+ifeq ($(ARCH),$(filter $(ARCH), x86 i386 i686))
     PLX_CPU_BITS   = 32
     PLX_CPU_ENDIAN = Little
-endif
-ifeq ($(ARCH),alpha)
-    PLX_CPU_BITS   = 32
-    PLX_CPU_ENDIAN = Big
 endif
 ifeq ($(ARCH),x86_64)
     PLX_CPU_BITS   = 64
@@ -35,6 +42,10 @@ endif
 ifeq ($(ARCH),ia64)
     PLX_CPU_BITS   = 64
     PLX_CPU_ENDIAN = Little
+endif
+ifeq ($(ARCH),alpha)
+    PLX_CPU_BITS   = 32
+    PLX_CPU_ENDIAN = Big
 endif
 ifeq ($(ARCH),ppc)
     PLX_CPU_BITS   = 32
@@ -54,6 +65,14 @@ ifeq ($(ARCH),arm)
     ifeq ($(CROSS_COMPILE),)
         CROSS_COMPILE = arm-linux-gnu-
     endif
+endif
+ifeq ($(ARCH),arm64)
+    PLX_CPU_BITS   = 64
+    PLX_CPU_ENDIAN = Little
+endif
+ifeq ($(ARCH),powerpc)
+    PLX_CPU_BITS   = 64
+    PLX_CPU_ENDIAN = Little
 endif
 
 
@@ -85,7 +104,9 @@ ifndef PLATFORM_NAME
         PLATFORM_NAME := "$(shell cat /etc/redhat-release)"
     else ifneq ($(wildcard /etc/SuSE-release),)
         PLATFORM_NAME := "$(shell cat /etc/SuSE-release | grep SUSE)"
-    else ifneq ($(wildcard /etc/lsb-release),)
+    else ifneq ($(wildcard /etc/lsb_release),)
+        PLATFORM_NAME := "$(shell lsb_release -s -d)"
+    else ifneq ($(wildcard /usr/bin/lsb_release),)
         PLATFORM_NAME := "$(shell lsb_release -s -d)"
     else
         PLATFORM_NAME := "Linux ver ??"
@@ -131,11 +152,11 @@ ifndef PLX_CHIP
 endif
 
 ifndef PLX_CPU_BITS
-    $(error ERROR: Variable 'PLX_CPU_BITS' not set ***)
+    $(error ERROR: Variable 'PLX_CPU_BITS' not set for ARCH=$(ARCH) ***)
 endif
 
 ifndef PLX_CPU_ENDIAN
-    $(error ERROR: Variable 'PLX_CPU_ENDIAN' not set ***)
+    $(error ERROR: Variable 'PLX_CPU_ENDIAN' not set for ARCH=$(ARCH) ***)
 endif
 
 
@@ -272,7 +293,7 @@ ifdef PLX_COSIM
     PLX_OPT += -DPLX_COSIM=$(PLX_COSIM)
 endif
 
-EXTRA_CFLAGS += $(PLX_OPT) $(PLX_INC_DIR)
+EXTRA_CFLAGS += -D$(ARCH) -DARCH=$(ARCH) $(PLX_OPT) $(PLX_INC_DIR)
 
 
 

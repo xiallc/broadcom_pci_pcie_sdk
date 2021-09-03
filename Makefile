@@ -17,35 +17,44 @@ SUBDIRS	= \
 	  Samples/PlxNotification
 
 
+# Options for make
+MAKEFLAGS += --no-print-directory
+
+
 # Targets
 all: $(SUBDIRS)
 	@clear
 	@for i in $(SUBDIRS); \
 	 do \
 	    echo '   ------------------'; \
-	    $(MAKE) -C $$i PLX_NO_CLEAR_SCREEN=1 --no-print-directory; \
+	    $(MAKE) -C $$i PLX_NO_CLEAR_SCREEN=1; \
 	    sleep 1; \
 	 done
 	@echo
 
 
+# Parameter shortcuts
+c: clean
+o: cleanobj
+
+
+# Clean all files
 clean: $(SUBDIRS)
 	@clear
 	@for i in $(SUBDIRS); \
 	 do \
 	    echo '   ------------------'; \
-	    $(MAKE) -C $$i clean --no-print-directory; \
-	    sleep 1; \
+	    $(MAKE) -C $$i clean; \
 	 done
 	@echo
 
 
+# Clean only object files
 cleanobj: $(SUBDIRS)
 	@clear
 	@for i in $(SUBDIRS); \
 	 do \
 	    echo '   ------------------'; \
-	    $(MAKE) -C $$i cleanobj --no-print-directory; \
-	    sleep 1; \
+	    $(MAKE) -C $$i cleanobj; \
 	 done
 	@echo

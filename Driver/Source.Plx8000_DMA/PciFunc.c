@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
@@ -820,7 +820,6 @@ PlxProbeForEcamBase(
             BIOS_MEM_START,
             (BIOS_MEM_END - BIOS_MEM_START)
             );
-
     if (Va_BiosRom == NULL)
     {
         goto _Exit_PlxProbeForEcamBase;
@@ -874,21 +873,15 @@ PlxProbeForEcamBase(
         ));
 
     DebugPrintf((
-        "ACPI Probe: 'RSD PTR ' found at %p\n",
-        pAcpi_Addr_RSDP
+        "ACPI Probe: 'RSD PTR ' found at %08lX\n",
+        PLX_PTR_TO_INT( pAcpi_Addr_RSDP )
         ));
 
     // Store RSDT address
     pAcpi_Addr_RSDT = (U8*)PLX_INT_TO_PTR( PHYS_MEM_READ_32( (U32*)(pAddress + 16) ) );
 
     // Map RSDT table
-    Va_RSDT =
-        ioremap_prot(
-            PLX_PTR_TO_INT( pAcpi_Addr_RSDT ),
-            1024,
-            0
-            );
-
+    Va_RSDT = ioremap_prot( PLX_PTR_TO_INT( pAcpi_Addr_RSDT ), 1024, 0 );
     if (Va_RSDT == NULL)
     {
         goto _Exit_PlxProbeForEcamBase;
@@ -896,7 +889,6 @@ PlxProbeForEcamBase(
 
     // Get RSDT size
     Acpi_Rsdt.Length = PHYS_MEM_READ_32( (U32*)(Va_RSDT + 4) );
-
     if (Acpi_Rsdt.Length == 0)
     {
         DebugPrintf(("ACPI Probe: Unable to read RSDT table length\n"));
@@ -907,14 +899,13 @@ PlxProbeForEcamBase(
     NumEntries = (U16)((Acpi_Rsdt.Length - sizeof(ACPI_RSDT_v1_0)) / sizeof(U32));
 
     DebugPrintf((
-        "ACPI Probe: RSD table at %p has %d entries\n",
-        pAcpi_Addr_RSDT,
-        NumEntries
+        "ACPI Probe: RSD table at %08lX has %d entries\n",
+        PLX_PTR_TO_INT( pAcpi_Addr_RSDT ), NumEntries
         ));
 
     if (NumEntries > 100)
     {
-        DebugPrintf(("ACPI Probe: Unable to determine number of entries in RSDT table\n"));
+        DebugPrintf(("ACPI Probe: Unable to determine RSDT entry count\n"));
         goto _Exit_PlxProbeForEcamBase;
     }
 
@@ -928,13 +919,7 @@ PlxProbeForEcamBase(
         pAddress = (U8*)PLX_INT_TO_PTR( PHYS_MEM_READ_32( (U32*)pEntry ) );
 
         // Map table
-        Va_Table =
-            ioremap_prot(
-                PLX_PTR_TO_INT( pAddress ),
-                200,
-                0
-                );
-
+        Va_Table = ioremap_prot( PLX_PTR_TO_INT( pAddress ), 200, 0 );
         if (Va_Table == NULL)
         {
             goto _Exit_PlxProbeForEcamBase;
@@ -944,20 +929,16 @@ PlxProbeForEcamBase(
         value = PHYS_MEM_READ_32( (U32*)Va_Table );
 
         DebugPrintf((
-            "ACPI Probe: %c%c%c%c table at %p\n",
+            "ACPI Probe: %c%c%c%c table at %08lX\n",
             (char)(value >>  0),
             (char)(value >>  8),
             (char)(value >> 16),
             (char)(value >> 24),
-            pAddress
+            PLX_PTR_TO_INT( pAddress )
             ));
 
         // Check if MCFG table
-        if (memcmp(
-                "MCFG",
-                &value,
-                sizeof(U32)
-                ) == 0)
+        if (memcmp( "MCFG", &value, sizeof(U32) ) == 0)
         {
             // Get 64-bit base address of Enhanced Config Access Mechanism
             Gbl_Acpi_Addr_ECAM[0] = PHYS_MEM_READ_32( (U32*)(Va_Table + 44) );
@@ -995,16 +976,13 @@ _Exit_PlxProbeForEcamBase:
     if (bFound)
     {
         DebugPrintf((
-            "ACPI Probe: PCIe ECAM at %04X_%08X\n",
+            "ACPI Probe: PCIe ECAM at %02X_%08X\n",
             (unsigned int)Gbl_Acpi_Addr_ECAM[1], (unsigned int)Gbl_Acpi_Addr_ECAM[0]
             ));
 
-        // For newer Linux kernels, default to using OS
-        if (LINUX_VERSION_CODE >= PLX_KER_VER_PCIE_USE_OS)
-        {
-            DebugPrintf(("ACPI Probe: Will default to OS for PCIe reg accesses\n"));
-            Gbl_Acpi_Addr_ECAM[2] = ACPI_PCIE_DEFAULT_TO_OS;
-        }
+        // Default to use OS calls
+        DebugPrintf(("ACPI Probe: Will default to OS for PCIe reg accesses\n"));
+        Gbl_Acpi_Addr_ECAM[2] = ACPI_PCIE_DEFAULT_TO_OS;
     }
     else
     {

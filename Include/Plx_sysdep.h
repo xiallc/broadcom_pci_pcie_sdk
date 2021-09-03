@@ -2,7 +2,7 @@
 #define _PLX_SYSDEP_H_
 
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -47,7 +47,7 @@
  *
  * Revision History:
  *
- *      09-01-16 : PLX SDK v7.25
+ *      04-01-19 : PCI/PCIe SDK v8.00
  *
  *****************************************************************************/
 
@@ -57,22 +57,10 @@
 #endif
 
 
-// Only allow 2.6 and higher kernels
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-    #error "ERROR: Linux kernel versions prior to v2.6 not supported"
+// Only allow 2.6.18 and higher kernels
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+    #error "ERROR: Linux kernel versions prior to v2.6.18 not supported"
 #endif
-
-
-
-
-/***********************************************************
- * This definition is used by the PLX driver's PCI functions
- * implementation to decide whether to default to using Linux
- * built-in PCIe configuration access functions. Kernel versions
- * prior to this will using the ACPI ECAM access. Kernels
- * equal to or newer will pass PCIe accesses to kernel functions.
- **********************************************************/
-#define PLX_KER_VER_PCIE_USE_OS         KERNEL_VERSION(2,6,18)
 
 
 
@@ -128,13 +116,16 @@
 /***********************************************************
  * ioremap_prot
  *
- * This function is supported after 2.6.27 on x86. PLX drivers
- * use it for probing ACPI tables. In newer kernels, calls
- * to ioremap() for ACPI locations may report errors if the
- * default flags conflict with kernel mappings.
+ * This function is supported after 2.6.27 only one some
+ * architectures, like x86 & PowerPC. Other architectures
+ * added support for it in later kernels. For platforms
+ * that support it, HAVE_IOREMAP_PROT is expected defined.
+ * SDK drivers use the function for probing ACPI tables. In
+ * newer kernels, calls to ioremap() for ACPI locations may
+ * report errors if default flags conflict with kernel mappings.
  **********************************************************/
-#if ((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)) || \
-     (!defined(__i386__) && !defined(__x86_64__)))
+#if !defined(CONFIG_HAVE_IOREMAP_PROT)
+    // Revert to ioremap() for unsupported architectures
     #define ioremap_prot(addr,size,flags)     ioremap((addr), (size))
 #endif
 
@@ -148,7 +139,21 @@
  * a standard definition for it starting with 2.6.29.
  **********************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-    #define pgprot_writecombine              pgprot_noncached
+    #define pgprot_writecombine               pgprot_noncached
+#endif
+
+
+
+
+/***********************************************************
+ * access_ok
+ *
+ * access_ok() removed type param in 5.0
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0))
+    #define Plx_access_ok                     access_ok
+#else
+    #define Plx_access_ok(type,addr,size)     access_ok( (addr),(size) )
 #endif
 
 
@@ -191,26 +196,12 @@
  * PLX drivers use work queue functions for the DPC/bottom-half
  * processing, the parameter had to be changed.  For cleaner
  * source code, the definition PLX_DPC_PARAM is used and is
- * defined below.  This also allows 2.4.x compatible source code.
+ * defined below.
  **********************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
     #define PLX_DPC_PARAM      VOID
 #else
     #define PLX_DPC_PARAM      struct work_struct
-#endif
-
-
-
-
-/***********************************************************
- * SA_SHIRQ / IRQF_SHARED
- *
- * In kernel 2.6.18, the IRQ flag SA_SHIRQ was renamed to
- * IRQF_SHARED.  SA_SHIRQ was deprecated but remained in the
- * the kernel headers to support older drivers until 2.6.24.
- **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
-    #define IRQF_SHARED         SA_SHIRQ
 #endif
 
 
@@ -229,18 +220,49 @@
 
 
 /***********************************************************
- * pci_enable_msi  --> pci_enable_msi_exact
- * pci_enable_msix --> pci_enable_msix_exact
+ * pci_enable_msi/pci_enable_msix deprecated
  *
- * A new set of pci_enable_msi* functions were added in 3.14
- * to replace existing functions.
+ * The pci_*_msi/msix MSI functions are deprecated as of
+ * kernel 4.8. A new set of PCI subsystem functions have
+ * replaced them.
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0))
-    #define Plx_pci_enable_msi_exact(dev,nvec)         pci_enable_msi( (dev) )
-    #define Plx_pci_enable_msix_exact                  pci_enable_msix
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,8,0))
+
+    #define Plx_pci_enable_msi          pci_enable_msi
+    #define Plx_pci_disable_msi         pci_disable_msi
+    #define Plx_pci_enable_msix         pci_enable_msix
+    #define Plx_pci_disable_msix        pci_disable_msix
+
 #else
-    #define Plx_pci_enable_msi_exact                   pci_enable_msi_exact
-    #define Plx_pci_enable_msix_exact                  pci_enable_msix_exact
+
+    #define Plx_pci_enable_msi( pdev )  pci_alloc_irq_vectors( (pdev), 1, 1, PCI_IRQ_MSI )
+    #define Plx_pci_disable_msi         pci_free_irq_vectors
+    #define Plx_pci_disable_msix        pci_free_irq_vectors
+
+    #define Plx_pci_enable_msix(pdev,entries,nvec)                       \
+        ({                                                               \
+            int _rc;                                                     \
+            int _idx;                                                    \
+                                                                         \
+            /* Attempt to allocate MSI-X vectors */                      \
+            _rc = pci_alloc_irq_vectors(                                 \
+                      (pdev), (nvec), (nvec), PCI_IRQ_MSIX );            \
+            if (_rc == (nvec))                                           \
+            {                                                            \
+                /* Set successful return value */                        \
+                _rc = 0;                                                 \
+                                                                         \
+                /* Fill in the vector table */                           \
+                for (_idx = 0; _idx < (nvec); _idx++)                    \
+                {                                                        \
+                    (entries)[_idx].vector =                             \
+                        pci_irq_vector( (pdev), (entries)[_idx].entry ); \
+                }                                                        \
+            }                                                            \
+                                                                         \
+            _rc;                                                         \
+        })
+
 #endif
 
 
@@ -344,7 +366,7 @@
 
 
 /***********************************************************
- * readq / writeq 
+ * readq / writeq
  *
  * These functions are used to perform 64-bit accesses to
  * I/O memory.  They are not defined for all architectures.
@@ -382,31 +404,40 @@
 
 
 /***********************************************************
- * dma_set_mask / pci_set_dma_mask
+ * get_user_pages
  *
- * This function is used to set the mask for DMA addresses
- * for the device.  In 2.4 kernels, the function is pci_set_dma_mask
- * and in 2.6 kernels, it has been change to dma_set_mask.
- * In addition to the name change, the first parameter has
- * been changed from the PCI device structure in 2.4, to
- * the device structure found in the PCI device structure.
+ * Parameters to this function changed as follows:
+ *   4.6: Removed first two params (curr task & task's mem-manage struct)
+ *   4.9: Replaced write & force params with a single gup_flags param
  **********************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-    #define Plx_dma_set_mask(pdx, mask) \
-            (                           \
-                pci_set_dma_mask(       \
-                    (pdx)->pPciDevice,  \
-                    (mask)              \
-                    )                   \
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0)
+    #define Plx_get_user_pages(start, nr_pages, gup_flags, pages, vmas) \
+            (                                           \
+                get_user_pages(                         \
+                    current,                            \
+                    current->mm,                        \
+                    (start),                            \
+                    (nr_pages),                         \
+                    ((gup_flags) & FOLL_WRITE) ? 1 : 0, \
+                    0,                                  \
+                    (pages),                            \
+                    (vmas)                              \
+                    )                                   \
+            )
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
+    #define Plx_get_user_pages(start, nr_pages, gup_flags, pages, vmas) \
+            (                                           \
+                get_user_pages(                         \
+                    (start),                            \
+                    (nr_pages),                         \
+                    ((gup_flags) & FOLL_WRITE) ? 1 : 0, \
+                    0,                                  \
+                    (pages),                            \
+                    (vmas)                              \
+                    )                                   \
             )
 #else
-    #define Plx_dma_set_mask(pdx, mask)        \
-            (                                  \
-                dma_set_mask(                  \
-                    &((pdx)->pPciDevice->dev), \
-                    (mask)                     \
-                    )                          \
-            )
+    #define Plx_get_user_pages          get_user_pages
 #endif
 
 
@@ -452,235 +483,6 @@
     #define PLX_DMA_BIT_MASK(n)         (((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
 #else
     #define PLX_DMA_BIT_MASK            DMA_BIT_MASK
-#endif
-
-
-
-
-/***********************************************************
- * dma_alloc_coherent & dma_free_coherent
- *
- * These functions are used to allocate and map DMA buffers.
- * In 2.4 kernels, the functions are pci_alloc/free_consistent
- * and in 2.6 kernels, they have been changed to
- * dma_alloc/free_coherent.  In addition to the name changes,
- * the first parameter has been changed from the PCI device
- * structure in 2.4, to the device structure found in the PCI
- * device structure.
- **********************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-    #define Plx_dma_alloc_coherent(pdx, size, dma_handle, flag) \
-                pci_alloc_consistent(  \
-                    (pdx)->pPciDevice, \
-                    (size),            \
-                    (dma_handle)       \
-                    )
-
-    #define Plx_dma_free_coherent(pdx, size, cpu_addr, dma_handle) \
-                pci_free_consistent(   \
-                    (pdx)->pPciDevice, \
-                    (size),            \
-                    (cpu_addr),        \
-                    (dma_handle)       \
-                    )
-#else
-    #define Plx_dma_alloc_coherent(pdx, size, dma_handle, flag) \
-                dma_alloc_coherent(            \
-                    &((pdx)->pPciDevice->dev), \
-                    (size),                    \
-                    (dma_handle),              \
-                    (flag)                     \
-                    )
-
-    #define Plx_dma_free_coherent(pdx, size, cpu_addr, dma_handle) \
-                dma_free_coherent(             \
-                    &((pdx)->pPciDevice->dev), \
-                    (size),                    \
-                    (cpu_addr),                \
-                    (dma_handle)               \
-                    )
-#endif
-
-
-
-
-/***********************************************************
- * dma_map_page & dma_unmap_page
- *
- * These functions are used to map a single user buffer page
- * in order to get a valid bus address for the page. In 2.4
- * kernels, the functions are pci_map/unmap_page and in 2.6
- * kernels, they have been changed to dma_map/unmap_page.
- * In addition to the name changes, the first parameter has
- * been changed from the PCI device structure in 2.4, to the
- * device structure found in the PCI device structure.
- **********************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-    #define Plx_dma_map_page(pdx, page, offset, size, direction) \
-                pci_map_page(          \
-                    (pdx)->pPciDevice, \
-                    (page),            \
-                    (offset),          \
-                    (size),            \
-                    (direction)        \
-                    )
-
-    #define Plx_dma_unmap_page(pdx, dma_address, size, direction) \
-                pci_unmap_page(        \
-                    (pdx)->pPciDevice, \
-                    (dma_address),     \
-                    (size),            \
-                    (direction)        \
-                    )
-#else
-    #define Plx_dma_map_page(pdx, page, offset, size, direction) \
-                dma_map_page(                  \
-                    &((pdx)->pPciDevice->dev), \
-                    (page),                    \
-                    (offset),                  \
-                    (size),                    \
-                    (direction)                \
-                    )
-
-    #define Plx_dma_unmap_page(pdx, dma_address, size, direction) \
-                dma_unmap_page(                \
-                    &((pdx)->pPciDevice->dev), \
-                    (dma_address),             \
-                    (size),                    \
-                    (direction)                \
-                    )
-#endif
-
-
-
-
-/***********************************************************
- * remap_pfn_range & remap_page_range
- *
- * The remap_pfn_range() function was added in kernel 2.6 and
- * does not exist in previous kernels.  For older kernels,
- * remap_page_range can be used, as it is the same function
- * except the Page Frame Number (pfn) parameter should
- * actually be a physical address.  For that case, the
- * pfn is simply shifted by PAGE_SHIFT to obtain the
- * corresponding physical address.
- *
- * remap_pfn_range, however, does not seem to exist in all
- * kernel 2.6 distributions.  remap_page_range was officially
- * removed in 2.6.11 but declared deprecated in 2.6.10. To keep
- * things simple, this driver will default to remap_page_range
- * unless the kernel version is 2.6.10 or greater.
- *
- * For 2.4 kernels, remap_pfn_range obviously does not exist.
- * Although remap_page_range() may be used instead, there
- * was a parameter added in kernel version 2.5.3. The new
- * parameter is a pointer to the VMA structure.  To make
- * matters even more complicated, the kernel source in
- * RedHat 9.0 (v2.4.20-8), however, also uses the new
- * parameter.  As a result, another #define is added if
- * RedHat 9.0 kernel source is used.
- *
- * The #defines below should result in the following usage table:
- *
- *  kernel                        function
- * ====================================================
- *  2.4.0  -> 2.4.19              remap_page_range (no VMA param)
- *  2.4.20 -> 2.5.2  (non-RedHat) remap_page_range (no VMA param)
- *  2.4.20 -> 2.5.2  (RedHat)     remap_page_range (with VMA param)
- *  2.5.3  -> 2.6.9               remap_page_range (with VMA param)
- *  2.6.10 & up                   remap_pfn_range
- *
- **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10))
-    #if ( (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)) || \
-         ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20)) && defined(RED_HAT_LINUX_KERNEL)) )
-
-        // Revert to remap_page_range
-        #define Plx_remap_pfn_range(vma, virt_addr, pfn, size, prot) \
-                (                           \
-                    remap_page_range(       \
-                        (vma),              \
-                        (virt_addr),        \
-                        (pfn) << PAGE_SHIFT,\
-                        (size),             \
-                        (prot)              \
-                        )                   \
-                )
-    #else
-        // VMA parameter must be removed
-        #define Plx_remap_pfn_range(vma, virt_addr, pfn, size, prot) \
-                (                           \
-                    remap_page_range(       \
-                        (virt_addr),        \
-                        (pfn) << PAGE_SHIFT,\
-                        (size),             \
-                        (prot)              \
-                        )                   \
-                )
-    #endif
-#else
-    // Function already defined
-    #define Plx_remap_pfn_range         remap_pfn_range
-#endif
-
-
-
-
-/***********************************************************
- * io_remap_pfn_range & io_remap_page_range
- *
- * The io_remap_page_range() function is used to map I/O space
- * into user mode.  Generally, it defaults to remap_page_range,
- * but on some architectures it performs platform-specific code.
- *
- * In kernel 2.6.12, io_remap_page_range was deprecated and
- * replaced with io_remap_pfn_range.
- *
- * Since io_remap_xxx_range usually reverts to remap_xxx_range,
- * the same issues regarding kernel version apply.  Refer to
- * the explanation above regarding remap_page/pfn_range.
- *
- * The #defines below should result in the following usage table:
- *
- *  kernel                        function
- * ====================================================
- *  2.4.0  -> 2.4.19              io_remap_page_range (no VMA param)
- *  2.4.20 -> 2.5.2  (non-RedHat) io_remap_page_range (no VMA param)
- *  2.4.20 -> 2.5.2  (RedHat)     io_remap_page_range (with VMA param)
- *  2.5.3  -> 2.6.11              io_remap_page_range (with VMA param)
- *  2.6.12 & up                   io_remap_pfn_range
- *
- **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,12))
-    #if ( (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)) || \
-         ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20)) && defined(RED_HAT_LINUX_KERNEL)) )
-
-        // Revert to io_remap_page_range (with VMA)
-        #define Plx_io_remap_pfn_range(vma, virt_addr, pfn, size, prot) \
-                (                           \
-                    io_remap_page_range(    \
-                        (vma),              \
-                        (virt_addr),        \
-                        (pfn) << PAGE_SHIFT,\
-                        (size),             \
-                        (prot)              \
-                        )                   \
-                )
-    #else
-        // Revert to io_remap_page_range (without VMA)
-        #define Plx_io_remap_pfn_range(vma, virt_addr, pfn, size, prot) \
-                (                           \
-                    io_remap_page_range(    \
-                        (virt_addr),        \
-                        (pfn) << PAGE_SHIFT,\
-                        (size),             \
-                        (prot)              \
-                        )                   \
-                )
-    #endif
-#else
-    // Function already defined
-    #define Plx_io_remap_pfn_range      io_remap_pfn_range
 #endif
 
 

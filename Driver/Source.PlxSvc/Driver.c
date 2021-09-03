@@ -86,7 +86,7 @@ Plx_init_module(
     int status;
 
 
-    InfoPrintf_Cont(("\n"));
+    InfoPrintf_Cont((" \n"));
     InfoPrintf(("<========================================================>\n"));
     InfoPrintf((
         "PLX PCI Service driver v%d.%02d (%d-bit)\n",
@@ -190,7 +190,7 @@ Plx_cleanup_module(
     DEVICE_OBJECT *pNext;
 
 
-    InfoPrintf_Cont(("\n"));
+    InfoPrintf_Cont((" \n"));
     InfoPrintf((
         "Unload driver v%d.%02d\n",
         PLX_SDK_VERSION_MAJOR, PLX_SDK_VERSION_MINOR

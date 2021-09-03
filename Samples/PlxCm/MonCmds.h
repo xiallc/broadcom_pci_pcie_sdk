@@ -64,7 +64,6 @@ typedef enum
     CMD_HELP,
     CMD_EXIT,
     CMD_SLEEP,
-    CMD_BOOT,
     CMD_SCREEN,
     CMD_THROTTLE,
     CMD_HISTORY,
@@ -73,6 +72,8 @@ typedef enum
     CMD_RESET,
     CMD_DEV,
     CMD_I2C,
+    CMD_MDIO,
+    CMD_SDB,
     CMD_PCI_CAP,
     CMD_PORT_PROP,
     CMD_MH_PROP,
@@ -87,7 +88,8 @@ typedef enum
     CMD_REG_PLX,
     CMD_REG_DUMP,
     CMD_EEP,
-    CMD_EEP_FILE
+    CMD_EEP_FILE,
+    CMD_NVME_PROP
 } MON_CMD_ID;
 
 
@@ -95,36 +97,37 @@ typedef enum
 /*************************************
  *          Functions
  ************************************/
-BOOLEAN Cmd_ConsClear ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Version   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Help      ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Sleep     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Boot      ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Screen    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Throttle  ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_History   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Scan      ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_SetChip   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Reset     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Dev       ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_PortProp  ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_MH_Prop   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_VarDisplay( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_VarSet    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_MemRead   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_MemWrite  ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_IoRead    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_IoWrite   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_RegPci    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_RegPlx    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_RegDump   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Eep       ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_Eep8000   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-BOOLEAN Cmd_EepFile   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
-
+BOOLEAN Cmd_ConsClear  ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Version    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Help       ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Sleep      ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Screen     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Throttle   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_History    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Scan       ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_SetChip    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Reset      ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Dev        ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_I2cConnect ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_MdioConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_SdbConnect ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_PciCapList ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_PortProp   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_MH_Prop    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_VarDisplay ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_VarSet     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_ShowBuffer ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_MemRead    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_MemWrite   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_IoRead     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_IoWrite    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_RegPci     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_RegPlx     ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_RegDump    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Eep        ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_Eep8000    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_EepFile    ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
+BOOLEAN Cmd_NvmeProp   ( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd );
 
 
 

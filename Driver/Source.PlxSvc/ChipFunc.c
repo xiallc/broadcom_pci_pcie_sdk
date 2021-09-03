@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,11 +43,12 @@
  *
  * Revision History:
  *
- *      01-01-17 : PLX SDK v7.25
+ *      03-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
 
+#include "ApiFunc.h"
 #include "ChipFunc.h"
 #include "DrvDefs.h"
 #include "PciFunc.h"
@@ -79,7 +80,9 @@ PlxRegisterRead_8111(
     if ((offset < 0x1000) || (offset > 0x1064))
     {
         if (pStatus != NULL)
+        {
             *pStatus = PLX_STATUS_INVALID_OFFSET;
+        }
         return 0;
     }
 
@@ -87,35 +90,21 @@ PlxRegisterRead_8111(
     offset -= 0x1000;
 
     // Save the current index register
-    PLX_PCI_REG_READ(
-        pNode,
-        0x84,
-        &RegSave
-        );
+    PLX_PCI_REG_READ( pNode, 0x84, &RegSave );
 
     // Set the new index
-    PLX_PCI_REG_WRITE(
-        pNode,
-        0x84,
-        offset
-        );
+    PLX_PCI_REG_WRITE( pNode, 0x84, offset );
 
     // Get the value
-    PLX_PCI_REG_READ(
-        pNode,
-        0x88,
-        &value
-        );
+    PLX_PCI_REG_READ( pNode, 0x88, &value );
 
     // Restore the current index register
-    PLX_PCI_REG_WRITE(
-        pNode,
-        0x84,
-        RegSave
-        );
+    PLX_PCI_REG_WRITE( pNode, 0x84, RegSave );
 
     if (pStatus != NULL)
+    {
         *pStatus = PLX_STATUS_OK;
+    }
 
     return value;
 }
@@ -142,38 +131,24 @@ PlxRegisterWrite_8111(
 
     // Verify register offset
     if ((offset < 0x1000) || (offset > 0x1064))
+    {
         return PLX_STATUS_INVALID_OFFSET;
+    }
 
     // Adjust offset
     offset -= 0x1000;
 
     // Save the current index register
-    PLX_PCI_REG_READ(
-        pNode,
-        0x84,
-        &RegSave
-        );
+    PLX_PCI_REG_READ( pNode, 0x84, &RegSave );
 
     // Set the new index
-    PLX_PCI_REG_WRITE(
-        pNode,
-        0x84,
-        offset
-        );
+    PLX_PCI_REG_WRITE( pNode, 0x84, offset );
 
     // Write the value
-    PLX_PCI_REG_WRITE(
-        pNode,
-        0x88,
-        value
-        );
+    PLX_PCI_REG_WRITE( pNode, 0x88, value );
 
     // Restore the current index register
-    PLX_PCI_REG_WRITE(
-        pNode,
-        0x84,
-        RegSave
-        );
+    PLX_PCI_REG_WRITE( pNode, 0x84, RegSave );
 
     return PLX_STATUS_OK;
 }
@@ -197,20 +172,28 @@ PlxRegisterRead_8000(
     )
 {
     int rc;
-    U16 Offset_PcieCap;
-    U32 value;
-    U32 RegValue;
     U32 OffsetAdjustment;
 
 
     // Verify that register access is setup
     if (pNode->pRegNode == NULL)
     {
-        DebugPrintf(("ERROR: Register access not setup, unable to access PLX registers\n"));
-
+        DebugPrintf(("ERROR: Register access not setup\n"));
         if (pStatus != NULL)
+        {
             *pStatus = PLX_STATUS_INVALID_DATA;
+        }
         return 0;
+    }
+
+
+    // In fabric mode chips, downstream ports may not point to GEP for
+    // register access due to device detection order, so update here
+    if ( (pNode->pRegNode->pRegNode != NULL) &&
+         (pNode->pRegNode != pNode->pRegNode->pRegNode) )
+    {
+        // Synchronize reg node to current, correct one
+        pNode->pRegNode = pNode->pRegNode->pRegNode;
     }
 
     // Check if BAR 0 has been mapped
@@ -219,18 +202,14 @@ PlxRegisterRead_8000(
         DebugPrintf(("Map BAR 0 for PLX reg access\n"));
 
         // Attempt to map BAR 0
-        rc =
-            PlxPciBarResourceMap(
-                pNode->pRegNode,
-                0
-                );
-
+        rc = PlxPciBarResourceMap( pNode->pRegNode, 0 );
         if (rc != 0)
         {
             DebugPrintf(("ERROR: Unable to map BAR 0 for PLX registers\n"));
-
             if (pStatus != NULL)
+            {
                 *pStatus = PLX_STATUS_INSUFFICIENT_RES;
+            }
             return 0;
         }
     }
@@ -243,39 +222,20 @@ PlxRegisterRead_8000(
         if ((pNode->Key.PlxPortType == PLX_SPEC_PORT_UPSTREAM) ||
             (pNode->Key.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM))
         {
-            // Determine port number if hasn't been done
-            if (pNode->PortNumber == (U8)-1)
+            // Update port properties if haven't yet
+            if (pNode->PortProp.PortType == PLX_PORT_UNKNOWN)
             {
-                // Get the offset of the PCI Express capability
-                Offset_PcieCap =
-                    PlxPciFindCapability(
-                        pNode,
-                        PCI_CAP_ID_PCI_EXPRESS,
-                        FALSE,
-                        0
-                        );
-
-                if (Offset_PcieCap == 0)
-                {
-                    // No PCIe capability, default to port 0
-                    pNode->PortNumber = 0;
-                }
-                else
-                {
-                    // Get PCIe Link Capabilities
-                    PLX_PCI_REG_READ(
-                        pNode,
-                        Offset_PcieCap + 0x0C,
-                        &RegValue
-                        );
-
-                    // Get port number
-                    pNode->PortNumber = (U8)((RegValue >> 24) & 0xFF);
-                }
+                PlxGetPortProperties( pNode, &pNode->PortProp );
             }
 
             // Adjust the offset based on port number
-            OffsetAdjustment = (pNode->PortNumber * (4 * 1024));
+            OffsetAdjustment = (pNode->PortProp.PortNumber * (4 * 1024));
+
+            // Port-specific registers start at offset 8MB in Atlas
+            if (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS)
+            {
+                OffsetAdjustment += 0x800000;
+            }
         }
         else if ((pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL) ||
                  (pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK))
@@ -286,8 +246,8 @@ PlxRegisterRead_8000(
 
         // For MIRA enhanced mode, USB EP regs start at 0 instead of port 3
         if ((pNode->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-            (pNode->PciHeaderType == 0) &&
-            (pNode->PortNumber == 3))
+            (pNode->PciHeaderType == PCI_HDR_TYPE_0) &&
+            (pNode->PortProp.PortNumber == 3))
         {
             DebugPrintf(("Override offset adjust for MIRA USB EP (3000 ==> 0)\n"));
             OffsetAdjustment = 0;
@@ -295,7 +255,7 @@ PlxRegisterRead_8000(
 
         DebugPrintf((
             "Adjust offset by %02X for port %d\n",
-            (int)OffsetAdjustment, pNode->PortNumber
+            (int)OffsetAdjustment, pNode->PortProp.PortNumber
             ));
 
         offset += OffsetAdjustment;
@@ -306,12 +266,16 @@ PlxRegisterRead_8000(
     {
         DebugPrintf(("Error - Offset (%02X) exceeds maximum\n", (unsigned)offset));
         if (pStatus != NULL)
+        {
             *pStatus = PLX_STATUS_INVALID_OFFSET;
+        }
         return 0;
     }
 
     if (pStatus != NULL)
+    {
         *pStatus = PLX_STATUS_OK;
+    }
 
     // For Draco 1, some register cause problems if accessed
     if (pNode->Key.PlxFamily == PLX_FAMILY_DRACO_1)
@@ -323,12 +287,7 @@ PlxRegisterRead_8000(
         }
     }
 
-    value =
-        PHYS_MEM_READ_32(
-            pNode->pRegNode->PciBar[0].pVa + offset
-            );
-
-    return value;
+    return PHYS_MEM_READ_32( pNode->pRegNode->PciBar[0].pVa + offset );
 }
 
 
@@ -350,8 +309,6 @@ PlxRegisterWrite_8000(
     )
 {
     int rc;
-    U16 Offset_PcieCap;
-    U32 RegValue;
     U32 OffsetAdjustment;
 
 
@@ -362,18 +319,22 @@ PlxRegisterWrite_8000(
         return PLX_STATUS_INVALID_DATA;
     }
 
+    // In fabric mode chips, downstream ports may not point to GEP for
+    // register access due to device detection order, so update here
+    if ( (pNode->pRegNode->pRegNode != NULL) &&
+         (pNode->pRegNode != pNode->pRegNode->pRegNode) )
+    {
+        // Synchronize reg node to current, correct one
+        pNode->pRegNode = pNode->pRegNode->pRegNode;
+    }
+
     // Check if BAR 0 has been mapped
     if (pNode->pRegNode->PciBar[0].pVa == NULL)
     {
         DebugPrintf(("Map BAR 0 for PLX reg access\n"));
 
         // Attempt to map BAR 0
-        rc =
-            PlxPciBarResourceMap(
-                pNode->pRegNode,
-                0
-                );
-
+        rc = PlxPciBarResourceMap( pNode->pRegNode, 0 );
         if (rc != 0)
         {
             DebugPrintf(("ERROR: Unable to map BAR 0 for PLX registers\n"));
@@ -389,39 +350,20 @@ PlxRegisterWrite_8000(
         if ((pNode->Key.PlxPortType == PLX_SPEC_PORT_UPSTREAM) ||
             (pNode->Key.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM))
         {
-            // Determine port number if hasn't been done
-            if (pNode->PortNumber == (U8)-1)
+            // Update port properties if haven't yet
+            if (pNode->PortProp.PortType == PLX_PORT_UNKNOWN)
             {
-                // Get the offset of the PCI Express capability
-                Offset_PcieCap =
-                    PlxPciFindCapability(
-                        pNode,
-                        PCI_CAP_ID_PCI_EXPRESS,
-                        FALSE,
-                        0
-                        );
-
-                if (Offset_PcieCap == 0)
-                {
-                    // No PCIe capability, default to port 0
-                    pNode->PortNumber = 0;
-                }
-                else
-                {
-                    // Get PCIe Link Capabilities
-                    PLX_PCI_REG_READ(
-                        pNode,
-                        Offset_PcieCap + 0x0C,
-                        &RegValue
-                        );
-
-                    // Get port number
-                    pNode->PortNumber = (U8)((RegValue >> 24) & 0xFF);
-                }
+                PlxGetPortProperties( pNode, &pNode->PortProp );
             }
 
             // Adjust the offset based on port number
-            OffsetAdjustment = (pNode->PortNumber * (4 * 1024));
+            OffsetAdjustment = (pNode->PortProp.PortNumber * (4 * 1024));
+
+            // Port-specific registers start at offset 8MB in Atlas
+            if (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS)
+            {
+                OffsetAdjustment += 0x800000;
+            }
         }
         else if ((pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL) ||
                  (pNode->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK))
@@ -432,8 +374,8 @@ PlxRegisterWrite_8000(
 
         // For MIRA enhanced mode, USB EP regs start at 0 instead of port 3
         if ((pNode->Key.PlxFamily == PLX_FAMILY_MIRA) &&
-            (pNode->PciHeaderType == 0) &&
-            (pNode->PortNumber == 3))
+            (pNode->PciHeaderType == PCI_HDR_TYPE_0) &&
+            (pNode->PortProp.PortNumber == 3))
         {
             DebugPrintf(("Override offset adjust for MIRA USB EP (3000 ==> 0)\n"));
             OffsetAdjustment = 0;
@@ -441,7 +383,7 @@ PlxRegisterWrite_8000(
 
         DebugPrintf((
             "Adjust offset by %02X for port %d\n",
-            (int)OffsetAdjustment, pNode->PortNumber
+            (int)OffsetAdjustment, pNode->PortProp.PortNumber
             ));
 
         offset += OffsetAdjustment;
@@ -464,10 +406,7 @@ PlxRegisterWrite_8000(
         }
     }
 
-    PHYS_MEM_WRITE_32(
-        pNode->pRegNode->PciBar[0].pVa + offset,
-        value
-        );
+    PHYS_MEM_WRITE_32( pNode->pRegNode->PciBar[0].pVa + offset, value );
 
     return PLX_STATUS_OK;
 }
@@ -566,6 +505,12 @@ PlxChipTypeDetect(
                 {
                     offset = 0;
                 }
+
+                // Some Intel devices have a VSEC that matches, so ignore
+                if (pDevice->Key.VendorId == PLX_PCI_VENDOR_ID_INTEL)
+                {
+                    offset = 0;
+                }
             }
             else
             {
@@ -577,8 +522,9 @@ PlxChipTypeDetect(
                     );
                 vsecID = (U8)(regValue >> 24);
 
-                // Valid IDs are 0 or 1
-                if ((vsecID != 0) && (vsecID != 1))
+                // Valid IDs are 0 or 1 & is final capability
+                if ( ((vsecID != 0) && (vsecID != 1)) ||
+                     ((U8)(regValue >> 8) != 0) )
                 {
                     offset = 0;
                 }
@@ -625,6 +571,25 @@ PlxChipTypeDetect(
                           (pDevice->Key.PlxRevision == 0xAA) )
                     {
                         pDevice->Key.PlxRevision = 0xA0;
+                    }
+
+                    // Override MPT EP chip ID
+                    if (pDevice->Key.PlxChip == 0x00B2)
+                    {
+                        // Use the device or subsystem ID, depending upon which is C0xxh
+                        if ((pDevice->Key.DeviceId & 0xFF00) == 0xC000)
+                        {
+                            pDevice->Key.PlxChip = pDevice->Key.DeviceId;
+                        }
+                        else if ((pDevice->Key.SubDeviceId & 0xFF00) == 0xC000)
+                        {
+                            pDevice->Key.PlxChip = pDevice->Key.SubDeviceId;
+                        }
+                        else
+                        {
+                            // MPT in BSW doesn't report C0xx in config space, so just pick one
+                            pDevice->Key.PlxChip = 0xC012;
+                        }
                     }
 
                     // Skip to assigning family
@@ -734,7 +699,15 @@ PlxChipTypeDetect(
             break;
 
         case 0x00213388:        // 6140/6152/6254(NT)
-            if (pDevice->PciHeaderType == 0)
+            // Get PCI header type
+            PLX_PCI_REG_READ(
+                pDevice,
+                PCI_REG_HDR_CACHE_LN,
+                &regValue
+                );
+            regValue = (U8)((regValue >> 16) & 0x7F);
+
+            if (regValue == PCI_HDR_TYPE_0)
             {
                 pDevice->Key.PlxChip = 0x6254;
             }
@@ -950,19 +923,13 @@ _PlxChipAssignFamily:
             break;
 
         case 0x9712:
-        case 0x9713:
         case 0x9716:
-        case 0x9717:
         case 0x9733:
-        case 0x9734:
         case 0x9749:
         case 0x9750:
         case 0x9765:
-        case 0x9766:
         case 0x9781:
-        case 0x9782:
         case 0x9797:
-        case 0x9798:
             pDevice->Key.PlxFamily = PLX_FAMILY_CAPELLA_2;
             break;
 
@@ -970,6 +937,7 @@ _PlxChipAssignFamily:
         case 0xC011:
         case 0xC012:
             pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS;
+            break;
 
         case 0:
             pDevice->Key.PlxFamily = PLX_FAMILY_NONE;

@@ -71,9 +71,9 @@
 #define UPDATE_DISPLAY_SEC              4                                       // Number of seconds between display updates
 #define PlxReg(Va, reg)                 (*(volatile U32 *)(((U8*)Va) + (reg)))  // Macro to access PLX Chip registers
 
- 
- 
- 
+
+
+
 /**********************************************
  *               Functions
  *********************************************/
@@ -460,8 +460,9 @@ PerformDma_8000(
     // Update any DMA properties
     Cons_printf("  Set DMA propeties.............. ");
 
-    // Set to support 128B TLP read request size
-    DmaProp.MaxSrcXferSize = PLX_DMA_MAX_SRC_TSIZE_128B;
+    // Set to support 512B read read request size & 128B write
+    DmaProp.MaxSrcXferSize   = PLX_DMA_MAX_SRC_TSIZE_512B;
+    DmaProp.MaxDestWriteSize = PLX_DMA_MAX_SRC_TSIZE_128B;
 
     status =
         PlxPci_DmaSetProperties(

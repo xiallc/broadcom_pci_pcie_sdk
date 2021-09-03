@@ -87,9 +87,9 @@
     #define API_NAME                     "aardvark"
 #else
   #if defined(_WIN64) || (PLX_CPU_BITS == 64)
-    #define API_NAME                     "PlxI2cAa_x64"
+    #define API_NAME                     "I2cAaUsb_x64"
   #else
-    #define API_NAME                     "PlxI2cAa"
+    #define API_NAME                     "I2cAaUsb"
   #endif
 #endif
 #define API_DEBUG                    AA_DEBUG
@@ -132,13 +132,13 @@ static char SO_NAME[MAX_SO_PATH+1] = API_NAME ".so";
  * These functions allow the Linux behavior to emulate
  * the Windows behavior as specified below in the Windows
  * support section.
- * 
+ *
  * First, search for the shared object in the application
  * binary path, then in the current working directory.
- * 
+ *
  * Searching the application binary path requires /proc
  * filesystem support, which is standard in 2.4.x kernels.
- * 
+ *
  * If the /proc filesystem is not present, the shared object
  * will not be loaded from the execution path unless that path
  * is either the current working directory or explicitly
@@ -288,8 +288,8 @@ static void *_loadFunction (const char *name, int *result) {
                         API_REQ_SW_VERSION & 0xff);
             else
                 fprintf(stderr, "(library version OK)\n");
-                        
-                   
+
+
             fprintf(stderr, "  Library version = v%d.%02d  ",
                     (sw_version >> 8) & 0xff,
                     (sw_version >> 0) & 0xff);

@@ -66,14 +66,14 @@ extern "C" {
 **********************************************/
 PLX_STATUS
 Plx6000_EepromReadByOffset_16(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32              offset,
     U16             *pValue
     );
 
 PLX_STATUS
 Plx6000_EepromWriteByOffset_16(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32              offset,
     U16              value
     );

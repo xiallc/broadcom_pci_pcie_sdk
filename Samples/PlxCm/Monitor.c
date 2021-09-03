@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -53,6 +53,7 @@
 #include "CmdLine.h"
 #include "Monitor.h"
 #include "MonCmds.h"
+#include "PciRegs.h"
 #include "PlxApi.h"
 #include "RegDefs.h"
 
@@ -72,35 +73,37 @@ U64 Gbl_LastRetVal = 0;     // Last return value from a command
 // Setup the function table
 static FN_TABLE Gbl_FnTable[] =
 {
-    { CMD_CLEAR     , FALSE, "cls/clear"               , Cmd_ConsClear  },
-    { CMD_HELP      , FALSE, "help/?"                  , Cmd_Help       },
-    { CMD_EXIT      , FALSE, "exit/quit/q"             , NULL           },
-    { CMD_VERSION   , FALSE, "ver"                     , Cmd_Version    },
-    { CMD_SLEEP     ,  TRUE, "sleep"                   , Cmd_Sleep      },
-    { CMD_SCREEN    ,  TRUE, "screen"                  , Cmd_Screen     },
-    { CMD_THROTTLE  ,  TRUE, "throttle"                , Cmd_Throttle   },
-    { CMD_HISTORY   , FALSE, "history/h/!"             , Cmd_History    },
-    { CMD_BOOT      , FALSE, "boot"                    , Cmd_Boot       },
-    { CMD_RESET     , FALSE, "reset"                   , Cmd_Reset      },
-    { CMD_SCAN      , FALSE, "scan"                    , Cmd_Scan       },
-    { CMD_SET_CHIP  , FALSE, "set_chip"                , Cmd_SetChip    },
-    { CMD_DEV       , FALSE, "dev"                     , Cmd_Dev        },
-    { CMD_I2C       , FALSE, "i2c"                     , Cmd_I2cConnect },
-    { CMD_PCI_CAP   , FALSE, "pci_cap"                 , Cmd_PciCapList },
-    { CMD_PORT_PROP , FALSE, "portinfo"                , Cmd_PortProp   },
-    { CMD_MH_PROP   , FALSE, "mh_prop"                 , Cmd_MH_Prop    },
-    { CMD_VARS      , FALSE, "var/vars"                , Cmd_VarDisplay },
-    { CMD_VAR_SET   ,  TRUE, "set"                     , Cmd_VarSet     },
-    { CMD_BUFFER    , FALSE, "buffer/buff"             , Cmd_ShowBuffer },
-    { CMD_MEM_READ  ,  TRUE, "db/dw/dl/dq"             , Cmd_MemRead    },
-    { CMD_MEM_WRITE ,  TRUE, "eb/ew/el/eq"             , Cmd_MemWrite   },
-    { CMD_IO_READ   ,  TRUE, "ib/iw/il"                , Cmd_IoRead     },
-    { CMD_IO_WRITE  ,  TRUE, "ob/ow/ol"                , Cmd_IoWrite    },
-    { CMD_REG_PCI   ,  TRUE, "pcr/pci"                 , Cmd_RegPci     },
-    { CMD_REG_PLX   ,  TRUE, "reg/mmr/lcr/rtr/dma/mqr" , Cmd_RegPlx     },
-    { CMD_REG_DUMP  ,  TRUE, "dp/dr"                   , Cmd_RegDump    },
-    { CMD_EEP       ,  TRUE, "eep"                     , Cmd_Eep        },
-    { CMD_EEP_FILE  , FALSE, "eep_load/eep_save"       , Cmd_EepFile    },
+    { CMD_CLEAR     , FALSE, "cls/clear"               , Cmd_ConsClear   },
+    { CMD_HELP      , FALSE, "help/?"                  , Cmd_Help        },
+    { CMD_EXIT      , FALSE, "exit/quit/q"             , NULL            },
+    { CMD_VERSION   , FALSE, "ver"                     , Cmd_Version     },
+    { CMD_SLEEP     ,  TRUE, "sleep"                   , Cmd_Sleep       },
+    { CMD_SCREEN    ,  TRUE, "screen"                  , Cmd_Screen      },
+    { CMD_THROTTLE  ,  TRUE, "throttle"                , Cmd_Throttle    },
+    { CMD_HISTORY   , FALSE, "history/h/!"             , Cmd_History     },
+    { CMD_RESET     , FALSE, "reset"                   , Cmd_Reset       },
+    { CMD_SCAN      , FALSE, "scan"                    , Cmd_Scan        },
+    { CMD_SET_CHIP  , FALSE, "setchip/set_chip"        , Cmd_SetChip     },
+    { CMD_DEV       , FALSE, "dev"                     , Cmd_Dev         },
+    { CMD_I2C       , FALSE, "i2c"                     , Cmd_I2cConnect  },
+    { CMD_MDIO      , FALSE, "mdio"                    , Cmd_MdioConnect },
+    { CMD_SDB       , FALSE, "sdb"                     , Cmd_SdbConnect  },
+    { CMD_PCI_CAP   , FALSE, "pcicap/pci_cap"          , Cmd_PciCapList  },
+    { CMD_PORT_PROP , FALSE, "portprop/portinfo"       , Cmd_PortProp    },
+    { CMD_MH_PROP   , FALSE, "mh_prop"                 , Cmd_MH_Prop     },
+    { CMD_VARS      , FALSE, "var/vars"                , Cmd_VarDisplay  },
+    { CMD_VAR_SET   ,  TRUE, "set"                     , Cmd_VarSet      },
+    { CMD_BUFFER    , FALSE, "buffer/buff"             , Cmd_ShowBuffer  },
+    { CMD_MEM_READ  ,  TRUE, "db/dw/dl/dq"             , Cmd_MemRead     },
+    { CMD_MEM_WRITE ,  TRUE, "eb/ew/el/eq"             , Cmd_MemWrite    },
+    { CMD_IO_READ   ,  TRUE, "ib/iw/il"                , Cmd_IoRead      },
+    { CMD_IO_WRITE  ,  TRUE, "ob/ow/ol"                , Cmd_IoWrite     },
+    { CMD_REG_PCI   ,  TRUE, "pcr/pci"                 , Cmd_RegPci      },
+    { CMD_REG_PLX   ,  TRUE, "reg/mmr/lcr/rtr/dma/mqr" , Cmd_RegPlx      },
+    { CMD_REG_DUMP  ,  TRUE, "dp/dr"                   , Cmd_RegDump     },
+    { CMD_EEP       ,  TRUE, "eep"                     , Cmd_Eep         },
+    { CMD_EEP_FILE  , FALSE, "eep_load/eep_save"       , Cmd_EepFile     },
+    { CMD_NVME_PROP , FALSE, "nvmeprop/nvme"           , Cmd_NvmeProp    },
     { CMD_FINAL     , FALSE, "", NULL }    // Must be last entry
 };
 
@@ -117,7 +120,6 @@ static HELP_TABLE Gbl_HelpTable[] =
     { CMD_SLEEP     , "sleep <ms>"          , "Sleeps for the specified number of milliseconds" },
     { CMD_SCREEN    , "screen [NumLines]"   , "Display current screen size or change to specified NumLines" },
     { CMD_HISTORY   , "history/h/!"         , "" },
-    { CMD_BOOT      , "boot"                , "" },
     { CMD_RESET     , "reset"               , "" },
     { CMD_SCAN      , "scan"                , "" },
     { CMD_SET_CHIP  , "set_chip"            , "" },
@@ -193,7 +195,9 @@ main(
     // Process command-line
     ExitCode = ProcessMonitorParams( argc, argv );
     if (ExitCode != 0)
+    {
         goto __Exit_App;
+    }
 
     // Start the monitor
     Monitor();
@@ -319,10 +323,7 @@ Monitor(
     Gbl_pNodeCurrent = NULL;
 
     // Build PCI device list
-    DeviceListCreate(
-        PLX_API_MODE_PCI,
-        NULL
-        );
+    DeviceListCreate( PLX_API_MODE_PCI, NULL );
 
     // Select first PLX device
     Gbl_pNodeCurrent =
@@ -331,22 +332,10 @@ Monitor(
             TRUE        // PLX only device
             );
 
-    if (Gbl_pNodeCurrent == NULL)
-    {
-        Cons_printf("ERROR: No PCI devices/drivers detected\n");
-#if !defined(PLX_MSWINDOWS)
-        // Exit if other methods not supported (eg I2C)
-        return;
-#endif
-    }
-
-    // Select the device
     if (Gbl_pNodeCurrent != NULL)
     {
-        PlxPci_DeviceOpen(
-            &Gbl_pNodeCurrent->Key,
-            &Gbl_DeviceObj
-            );
+        // Select the device
+        PlxPci_DeviceOpen( &Gbl_pNodeCurrent->Key, &Gbl_DeviceObj );
 
         // Map valid PCI BAR spaces
         PciSpacesMap( &Gbl_DeviceObj );
@@ -365,7 +354,7 @@ Monitor(
 
     if (Gbl_pNodeCurrent == NULL)
     {
-        Cons_printf("\n* Use 'i2c' command to connect over I2C or 'q' to exit *\n\n");
+        Cons_printf("\n* Use i2c/mdio/sdb to connect over I2C/MDIO/SDB or 'q' to exit *\n\n");
     }
     else
     {
@@ -415,7 +404,9 @@ Monitor(
 
             // Wait for keypress
             if (Gbl_pScriptFile == NULL)
+            {
                 NextInp = Cons_getch();
+            }
         }
         else
         {
@@ -443,9 +434,13 @@ Monitor(
                 {
                     // Set device object parameter to pass
                     if (Gbl_pNodeCurrent == NULL)
+                    {
                         pDevice = NULL;
+                    }
                     else
+                    {
                         pDevice = &Gbl_DeviceObj;
+                    }
 
                     // Process the command
                     pCmd = ProcessCommand( pDevice, buffer );
@@ -496,7 +491,9 @@ Monitor(
                     {
                         buffer[i] = buffer[i+1];
                         if (buffer[i+1] == '\0')
+                        {
                             Cons_printf(" \b");
+                        }
                         else
                         {
                             Cons_printf("%c", buffer[i]);
@@ -522,7 +519,9 @@ Monitor(
             case CONS_KEY_ESCAPE:
                 // If another key already pending, then extended code
                 if (Cons_kbhit())
+                {
                     break;
+                }
 
                 // Delay for a bit to wait for additional keys
                 Plx_sleep(10);
@@ -663,9 +662,13 @@ Monitor(
                     case CONS_KEY_INSERT:
                         bInsertMode ^= 1;
                         if (bInsertMode)
+                        {
                             ConsoleCursorPropertiesSet( CONS_CURSOR_INSERT );
+                        }
                         else
+                        {
                             ConsoleCursorPropertiesSet( CONS_CURSOR_DEFAULT );
+                        }
                         break;
 
                     case CONS_KEY_DELETE:
@@ -675,7 +678,9 @@ Monitor(
                         {
                             buffer[i] = buffer[i+1];
                             if (buffer[i+1] == '\0')
+                            {
                                 Cons_printf(" \b");
+                            }
                             else
                             {
                                 Cons_printf("%c", buffer[i]);
@@ -700,7 +705,9 @@ Monitor(
 
                 // Linux also adds '~' in some cases, so ignore it
                 if (Cons_kbhit())
+                {
                     Cons_getch();
+                }
 
                 // Update command line if requested to
                 if (bFlag)
@@ -796,7 +803,9 @@ ProcessCommand(
     pCmd = CmdLine_CmdAdd( buffer, Gbl_FnTable );
 
     if (pCmd == NULL)
+    {
         return NULL;
+    }
 
     if (pCmd->pCmdRoutine == NULL)
     {
@@ -813,7 +822,9 @@ ProcessCommand(
     {
         // Check for command-line parsing errors
         if (pCmd->bErrorParse)
+        {
             return NULL;
+        }
 
         // Call the command
         pCmd->pCmdRoutine( pDevice, pCmd );
@@ -840,7 +851,7 @@ DeviceSelectByIndex(
     DEVICE_NODE *pNode;
 
 
-    // Get 
+    // Get
     pNode =
         DeviceNodeGetByNum(
             index,
@@ -848,14 +859,18 @@ DeviceSelectByIndex(
             );
 
     if (pNode == NULL)
+    {
         return NULL;
+    }
 
     // De-select current device if selected
     if (Gbl_pNodeCurrent != NULL)
     {
         // Do nothing if re-selecting same node
         if (pNode == Gbl_pNodeCurrent)
+        {
             return pNode;
+        }
 
         Gbl_pNodeCurrent->bSelected = FALSE;
         PciSpacesUnmap( &Gbl_DeviceObj );
@@ -866,10 +881,7 @@ DeviceSelectByIndex(
     }
 
     // Select new device
-    PlxPci_DeviceOpen(
-        &pNode->Key,
-        &Gbl_DeviceObj
-        );
+    PlxPci_DeviceOpen( &pNode->Key, &Gbl_DeviceObj );
 
     // Update current node
     Gbl_pNodeCurrent = pNode;
@@ -909,7 +921,7 @@ PciSpacesMap(
     if (Gbl_pNodeCurrent == NULL)
         return;
 
-    for (i=0; i<6; i++)
+    for (i = 0; i < PCI_NUM_BARS_TYPE_00; i++)
     {
         // Map PCI BAR into user space
         PlxPci_PciBarMap(
@@ -955,9 +967,11 @@ PciSpacesUnmap(
 
     // Skip if no device is selected
     if (Gbl_pNodeCurrent == NULL)
+    {
         return;
+    }
 
-    for (i=0; i<6; i++)
+    for (i = 0; i < PCI_NUM_BARS_TYPE_00; i++)
     {
         if (Gbl_pNodeCurrent->Va_PciBar[i] != 0)
         {
@@ -999,18 +1013,12 @@ CommonBufferMap(
 
 
     // Get PCI buffer properties
-    PlxPci_CommonBufferProperties(
-        pDevice,
-        &PciBuffer
-        );
+    PlxPci_CommonBufferProperties( pDevice, &PciBuffer );
 
     if (PciBuffer.Size != 0)
     {
         // Map buffer into user space
-        PlxPci_CommonBufferMap(
-            pDevice,
-            &pBuffer
-            );
+        PlxPci_CommonBufferMap( pDevice, &pBuffer );
 
         // Add to variable table
         if (pBuffer != 0)
@@ -1053,10 +1061,7 @@ CommonBufferUnmap(
         pBuffer = (VOID*)htol( pVar->strValue );
 
         // Unmap buffer
-        PlxPci_CommonBufferUnmap(
-            pDevice,
-            &pBuffer
-            );
+        PlxPci_CommonBufferUnmap( pDevice, &pBuffer );
 
         // Remove variable from table
         CmdLine_VarDelete(

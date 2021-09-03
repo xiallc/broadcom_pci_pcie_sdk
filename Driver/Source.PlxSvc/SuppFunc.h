@@ -2,7 +2,7 @@
 #define __SUPPORT_FN_H
 
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      01-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -113,6 +113,11 @@ PlxProbePciBarSpaces(
 
 BOOLEAN
 PlxDeterminePlxPortType(
+    PLX_DEVICE_NODE *pdx
+    );
+
+BOOLEAN
+PlxSetupRegisterAccess(
     PLX_DEVICE_NODE *pdx
     );
 

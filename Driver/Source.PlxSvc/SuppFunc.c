@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      03-01-17 : PLX SDK v7.25
+ *      01-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -105,7 +105,8 @@ PlxPciFindCapability(
 
 
     // Verify PCI header is not Type 2
-    if ((pDevice->PciHeaderType != 0) && (pDevice->PciHeaderType != 1))
+    if ((pDevice->PciHeaderType != PCI_HDR_TYPE_0) &&
+        (pDevice->PciHeaderType != PCI_HDR_TYPE_1))
     {
         ErrorPrintf((
             "Error: PCI header type (%d) not 0 or 1\n",
@@ -255,7 +256,7 @@ PlxPciBarResourceMap(
     // Verify BAR index
     switch (pDevice->PciHeaderType)
     {
-        case 0:
+        case PCI_HDR_TYPE_0:
             if ((BarIndex != 0) && (BarIndex > 5))
             {
                 DebugPrintf(("Invalid PCI BAR (%d) specified\n", BarIndex));
@@ -263,7 +264,7 @@ PlxPciBarResourceMap(
             }
             break;
 
-        case 1:
+        case PCI_HDR_TYPE_1:
             if ((BarIndex != 0) && (BarIndex != 1))
             {
                 DebugPrintf(("PCI BAR %d does not exist on PCI type 1 headers\n", BarIndex));
@@ -272,7 +273,7 @@ PlxPciBarResourceMap(
             break;
 
         default:
-            DebugPrintf(("PCI Header Type %d is not supported for PCI BAR mappings\n", pDevice->PciHeaderType));
+            DebugPrintf(("PCI Header Type %d is not supported\n", pDevice->PciHeaderType));
             return (-1);
     }
 
@@ -345,11 +346,11 @@ PlxPciBarResourcesUnmap(
     U8 MaxBar;
 
 
-    if (pDevice->PciHeaderType == 0)
+    if (pDevice->PciHeaderType == PCI_HDR_TYPE_0)
     {
         MaxBar = PCI_NUM_BARS_TYPE_00;
     }
-    else if (pDevice->PciHeaderType == 1)
+    else if (pDevice->PciHeaderType == PCI_HDR_TYPE_1)
     {
         MaxBar = PCI_NUM_BARS_TYPE_01;
     }
@@ -594,11 +595,7 @@ PlxDeviceListBuild(
         DeviceCount++;
 
         // Allocate memory for new node
-        pDevice =
-            kmalloc(
-                sizeof(PLX_DEVICE_NODE),
-                GFP_KERNEL
-                );
+        pDevice = kmalloc( sizeof(PLX_DEVICE_NODE), GFP_KERNEL );
 
         // Clear node
         RtlZeroMemory( pDevice, sizeof(PLX_DEVICE_NODE) );
@@ -633,7 +630,6 @@ PlxDeviceListBuild(
         if (pDevice->Key.VendorId == PLX_PCI_VENDOR_ID_PLX)
         {
             PLX_PCI_REG_READ( pDevice, PCI_REG_CMD_STAT, &RegValue );
-
             if ((RegValue & 0x7) == 0)
             {
                 // Enable device but don't clear any PCI error status
@@ -643,11 +639,11 @@ PlxDeviceListBuild(
         }
 
         // Set subsystem ID offset
-        if (pDevice->PciHeaderType == 0)
+        if (pDevice->PciHeaderType == PCI_HDR_TYPE_0)
         {
             offset = PCI_REG_TO_SUBSYS_ID;
         }
-        else if (pDevice->PciHeaderType == 1)
+        else if (pDevice->PciHeaderType == PCI_HDR_TYPE_1)
         {
             // For PCI type 1, get Subsystem ID from capability
             offset =
@@ -687,11 +683,36 @@ PlxDeviceListBuild(
         // Set PLX chip version
         PlxChipTypeDetect( pDevice, FALSE );
 
-        // Set port number as unknown
-        pDevice->PortNumber = (U8)-1;
+        // Flag port properties as not yet probed
+        pDevice->PortProp.PortType = PLX_PORT_UNKNOWN;
 
         // Set default EEPROM width (for 8111/8112 series)
         pDevice->Default_EepWidth = 2;
+
+        // OS may place switch ports in low power state (D3)
+        if ( (pDevice->Key.PlxChip != 0) &&
+             (pDevice->PciHeaderType == PCI_HDR_TYPE_1) )
+        {
+            // Get power management capability
+            offset =
+                PlxPciFindCapability(
+                    pDevice,
+                    PCI_CAP_ID_POWER_MAN,
+                    FALSE,
+                    0
+                    );
+            if (offset != 0)
+            {
+                // Ensure PM state is D0 (PM 04h[1:0]=0)
+                PLX_PCI_REG_READ( pDevice, offset + 0x4, &RegValue );
+                if ((RegValue & 0x3) != PCI_CAP_PM_STATE_D0)
+                {
+                    RegValue &= ~(U32)0x3;
+                    RegValue |= (PCI_CAP_PM_STATE_D0 << 0);
+                    PLX_PCI_REG_WRITE( pDevice, offset + 0x4, RegValue );
+                }
+            }
+        }
 
         // Jump to next device
         pPciDev =
@@ -719,41 +740,16 @@ PlxDeviceListBuild(
         // Find & assign parent P2P device
         PlxAssignParentDevice( pdx, pDevice );
 
-        // Set register access device back to itself
-        pDevice->pRegNode = pDevice;
-
-        // For some 8000 devices, upstream port must be used for reg access
-        if (((pDevice->Key.PlxChip & 0xFF00) == 0x2300) ||
-            ((pDevice->Key.PlxChip & 0xFF00) == 0x3300) ||
-            ((pDevice->Key.PlxChip & 0xFF00) == 0x8500) ||
-            ((pDevice->Key.PlxChip & 0xFF00) == 0x8600) ||
-            ((pDevice->Key.PlxChip & 0xFF00) == 0x8700) ||
-            ((pDevice->Key.PlxChip & 0xFF00) == 0x9700) ||
-            ((pDevice->Key.PlxChip & 0xFF00) == 0xC000))
-        {
-            // Read BAR 0
-            PLX_PCI_REG_READ( pDevice, PCI_REG_BAR_0, &RegValue );
-
-            // If BAR 0 not enabled, use parent upstream port
-            if (RegValue == 0)
-            {
-                pDevice->pRegNode = pDevice->pParent;
-            }
-
-            // For Capella-2, update upstream port to GEP for BAR 0
-            if ((pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) &&
-                (pDevice->Key.DeviceId == 0x1009))
-            {
-                if (pDevice->pParent && pDevice->pParent->pParent)
-                {
-                    pDevice->pParent->pParent->pRegNode = pDevice;
-                }
-            }
-        }
-
-        // For PLX chips, set PLX-specific port type
+        // For PLX chips, get port properties & set PLX-specific port type
         if (pDevice->Key.PlxChip)
         {
+            // Get port properties
+            PlxGetPortProperties( pDevice, &pDevice->PortProp );
+
+            // Setup for future internal register access
+            PlxSetupRegisterAccess( pDevice );
+
+            // Determine additional port type details
             PlxDeterminePlxPortType( pDevice );
         }
 
@@ -764,7 +760,7 @@ PlxDeviceListBuild(
         // Enhanced Mode (PCIe Switch + USB EP). Some features not available in Enhanced mode.
         if (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA)
         {
-            if (pDevice->PciHeaderType == 1)
+            if (pDevice->PciHeaderType == PCI_HDR_TYPE_1)
             {
                 // For US/DS ports, device must be in Enhanced mode
                 pDevice->Key.DeviceMode = PLX_PORT_ENDPOINT;
@@ -840,7 +836,7 @@ PlxAssignParentDevice(
                 );
 
         // If this is a P2P device, get its owned buses
-        if (pCurrNode->PciHeaderType == 1)
+        if (pCurrNode->PciHeaderType == PCI_HDR_TYPE_1)
         {
             PLX_PCI_REG_READ(
                 pCurrNode,
@@ -890,12 +886,12 @@ PlxProbePciBarSpaces(
     // Set max BAR index
     switch (pdx->PciHeaderType)
     {
-        case 0:
-            NumBars = 6;
+        case PCI_HDR_TYPE_0:
+            NumBars = PCI_NUM_BARS_TYPE_00;
             break;
 
-        case 1:
-            NumBars = 2;
+        case PCI_HDR_TYPE_1:
+            NumBars = PCI_NUM_BARS_TYPE_01;
             break;
 
         default:
@@ -1011,19 +1007,18 @@ PlxDeterminePlxPortType(
     PLX_DEVICE_NODE *pDevice
     )
 {
-    U8            *pRegVa;
-    U32            RegPci;
-    U32            RegSave;
-    U32            RegPciBar0;
-    U32            RegExpected;
-    PLX_PORT_PROP  PortProp;
+    U8  *pRegVa;
+    U32  RegPci;
+    U32  RegSave;
+    U32  RegPciBar0;
+    U32  RegExpected;
 
 
     // Default to unknown type
     pDevice->Key.PlxPortType = PLX_SPEC_PORT_UNKNOWN;
 
     // Type 1 PCI devices
-    if (pDevice->PciHeaderType == 1)
+    if (pDevice->PciHeaderType == PCI_HDR_TYPE_1)
     {
         if ((pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCI_P2P) ||
             (pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCIE_P2P))
@@ -1032,14 +1027,18 @@ PlxDeterminePlxPortType(
         }
         else
         {
-            // Get PCIe properties to differentiate between UP/DS
-            PlxGetPortProperties( pDevice, &PortProp );
+            // Update port properties if haven't yet
+            if (pDevice->PortProp.PortType == PLX_PORT_UNKNOWN)
+            {
+                PlxGetPortProperties( pDevice, &pDevice->PortProp );
+            }
 
-            if (PortProp.PortType == PLX_PORT_UPSTREAM)
+            // Differentiate between UP/DS
+            if (pDevice->PortProp.PortType == PLX_PORT_UPSTREAM)
             {
                 pDevice->Key.PlxPortType = PLX_SPEC_PORT_UPSTREAM;
             }
-            else if (PortProp.PortType == PLX_PORT_DOWNSTREAM)
+            else if (pDevice->PortProp.PortType == PLX_PORT_DOWNSTREAM)
             {
                 pDevice->Key.PlxPortType = PLX_SPEC_PORT_DOWNSTREAM;
             }
@@ -1073,6 +1072,11 @@ PlxDeterminePlxPortType(
         // Synthetic NT 2.0 EP
         pDevice->Key.PlxPortType = PLX_SPEC_PORT_SYNTH_NT;
     }
+    else if (pDevice->Key.SubDeviceId == 0x2005)
+    {
+        // Synthetic gDMA EP
+        pDevice->Key.PlxPortType = PLX_SPEC_PORT_SYNTH_GDMA;
+    }
     else if ((pDevice->Key.DeviceId == 0x1008) ||
              (pDevice->Key.DeviceId == 0x02AB) ||
              (pDevice->Key.DeviceId == 0x02B2))
@@ -1080,9 +1084,14 @@ PlxDeterminePlxPortType(
         // Synthetic Enabler EP
         pDevice->Key.PlxPortType = PLX_SPEC_PORT_SYNTH_EN_EP;
     }
-    else if ((pDevice->Key.DeviceId == 0x00B0) ||
-             (pDevice->Key.DeviceId == 0x00B2) ||
-             (pDevice->Key.SubDeviceId == 0x00B2))
+    else if ( ((pDevice->Key.DeviceId & 0xFF00) == 0xC000) &&
+              ((pDevice->Key.SubDeviceId == 0x00B2) ||
+               (pDevice->Key.SubDeviceId == 0x0032)) )  // Incorrect ID on FPGA
+    {
+        // MPT EP without SES support
+        pDevice->Key.PlxPortType = PLX_SPEC_PORT_MPT_NO_SES;
+    }
+    else if (pDevice->Key.DeviceId == 0x00B2)
     {
         // Search for a PCI vendor-specific capability
         RegPci =
@@ -1241,7 +1250,7 @@ PlxDeterminePlxPortType(
                 RegPciBar0 &= ~0xF;
 
                 // Set register offset
-                pRegVa = PLX_INT_TO_PTR(RegPciBar0 + pDevice->Offset_NtRegBase + 0x3C);
+                pRegVa = PLX_INT_TO_PTR(RegPciBar0 + pDevice->Offset_NtRegBase + PCI_REG_INT_PIN_LN);
 
                 // Store original value
                 RegSave = (U32)PlxPhysicalMemRead( PLX_PTR_TO_INT(pRegVa), sizeof(U32) );
@@ -1264,7 +1273,7 @@ PlxDeterminePlxPortType(
                     pDevice->Key.bus,
                     pDevice->Key.slot,
                     pDevice->Key.function,
-                    0x3C,
+                    PCI_REG_INT_PIN_LN,
                     &RegPci
                     );
 
@@ -1274,7 +1283,7 @@ PlxDeterminePlxPortType(
             else
             {
                 // Set register offset
-                pRegVa = pRegVa + pDevice->Offset_NtRegBase + 0x3C;
+                pRegVa = pRegVa + pDevice->Offset_NtRegBase + PCI_REG_INT_PIN_LN;
 
                 // Store original value
                 RegSave = PHYS_MEM_READ_32( (U32*)pRegVa );
@@ -1291,7 +1300,7 @@ PlxDeterminePlxPortType(
                     pDevice->Key.bus,
                     pDevice->Key.slot,
                     pDevice->Key.function,
-                    0x3C,
+                    PCI_REG_INT_PIN_LN,
                     &RegPci
                     );
 
@@ -1314,13 +1323,110 @@ PlxDeterminePlxPortType(
     }
 
     DebugPrintf((
-        "%04X NT @ [%02X:%02X.0] is %s-side (NT base=%Xh)\n",
-        pDevice->Key.PlxChip, pDevice->Key.bus, pDevice->Key.slot,
+        "[D%d %02X:%02X.0] %04X NT is %s-side (NT base=%Xh)\n",
+        pDevice->Key.domain, pDevice->Key.bus, pDevice->Key.slot,
+        pDevice->Key.PlxChip,
         (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "LINK" : "VIRTUAL",
         (int)pDevice->Offset_NtRegBase
         ));
 
     return TRUE;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  PlxSetupRegisterAccess
+ *
+ * Description:  Sets up the device object for future internal register access
+ *
+ ******************************************************************************/
+BOOLEAN
+PlxSetupRegisterAccess(
+    PLX_DEVICE_NODE *pdx
+    )
+{
+    PLX_DEVICE_NODE *pdxParent;
+
+
+    // Update port properties if haven't yet
+    if (pdx->PortProp.PortType == PLX_PORT_UNKNOWN)
+    {
+        PlxGetPortProperties( pdx, &pdx->PortProp );
+    }
+
+    // Default register access device back to itself
+    pdx->pRegNode = pdx;
+
+    // Nothing else to do for non-PCIe devices or have BAR 0
+    if ( (pdx->PortProp.bNonPcieDevice == TRUE) ||
+         (pdx->PciBar[0].Properties.BarValue != 0) )
+    {
+        // If GEP, then fabric mode, so update upstream port to GEP for BAR 0
+        if (pdx->Key.DeviceId == 0x1009)
+        {
+            if ( (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) ||
+                 (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS) )
+            {
+                if (pdx->pParent && pdx->pParent->pParent)
+                {
+                    // GEP -> DS -> UP
+                    pdx->pParent->pParent->pRegNode = pdx;
+                }
+            }
+        }
+        return TRUE;
+    }
+
+    //
+    // For PCIe switch devices, first upstream port or GEP (fabric mode) BAR 0 is used
+    //
+
+    // Start at current device
+    pdxParent = pdx;
+
+    do
+    {
+        // Verify parent is valid
+        if (pdxParent->pParent == NULL)
+        {
+            return FALSE;
+        }
+
+        // If parent is different chip, halt traversal & use current device for access
+        if (pdx->Key.PlxChip != pdxParent->pParent->Key.PlxChip)
+        {
+            pdx->pRegNode = pdxParent->pRegNode;
+            return FALSE;
+        }
+
+        // Go to next parent device
+        pdxParent = pdxParent->pParent;
+
+        // If parent has BAR 0, use for access
+        if (pdxParent->PciBar[0].Properties.BarValue != 0)
+        {
+            pdx->pRegNode = pdxParent;
+            return TRUE;
+        }
+
+        // If parent has already determined its access, copy it.
+        if ( (pdxParent->pRegNode != NULL) &&
+             (pdxParent->pRegNode->PciBar[0].Properties.BarValue != 0) )
+        {
+            pdx->pRegNode = pdxParent->pRegNode;
+            return TRUE;
+        }
+    }
+    while (pdxParent);
+
+    ErrorPrintf((
+        "ERROR: No register access node found for [D%d %02X:%02X.%X]\n",
+        pdx->Key.domain, pdx->Key.bus, pdx->Key.slot, pdx->Key.function
+        ));
+    return FALSE;
 }
 
 
@@ -1356,9 +1462,10 @@ GetDeviceNodeFromKey(
                 ListEntry
                 );
 
-        if ((pDevice->Key.bus      == pKey->bus) &&
-            (pDevice->Key.slot     == pKey->slot) &&
-            (pDevice->Key.function == pKey->function))
+        if ( (pDevice->Key.domain   == pKey->domain) &&
+             (pDevice->Key.bus      == pKey->bus)    &&
+             (pDevice->Key.slot     == pKey->slot)   &&
+             (pDevice->Key.function == pKey->function) )
         {
             return pDevice;
         }

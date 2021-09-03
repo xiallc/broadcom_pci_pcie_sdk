@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2016 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      07-01-14 : PLX SDK v7.20
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -180,7 +180,9 @@ PlxChipTypeDetect(
             pdx->Key.PlxChip = 0x6540;
 
             if (pdx->Key.Revision == 0x2)
+            {
                 pdx->Key.PlxRevision = 0xBB;
+            }
             break;
 
         default:
@@ -214,9 +216,13 @@ PlxDetermineNtPortSide(
 {
     // On 6000-series devices, bit 0 set if primary side & bit 1 set for secondary
     if (pdx->Key.DeviceId & (1 << 0))
+    {
         pdx->Key.PlxPortType = PLX_SPEC_PORT_NT_VIRTUAL;
+    }
     else if (pdx->Key.DeviceId & (1 << 1))
+    {
         pdx->Key.PlxPortType = PLX_SPEC_PORT_NT_LINK;
+    }
     else
     {
         DebugPrintf(("Error: Unable to determine NT side\n"));

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,12 +43,12 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      11-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <asm/uaccess.h>    // For copy_to/from_user()
+#include <linux/uaccess.h>  // For copy_to/from_user()
 #include <linux/sched.h>    // For MAX_SCHED_TIMEOUT & TASK_UNINTERRUPTIBLE
 #include "ApiFunc.h"
 #include "Eep_8000.h"
@@ -99,28 +99,14 @@ PlxDeviceFind(
         // Compare device key information
         //
 
-        // Compare Bus number
-        if (pKey->bus != (U8)PCI_FIELD_IGNORE)
+        // Compare Bus, Slot, Fn numbers
+        if ( (pKey->bus      != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->slot     != (U8)PCI_FIELD_IGNORE) ||
+             (pKey->function != (U8)PCI_FIELD_IGNORE) )
         {
-            if (pKey->bus != pdx->Key.bus)
-            {
-                bMatchLoc = FALSE;
-            }
-        }
-
-        // Compare Slot number
-        if (pKey->slot != (U8)PCI_FIELD_IGNORE)
-        {
-            if (pKey->slot != pdx->Key.slot)
-            {
-                bMatchLoc = FALSE;
-            }
-        }
-
-        // Compare Function number
-        if (pKey->function != (U8)PCI_FIELD_IGNORE)
-        {
-            if (pKey->function != pdx->Key.function)
+            if ( (pKey->bus      != pdx->Key.bus)  ||
+                 (pKey->slot     != pdx->Key.slot) ||
+                 (pKey->function != pdx->Key.function) )
             {
                 bMatchLoc = FALSE;
             }
@@ -1843,10 +1829,7 @@ PlxNotificationRegisterFor(
         flags
         );
 
-    DebugPrintf((
-        "Registered interrupt wait object (%p)\n",
-        pWaitObject
-        ));
+    DebugPrintf(("Registered interrupt wait object (%p)\n", pWaitObject));
 
     return PLX_STATUS_OK;
 }
@@ -1904,7 +1887,7 @@ PlxNotificationWait(
                 );
 
             DebugPrintf((
-                "Waiting for Interrupt wait object (%p) to wake-up\n",
+                "Wait for Interrupt wait object (%p) to wake-up\n",
                 pWaitObject
                 ));
 
@@ -2020,13 +2003,13 @@ PlxNotificationWait(
 
 
 
-/*******************************************************************************
+/******************************************************************************
  *
  * Function   :  PlxNotificationStatus
  *
  * Description:  Returns the interrupt(s) that have caused notification events
  *
- ******************************************************************************/
+ *****************************************************************************/
 PLX_STATUS
 PlxNotificationStatus(
     DEVICE_EXTENSION *pdx,
@@ -2040,10 +2023,7 @@ PlxNotificationStatus(
     PLX_INTERRUPT_DATA  IntData;
 
 
-    spin_lock_irqsave(
-        &(pdx->Lock_WaitObjectsList),
-        flags
-        );
+    spin_lock_irqsave( &(pdx->Lock_WaitObjectsList), flags );
 
     pEntry = pdx->List_WaitObjects.next;
 
@@ -2069,13 +2049,10 @@ PlxNotificationStatus(
             pWaitObject->Source_Ints     = INTR_TYPE_NONE;
             pWaitObject->Source_Doorbell = 0;
 
-            spin_unlock_irqrestore(
-                &(pdx->Lock_WaitObjectsList),
-                flags
-                );
+            spin_unlock_irqrestore( &(pdx->Lock_WaitObjectsList), flags );
 
             DebugPrintf((
-                "Returning status for interrupt wait object (%p)...\n",
+                "Return status for interrupt wait object (%p)...\n",
                 pWaitObject
                 ));
 
@@ -2111,10 +2088,7 @@ PlxNotificationStatus(
         pEntry = pEntry->next;
     }
 
-    spin_unlock_irqrestore(
-        &(pdx->Lock_WaitObjectsList),
-        flags
-        );
+    spin_unlock_irqrestore( &(pdx->Lock_WaitObjectsList), flags );
 
     return PLX_STATUS_FAILED;
 }
@@ -2181,14 +2155,12 @@ PlxNotificationCancel(
         if (bRemove)
         {
             DebugPrintf((
-                "Removing interrupt wait object (%p)...\n",
+                "Remove interrupt wait object (%p)...\n",
                 pWaitObject
                 ));
 
             // Remove the object from the list
-            list_del(
-                pEntry
-                );
+            list_del( pEntry );
 
             spin_unlock_irqrestore(
                 &(pdx->Lock_WaitObjectsList),
@@ -2201,15 +2173,13 @@ PlxNotificationCancel(
             // Wake-up processes if wait object is pending
             if (atomic_read(&pWaitObject->SleepCount) != 0)
             {
-                DebugPrintf(("Wait object is pending in another thread, forcing wake up\n"));
+                DebugPrintf(("Wait object pending in another thread, forcing wake up\n"));
 
                 // Mark object for deletion
                 pWaitObject->state = PLX_STATE_MARKED_FOR_DELETE;
 
                 // Wake-up any process waiting on the object
-                wake_up_interruptible(
-                    &(pWaitObject->WaitQueue)
-                    );
+                wake_up_interruptible( &(pWaitObject->WaitQueue) );
 
                 do
                 {
@@ -2225,7 +2195,6 @@ PlxNotificationCancel(
                 while (LoopCount && (atomic_read(&pWaitObject->SleepCount) != 0));
             }
 
-
             if (LoopCount == 0)
             {
                 DebugPrintf(("ERROR: Timeout waiting for pending thread, unable to free wait object\n"));
@@ -2233,9 +2202,7 @@ PlxNotificationCancel(
             else
             {
                 // Release the list object
-                kfree(
-                    pWaitObject
-                    );
+                kfree( pWaitObject );
             }
 
             // Return if removing only a specific object

@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *      01-01-17 : PLX SDK v7.25
+ *      06-01-19 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -97,10 +97,8 @@ extern "C" {
     typedef __u32                 U32;
     typedef __s64                 S64;
     typedef __u64                 U64;
-    #define PLX_SIZE_64           8
     typedef signed long           PLX_INT_PTR;        // For 32/64-bit code compatability
     typedef unsigned long         PLX_UINT_PTR;
-
     typedef int                   HANDLE;
     typedef int                   PLX_DRIVER_HANDLE;  // Linux-specific driver handle
 
@@ -125,10 +123,8 @@ extern "C" {
     typedef u32                   U32;
     typedef s64                   S64;
     typedef u64                   U64;
-    #define PLX_SIZE_64           8
     typedef signed long           PLX_INT_PTR;        // For 32/64-bit code compatability
     typedef unsigned long         PLX_UINT_PTR;
-
     typedef int                   PLX_DRIVER_HANDLE;  // Linux-specific driver handle
 #endif
 
@@ -144,13 +140,11 @@ extern "C" {
     typedef unsigned short        U16;
     typedef signed long           S32;
     typedef unsigned long         U32;
-    typedef signed _int64         S64;
-    typedef unsigned _int64       U64;
+    typedef signed __int64        S64;
+    typedef unsigned __int64      U64;
     typedef INT_PTR               PLX_INT_PTR;        // For 32/64-bit code compatability
     typedef UINT_PTR              PLX_UINT_PTR;
-
     typedef HANDLE                PLX_DRIVER_HANDLE;  // Windows-specific driver handle
-    #define PLX_SIZE_64           8
 
     #if defined(_DEBUG)
         #define PLX_DEBUG
@@ -209,7 +203,7 @@ extern "C" {
             NonPagedPoolSessionNx                 = NonPagedPoolNx + 32
         } PLX_POOL_TYPE;
 
-        // Additional -OR- flags for MM_PAGE_PRIORITY 
+        // Additional -OR- flags for MM_PAGE_PRIORITY
         #define MdlMappingNoWrite       0x80000000  // Create the mapping as nowrite
         #define MdlMappingNoExecute     0x40000000  // Create the mapping as noexecute
     #endif
@@ -316,11 +310,9 @@ extern "C" {
     typedef unsigned long long    U64;
     typedef S32                   PLX_INT_PTR;        // For 32/64-bit code compatability
     typedef U32                   PLX_UINT_PTR;
-
     typedef unsigned long         HANDLE;
     typedef HANDLE                PLX_DRIVER_HANDLE;
     #define INVALID_HANDLE_VALUE  0
-    #define PLX_SIZE_64           8
 
     #if !defined(_far)
         #define _far
@@ -344,7 +336,7 @@ typedef volatile U64          VU64;
 
 
 /*******************************************
- *    Definitions used for ACPI probe
+ * Definitions used for ACPI & ECAM probe
  ******************************************/
 // Used to scan ROM for services
 #define BIOS_MEM_START                  0x000E0000
@@ -356,6 +348,20 @@ typedef volatile U64          VU64;
 #define ACPI_PCIE_DEFAULT_TO_OS         2
 #define ACPI_PCIE_ALWAYS_USE_OS         3
 
+// ECAM
+#define ECAM_PROBE_ADDR_START           0x80000000
+#define ECAM_PROBE_ADDR_END             0xFF000000
+#define ECAM_PROBE_ADDR_INCR            0x01000000
+
+// Number of PCI registers to compare
+#define ECAM_PROBE_REG_CMP_COUNT        4
+
+// ECAM address offset
+#define ECAM_DEVICE_REG_OFFSET( bus, dev, fn, off ) \
+               (U32)( ( (bus) << 20) | \
+                      ( (dev) << 15) | \
+                      ( (fn)  << 12) | \
+                      ( (off) <<  0) )
 
 // ACPI RSDT v1.0 structure
 typedef struct _ACPI_RSDT_v1_0

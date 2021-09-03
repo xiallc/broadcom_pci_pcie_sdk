@@ -65,8 +65,8 @@
 /*************************************
  *          Definitions
  ************************************/
-#define MONITOR_VERSION_MAJOR       2       // Version information
-#define MONITOR_VERSION_MINOR       9
+#define MONITOR_VERSION_MAJOR       3       // Version information
+#define MONITOR_VERSION_MINOR       0
 #define MONITOR_VERSION_REVISION    0
 
 #define MONITOR_PROMPT              ">"     // The monitor prompt string

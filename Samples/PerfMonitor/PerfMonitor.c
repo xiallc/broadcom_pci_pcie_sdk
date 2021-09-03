@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2015 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -44,7 +44,7 @@
  *
  * Revision History:
  *
- *      10-01-14 : PLX SDK v7.20
+ *      03-01-18 : PLX SDK v8.00
  *
  ******************************************************************************/
 
@@ -109,7 +109,7 @@ main(
     )
 {
     S16               DeviceSelected;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_DEVICE_KEY    DeviceKey;
     PLX_DEVICE_OBJECT Device;
 
@@ -148,15 +148,11 @@ main(
         exit(0);
     }
 
-    rc =
-        PlxPci_DeviceOpen(
-            &DeviceKey,
-            &Device
-            );
+    status = PlxPci_DeviceOpen( &DeviceKey, &Device );
 
-    if (rc != PLX_STATUS_OK)
+    if (status != PLX_STATUS_OK)
     {
-        Cons_printf("\n   ERROR: Unable to find or select a PLX device (rc=%X)\n", rc);
+        Cons_printf("\n   ERROR: Unable to find or select a PLX device (status=%X)\n", status);
         ConsoleEnd();
         exit(-1);
     }
@@ -172,20 +168,14 @@ main(
     /************************************
     *        Perform the Test
     ************************************/
-    PerformTest(
-        &Device
-        );
+    PerformTest( &Device );
 
 
 
     /************************************
     *        Close the Device
     ************************************/
-    PlxPci_DeviceClose(
-        &Device
-        );
-
-    Cons_printf("\n\n");
+    PlxPci_DeviceClose( &Device );
 
     ConsoleEnd();
 
@@ -357,7 +347,7 @@ PerformTest(
         {
             if (Cons_getch() == 27)
             {
-                Cons_printf("\n\n");
+                Cons_printf("\n");
                 break;
             }
         }
@@ -397,25 +387,21 @@ GroupDigitsWithTag(
     else if (value < (1 << 20))         // KB
     {
         DecimalValue = (double)value / (1 << 10);
-
         sprintf(pStr, "%.2lf KB", DecimalValue);
     }
     else if (value < ((S64)1 << 30))    // MB
     {
         DecimalValue = (double)value / (1 << 20);
-
         sprintf(pStr, "%.2lf MB", DecimalValue);
     }
     else if (value < ((S64)1 << 40))    // GB
     {
         DecimalValue = (long double)value / (1 << 30);
-
         sprintf(pStr, "%.2lf GB", DecimalValue);
     }
     else                                // TB
     {
         DecimalValue = (long double)value / ((S64)1 << 40);
-
         sprintf(pStr, "%.2lf TB", DecimalValue);
     }
 }
@@ -441,7 +427,7 @@ SelectDevice_8000(
     S32               i;
     S32               NumDevices;
     BOOLEAN           bAddDevice;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_PORT_PROP     PortProp;
     PLX_DEVICE_KEY    DevKey;
     PLX_DEVICE_KEY    DevKey_US[MAX_DEVICES_TO_LIST];
@@ -460,13 +446,9 @@ SelectDevice_8000(
         memset(&DevKey, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY));
 
         // Check if device exists
-        rc =
-            PlxPci_DeviceFind(
-                &DevKey,
-                (U16)i
-                );
+        status = PlxPci_DeviceFind( &DevKey, (U16)i );
 
-        if (rc == PLX_STATUS_OK)
+        if (status == PLX_STATUS_OK)
         {
             // Default to add device
             bAddDevice = TRUE;
@@ -476,7 +458,8 @@ SelectDevice_8000(
                 ((DevKey.PlxChip & 0xFF00) != 0x3300) &&
                 ((DevKey.PlxChip & 0xFF00) != 0x8600) &&
                 ((DevKey.PlxChip & 0xFF00) != 0x8700) &&
-                ((DevKey.PlxChip & 0xFF00) != 0x9700))
+                ((DevKey.PlxChip & 0xFF00) != 0x9700) &&
+                ((DevKey.PlxChip & 0xFF00) != 0xC000))
             {
                 bAddDevice = FALSE;
             }
@@ -484,16 +467,10 @@ SelectDevice_8000(
             // Open device to get its properties
             if (bAddDevice)
             {
-                PlxPci_DeviceOpen(
-                    &DevKey,
-                    &Device
-                    );
+                PlxPci_DeviceOpen( &DevKey, &Device );
 
                 // Get port properties
-                PlxPci_GetPortProperties(
-                    &Device,
-                    &PortProp
-                    );
+                PlxPci_GetPortProperties( &Device, &PortProp );
 
                 // Only certain port types are allowed
                 if ((PortProp.PortType != PLX_PORT_UPSTREAM)   &&
@@ -504,12 +481,21 @@ SelectDevice_8000(
                     bAddDevice = FALSE;
                 }
 
+                // For Atlas, ignore special internal ports
+                if ( (DevKey.PlxFamily == PLX_FAMILY_ATLAS) &&
+                     (PortProp.PortNumber >= 96) )
+                {
+                    bAddDevice = FALSE;
+                }
+
                 // For MIRA USB EP, PM only available in Legacy mode
-                if ((DevKey.PlxFamily == PLX_FAMILY_MIRA) &&
-                    (PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT))
+                if ( (DevKey.PlxFamily == PLX_FAMILY_MIRA) &&
+                     (PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT) )
                 {
                     if (DevKey.DeviceMode == PLX_PORT_ENDPOINT)
+                    {
                         bAddDevice = FALSE;
+                    }
                 }
 
                 // For endpoints, only NT virtual is supported
@@ -523,19 +509,15 @@ SelectDevice_8000(
             // Verify driver used is Service driver
             if (bAddDevice)
             {
-                PlxPci_DriverProperties(
-                    &Device,
-                    &DriverProp
-                    );
-
+                PlxPci_DriverProperties( &Device, &DriverProp );
                 if (DriverProp.bIsServiceDriver == FALSE)
+                {
                     bAddDevice = FALSE;
+                }
             }
 
             // Close device
-            PlxPci_DeviceClose(
-                &Device
-                );
+            PlxPci_DeviceClose( &Device );
 
             if (bAddDevice)
             {
@@ -543,7 +525,7 @@ SelectDevice_8000(
                 DevKey_US[NumDevices] = DevKey;
 
                 Cons_printf(
-                    "\t\t  %2d. %04x Port %2d [%02x:%02x.%x] ",
+                    "\t\t  %2d. %04X Port %2d [%02x:%02x.%x] ",
                     (NumDevices + 1), DevKey.PlxChip, PortProp.PortNumber,
                     DevKey.bus, DevKey.slot, DevKey.function
                     );
@@ -576,25 +558,27 @@ SelectDevice_8000(
             i++;
         }
     }
-    while ((rc == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
+    while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
+    {
         return 0;
+    }
 
-    Cons_printf(
-        "\t\t   0. Cancel\n\n"
-        );
+    Cons_printf( "\t\t   0. Cancel\n\n" );
 
     do
     {
         Cons_printf("\t  Device Selection --> ");
-
         Cons_scanf("%d", &i);
     }
     while (i > NumDevices);
 
     if (i == 0)
+    {
+        Cons_printf("\n");
         return -1;
+    }
 
     // Return selected device information
     *pKey = DevKey_US[i - 1];

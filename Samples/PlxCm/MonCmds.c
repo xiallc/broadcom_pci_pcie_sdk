@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Avago Technologies
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -50,6 +50,7 @@
 
 
 #include <ctype.h>
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include "CmdLine.h"
@@ -147,6 +148,14 @@ BOOLEAN Cmd_Version( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             {
                 Cons_printf(" (connected over I2C)");
             }
+            else if (pDevice->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE)
+            {
+                Cons_printf(" (connected over MDIO)");
+            }
+            else if (pDevice->Key.ApiMode == PLX_API_MODE_SDB)
+            {
+                Cons_printf(" (connected over SDB)");
+            }
             else
             {
                 if (DriverProp.bIsServiceDriver)
@@ -208,8 +217,10 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     Cons_printf("\n");
     Cons_printf("       ------------  Device Access  -------------\n");
     Cons_printf(" dev       Display device list or select new device\n");
-    Cons_printf(" i2c       Probe for PLX devices using I2C\n");
-    Cons_printf(" set_chip  Force current device to a PLX chip type\n");
+    Cons_printf(" i2c       Probe for devices using I2C\n");
+    Cons_printf(" mdio      Probe for devices using MDIO\n");
+    Cons_printf(" sdb       Probe for devices using SDB\n");
+    Cons_printf(" set_chip  Force current device to specific chip type\n");
 
     Cons_printf("\n");
     Cons_printf("       ------------- PCI/PCIe Info --------------\n");
@@ -295,7 +306,6 @@ BOOLEAN Cmd_Sleep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     // Get timeout value
     pArg = CmdLine_ArgGet( pCmd, 0 );
-
     if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
     {
         Cons_printf("Error: Timeout value is invalid\n");
@@ -306,31 +316,6 @@ BOOLEAN Cmd_Sleep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     Plx_sleep( (U32)pArg->ArgIntDec );
 
     return TRUE;
-}
-
-
-
-
-/**********************************************************
- *
- * Function   :  Cmd_Boot
- *
- * Description:  Initiates the system bootstrap
- *
- *********************************************************/
-BOOLEAN Cmd_Boot( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
-{
-#if !defined(PLX_DOS)
-    Cons_printf("Error: The Bootstrap feature is only supported in PlxCm for DOS\n");
-    return FALSE;
-#else
-    Cons_printf(
-        "Error: Bootstrap is not supported directly in PlxCm.\n"
-        "       Please use the 16-bit real-mode 'PlxBoot.exe'\n"
-        "       DOS application available from PLX Technology.\n"
-        );
-    return TRUE;
-#endif // PLX_DOS
 }
 
 
@@ -550,17 +535,16 @@ BOOLEAN Cmd_Reset( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         return TRUE;
     }
 
-    Cons_printf("Resetting device....");
+    Cons_printf("Reset device....");
 
     status = PlxPci_DeviceReset( pDevice );
-
     if (status == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
     else
     {
-        Cons_printf("Error: Unable to reset device (code=%X)\n", status);
+        Cons_printf("Error: Unable to reset device (status=%02Xh)\n", status);
     }
 
     return TRUE;
@@ -626,7 +610,9 @@ BOOLEAN Cmd_Scan( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         &status
                         );
 
-                if ((status == PLX_STATUS_OK) && (RegValue != (U32)-1))
+                if ( (status == PLX_STATUS_OK) &&
+                     (RegValue != PCI_CFG_RD_ERR_VAL_32) &&
+                     (RegValue != 0) )
                 {
                     // Clear device node
                     RtlZeroMemory( &TmpNode, sizeof(DEVICE_NODE) );
@@ -731,7 +717,6 @@ BOOLEAN Cmd_SetChip( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     // Get chip type
     pArg = CmdLine_ArgGet( pCmd, 0 );
-
     if (pArg == NULL)
     {
         Cons_printf(
@@ -829,7 +814,6 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     // Attempt to select desired device
     pNode = DeviceSelectByIndex( (U16)pArg->ArgIntHex );
-
     if (pNode == NULL)
     {
         Cons_printf("Error: Invalid device selection\n");
@@ -837,7 +821,8 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     Cons_printf(
-        "Selected: [%02X:%02X.%X] %04X_%04X",
+        "Selected: [D%d %02X:%02X.%X] %04X_%04X",
+        pNode->Key.domain,
         pNode->Key.bus,
         pNode->Key.slot,
         pNode->Key.function,
@@ -859,7 +844,6 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     Device_GetClassString( pNode, DeviceText );
-
     Cons_printf( " - %s\n", DeviceText );
 
     return TRUE;
@@ -956,12 +940,12 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         Cons_printf(
             "Usage: i2c <USB_I2C_Port> <I2C_Address> <I2C_Clock>\n"
             "\n"
-            "    USB_I2C_Port : USB I2C device ID (e.g. 0,1,2..)\n"
-            "    I2C_Address  : I2C bus hex address of PLX chip (0=auto-probe)\n"
+            "    USB_I2C_Port : USB I2C device number (e.g. 0,1,2..)\n"
+            "    I2C_Address  : I2C bus hex address of chip (0=auto-probe)\n"
             "    I2C_Clock    : Decimal I2C bus clock speed in KHz. (0=auto/100KHz)\n"
             "\n"
-            "Examples: 'i2c 0 0 40' - Auto-scan for PLX chip & use 40KHz I2C clock\n"
-            "          'i2c 0 68 0' - Auto-scan for PLX chip at 68h using default I2C clock\n"
+            "Examples: 'i2c 0 0 40' - Auto-scan for chip & use 40KHz I2C clock\n"
+            "          'i2c 0 68 0' - Auto-scan for chip at 68h using default I2C clock\n"
             "\n"
             );
 
@@ -970,7 +954,7 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     bReselect = FALSE;
 
-    // If already connected over I2C, must release current open device
+    // If already connected, must release current open device
     if ((pDevice != NULL) && (pDevice->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK))
     {
         bReselect = TRUE;
@@ -978,20 +962,16 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         PlxPci_DeviceClose( pDevice );
     }
 
-    Cons_printf("Scanning for I2C devices (ESC to halt)...\n");
+    Cons_printf("Scan for I2C devices (ESC to halt)...\n");
 
     // Build device list
-    i =
-        DeviceListCreate(
-            PLX_API_MODE_I2C_AARDVARK,
-            &ModeProp
-            );
+    i = DeviceListCreate( PLX_API_MODE_I2C_AARDVARK, &ModeProp );
 
     // Check if user canceled
-    if (i & (1 << 7))
+    if (i & (1 << 15))
     {
         Cons_printf(" -- User aborted scan --   ");
-        i &= ~(U8)(1 << 7);
+        i &= ~(U8)(1 << 15);
     }
 
     if (i == 0)
@@ -1000,7 +980,308 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
     else
     {
-        Cons_printf(" - Detected %d I2C device(s) -\n", i);
+        Cons_printf(
+            " - Detected %d I2C device%s -\n",
+            i, (i == 1) ? "" : "s"
+            );
+
+        // Select first device if none previously selected
+        if (pDevice == NULL)
+        {
+            DeviceSelectByIndex( 0 );
+        }
+    }
+
+    // Reselect previously selected I2C device
+    if (bReselect)
+    {
+        PlxPci_DeviceOpen( &Key, pDevice );
+    }
+
+    Cons_printf("\n");
+
+    return TRUE;
+#endif
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_MdioConnect
+ *
+ * Description:  Attempts to connect to a device over I2C
+ *
+ *********************************************************/
+BOOLEAN Cmd_MdioConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+#if defined(PLX_DOS)
+
+    Cons_printf( "Error: MDIO is not supported in DOS\n" );
+    return TRUE;
+
+#else
+
+    U16             i;
+    BOOLEAN         bError;
+    BOOLEAN         bReselect;
+    PLXCM_ARG      *pArg;
+    PLX_MODE_PROP   ModeProp;
+    PLX_DEVICE_KEY  Key;
+
+
+    bError = FALSE;
+
+    // Verify argument count
+    if (pCmd->NumArgs < 2)
+    {
+        bError = TRUE;
+    }
+
+    // Get MDIO port
+    if (!bError)
+    {
+        // Clear properties
+        memset( &ModeProp, 0, sizeof(PLX_MODE_PROP) );
+
+        pArg = CmdLine_ArgGet( pCmd, 0 );
+        if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
+        {
+            bError = TRUE;
+        }
+        else
+        {
+            ModeProp.Mdio.Port = (U8)pArg->ArgIntDec;
+        }
+    }
+
+    // Get MDIO clock rate in KHz
+    if (!bError)
+    {
+        pArg = CmdLine_ArgGet( pCmd, 1 );
+        if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
+        {
+            bError = TRUE;
+        }
+        else
+        {
+            ModeProp.Mdio.ClockRate = (U32)pArg->ArgIntDec;
+        }
+    }
+
+    if (bError)
+    {
+        Cons_printf(
+            "Usage: mdio <USB_MDIO_Port> <MDIO_Clock>\n"
+            "\n"
+            "    USB_MDIO_Port : USB MDIO device number (e.g. 0,1,2..)\n"
+            "    MDIO_Clock    : Decimal I2C bus clock speed in KHz. (0=auto/100KHz)\n"
+            "\n"
+            "Examples: 'mdio 0 40' - Scan for chip & use 40KHz MDIO clock\n"
+            "          'mdio 0 0'  - Scan for chip using default MDIO clock\n"
+            "\n"
+            );
+        return TRUE;
+    }
+
+    bReselect = FALSE;
+
+    // If already connected, must release current open device
+    if ((pDevice != NULL) && (pDevice->Key.ApiMode == PLX_API_MODE_MDIO_SPLICE))
+    {
+        bReselect = TRUE;
+        RtlCopyMemory( &Key, &pDevice->Key, sizeof(PLX_DEVICE_KEY) );
+        PlxPci_DeviceClose( pDevice );
+    }
+
+    Cons_printf("Scan for MDIO devices (ESC to halt)...\n");
+
+    // Build device list
+    i = DeviceListCreate( PLX_API_MODE_MDIO_SPLICE, &ModeProp );
+
+    // Check if user canceled
+    if (i & (1 << 15))
+    {
+        Cons_printf(" -- User aborted scan --   ");
+        i &= ~(U8)(1 << 15);
+    }
+
+    if (i == 0)
+    {
+        Cons_printf(" - No MDIO devices added -\n");
+    }
+    else
+    {
+        Cons_printf(
+            " - Detected %d MDIO device%s -\n",
+            i, (i == 1) ? "" : "s"
+            );
+
+        // Select first device if none previously selected
+        if (pDevice == NULL)
+        {
+            DeviceSelectByIndex( 0 );
+        }
+    }
+
+    // Reselect previously selected I2C device
+    if (bReselect)
+    {
+        PlxPci_DeviceOpen( &Key, pDevice );
+    }
+
+    Cons_printf("\n");
+
+    return TRUE;
+#endif
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_SdbConnect
+ *
+ * Description:  Attempts to connect to a device over SDB
+ *
+ *********************************************************/
+BOOLEAN Cmd_SdbConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+#if defined(PLX_DOS)
+
+    Cons_printf( "Error: SDB is not supported in DOS\n" );
+    return TRUE;
+
+#else
+
+    U16             i;
+    BOOLEAN         bError;
+    BOOLEAN         bReselect;
+    PLXCM_ARG      *pArg;
+    PLX_MODE_PROP   ModeProp;
+    PLX_DEVICE_KEY  Key;
+
+
+    bError = FALSE;
+
+    // Verify argument count
+    if (pCmd->NumArgs < 2)
+    {
+        bError = TRUE;
+    }
+
+    // Get COM/TTY port
+    if (!bError)
+    {
+        // Clear properties
+        memset( &ModeProp, 0, sizeof(PLX_MODE_PROP) );
+
+        pArg = CmdLine_ArgGet( pCmd, 0 );
+        if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
+        {
+            bError = TRUE;
+        }
+        else
+        {
+            ModeProp.Sdb.Port = (U8)pArg->ArgIntDec;
+        }
+    }
+
+    // Get baud rate
+    if (!bError)
+    {
+        pArg = CmdLine_ArgGet( pCmd, 1 );
+        if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
+        {
+            bError = TRUE;
+        }
+        else
+        {
+            if ( ((U8)pArg->ArgIntDec == 0) || ((U8)pArg->ArgIntDec == 2) )
+            {
+                ModeProp.Sdb.Baud = SDB_BAUD_RATE_115200;
+            }
+            else if ((U8)pArg->ArgIntDec == 1)
+            {
+                ModeProp.Sdb.Baud = SDB_BAUD_RATE_19200;
+            }
+            else
+            {
+                bError = TRUE;
+            }
+        }
+    }
+
+    // Default connection to standard UART
+    ModeProp.Sdb.Cable = SDB_UART_CABLE_UART;
+
+    // Get USB connection option, if specified
+    if (!bError && (pCmd->NumArgs > 2))
+    {
+        pArg = CmdLine_ArgGet( pCmd, 2 );
+        if (pArg->ArgType != PLXCM_ARG_TYPE_STRING)
+        {
+            bError = TRUE;
+        }
+        else
+        {
+            if (Plx_strcasecmp( pArg->ArgString, "u" ) == 0)
+            {
+                ModeProp.Sdb.Cable = SDB_UART_CABLE_USB;
+            }
+        }
+    }
+
+    if (bError)
+    {
+        Cons_printf(
+            "Usage: sdb <COM Port> <BAUD Rate> [u] \n"
+            "\n"
+            "    COM Port : COM/TTY port number (1,2..)\n"
+            "    BAUD Rate: 0=Default  1=19,200  2=115,2000 (default)\n"
+            "    u        : [Linux] Specify USB-to-Serial (ttyUSBx)\n"
+            "\n"
+            "Examples: 'sdb 1 0'   - COM1 115,200 baud\n"
+            "          'sdb 2 1 u' - COM2 19,200 baud via USB cable (/dev/ttyUSB1)\n"
+            "\n"
+            );
+        return TRUE;
+    }
+
+    bReselect = FALSE;
+
+    // If already connected, must release current open device
+    if ((pDevice != NULL) && (pDevice->Key.ApiMode == PLX_API_MODE_SDB))
+    {
+        bReselect = TRUE;
+        RtlCopyMemory( &Key, &pDevice->Key, sizeof(PLX_DEVICE_KEY) );
+        PlxPci_DeviceClose( pDevice );
+    }
+
+    Cons_printf("Scan for SDB devices (ESC to halt)...\n");
+
+    // Build device list
+    i = DeviceListCreate( PLX_API_MODE_SDB, &ModeProp );
+
+    // Check if user canceled
+    if (i & (1 << 15))
+    {
+        Cons_printf(" -- User aborted scan --   ");
+        i &= ~(U8)(1 << 7);
+    }
+
+    if (i == 0)
+    {
+        Cons_printf(" - No SDB devices added -\n");
+    }
+    else
+    {
+        Cons_printf(
+            " - Detected %d SDB device%s -\n",
+            i, (i == 1) ? "" : "s"
+            );
 
         // Select first device if none previously selected
         if (pDevice == NULL)
@@ -1057,7 +1338,7 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     // Verify PCI header is not Type 2
-    if (pNode->PciHeaderType == 2)
+    if (pNode->PciHeaderType == PCI_HDR_TYPE_2)
     {
         Cons_printf("Device is PCI Type 2 (Cardbus) - no extended capabilities\n");
         return TRUE;
@@ -1073,7 +1354,7 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     RegValue = PlxPci_PciRegisterReadFast( pDevice, PCI_REG_CAP_PTR, NULL );
 
     // If link is down, PCI reg accesses will fail
-    if ((RegValue == (U32)-1) || (RegValue == 0))
+    if ((RegValue == PCI_CFG_RD_ERR_VAL_32) || (RegValue == 0))
     {
         Cons_printf("  -- Device does not have PCI extended capabilities --\n");
         return TRUE;
@@ -1103,9 +1384,9 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             break;
         }
 
-        if ((RegValue == (U32)-1) || (RegValue == 0))
+        if ((RegValue == PCI_CFG_RD_ERR_VAL_32) || (RegValue == 0))
         {
-            if ((Offset_Cap != PCIE_REG_CAP_PTR) && (RegValue == (U32)-1))
+            if ((Offset_Cap != PCIE_REG_CAP_PTR) && (RegValue == PCI_CFG_RD_ERR_VAL_32))
             {
                 Cons_printf("  -- Error: Invalid entry at offset %02X --\n", Offset_Cap);
             }
@@ -1277,6 +1558,14 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         strcpy( szCapability, "Physical Layer 16 GT/s Margining" );
                         break;
 
+                    case PCIE_CAP_ID_HIERARCHY_ID:
+                        strcpy( szCapability, "Hierarchy ID" );
+                        break;
+
+                    case PCIE_CAP_ID_NATIVE_PCIE_ENCL_MGMT:
+                        strcpy( szCapability, "Native PCIe Enclosure Management (NPEM)" );
+                        break;
+
                     default:
                         strcpy( szCapability, "?Unknown?" );
                         break;
@@ -1445,7 +1734,7 @@ BOOLEAN Cmd_PortProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     status = PlxPci_GetPortProperties( pDevice, &PortProp );
     if (status != PLX_STATUS_OK)
     {
-        Cons_printf("*ERROR* - API failed (status=%x)\n", status);
+        Cons_printf("*ERROR* - API failed (status=%02Xh)\n", status);
         return FALSE;
     }
     Cons_printf("\n");
@@ -1510,19 +1799,29 @@ BOOLEAN Cmd_PortProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     // Max Payload
     Cons_printf(
-        "    Max Payload : %02dB / %02dB\n",
-        PortProp.MaxPayloadSize, PortProp.MaxPayloadSupported
+        "    Max Payload : %d%sB / %d%sB\n",
+        (PortProp.MaxPayloadSize > 1000) ?
+          (PortProp.MaxPayloadSize >> 10) : PortProp.MaxPayloadSize,
+        (PortProp.MaxPayloadSize > 1000) ? "K" : "",
+        (PortProp.MaxPayloadSupported > 1000) ?
+          (PortProp.MaxPayloadSupported >> 10) : PortProp.MaxPayloadSupported,
+        (PortProp.MaxPayloadSupported > 1000) ? "K" : ""
         );
 
     // Max Read Req Size
     Cons_printf("    Max Read Req: %02dB\n", PortProp.MaxReadReqSize);
 
     // PCIe Link
-    Cons_printf(
-        "    PCIe Link   : Gen%d x%d / Gen%d x%d\n",
-        PortProp.LinkSpeed, PortProp.LinkWidth,
-        PortProp.MaxLinkSpeed, PortProp.MaxLinkWidth
-        );
+    Cons_printf("    PCIe Link   : ");
+    if (PortProp.LinkWidth == 0)
+    {
+        Cons_printf(" --");
+    }
+    else
+    {
+        Cons_printf("G%dx%d", PortProp.LinkSpeed, PortProp.LinkWidth);
+    }
+    Cons_printf(" / G%dx%d\n", PortProp.MaxLinkSpeed, PortProp.MaxLinkWidth);
 
     return TRUE;
 }
@@ -1603,6 +1902,101 @@ BOOLEAN Cmd_MH_Prop( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 );
         }
     }
+
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_NvmeProp
+ *
+ * Description:  Displays NVMe properties
+ *
+ *********************************************************/
+BOOLEAN Cmd_NvmeProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+    U8          *pBarVa;
+    U32          regVal;
+    U32          pciCmdStat;
+    DEVICE_NODE *pNode;
+
+
+    if (pDevice == NULL)
+    {
+        Cons_printf("Error: No device selected\n");
+        return FALSE;
+    }
+
+    // Get device node
+    pNode = DeviceNodeGetByKey( &pDevice->Key );
+    if (pNode == NULL)
+    {
+        return FALSE;
+    }
+
+    // Verify NVMe device is selected
+    if (pNode->PciClass != 0x010802)
+    {
+        Cons_printf("Error: Command only supported when NVMe endpoint selected\n");
+        return FALSE;
+    }
+
+    // Ensure BAR 0 is mapped
+    if (pNode->Va_PciBar[0] == 0)
+    {
+        Cons_printf("Error: BAR 0 disabled or not mapped\n");
+        return FALSE;
+    }
+
+    // Get BAR 0 virtual address
+    pBarVa = (U8*)pNode->Va_PciBar[0];
+
+    // Get PCI command/status register (04h)
+    pciCmdStat = PlxPci_PciRegisterReadFast( pDevice, PCI_REG_CMD_STAT, NULL );
+
+    // Clear any error status bits (04h[31:27])
+    pciCmdStat &= ~((U32)0x1F << 27);
+
+    // Make sure memory BAR access is enabled (04h[1])
+    PlxPci_PciRegisterWriteFast( pDevice, PCI_REG_CMD_STAT, pciCmdStat | (1 << 1) );
+
+    // Display (0h[])
+    Cons_printf("NVMe Properties:\n");
+    Cons_printf("  Vendor      : %04Xh\n", pDevice->Key.VendorId);
+
+    // Version
+    regVal = PlxCm_MemRead_32( pBarVa + 0x8 );
+    Cons_printf(
+        "  Compliance  : v%d.%d%d\n",
+        (U8)(regVal >> 16), (U8)(regVal >> 8), (U8)(regVal >> 0)
+        );
+
+    // Admin queue (24h Submit=[11:0] Cpl=[27:16]
+    //              2Ch/28h=64b Submit addr
+    //              34h/30h=64b Cpl addr)
+    regVal = PlxCm_MemRead_32( pBarVa + 0x24 );
+    Cons_printf(
+        "  Admin Queue : Submit: %02X_%08Xh (%d entries)\n"
+        "                Compl : %02X_%08Xh (%d entries)\n",
+        PlxCm_MemRead_32( pBarVa + 0x2C ), PlxCm_MemRead_32( pBarVa + 0x28 ),
+        (regVal >> 0) & 0xFFF,
+        PlxCm_MemRead_32( pBarVa + 0x34 ), PlxCm_MemRead_32( pBarVa + 0x30 ),
+        (regVal >> 16) & 0xFFF
+        );
+
+    // I/O queues (14h Submit=[23:20] Cpl=[19:16])
+    regVal = PlxCm_MemRead_32( pBarVa + 0x14 );
+    Cons_printf(
+        "  I/O Queues  : Submit:%dB  Cpl:%dB (entry sizes)\n",
+        (int)pow( 2, ((regVal >> 20) & 0xF) ),
+        (int)pow( 2, ((regVal >> 16) & 0xF) )
+        );
+
+    // Restore PCI command/status (04h)
+    PlxPci_PciRegisterWriteFast( pDevice, PCI_REG_CMD_STAT, pciCmdStat );
 
     return TRUE;
 }
@@ -1841,10 +2235,7 @@ BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     // Get PCI buffer properties
-    PlxPci_CommonBufferProperties(
-        pDevice,
-        &PciBuffer
-        );
+    PlxPci_CommonBufferProperties( pDevice, &PciBuffer );
 
     if (PciBuffer.Size == 0)
     {
@@ -1934,6 +2325,13 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     PLXCM_ARG  *pArg;
 
 
+    // Memory access commands only available in PCI access mode
+    if (pDevice->Key.ApiMode != PLX_API_MODE_PCI)
+    {
+        Cons_printf("Error: '%s' is only available in direct PCI access mode\n", pCmd->szCmd);
+        return FALSE;
+    }
+
     // Set access size
     if (pCmd->szCmd[1] == 'b')
     {
@@ -2020,9 +2418,8 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 // Set initial number of characters to display
                 CharsToPrint = 0;
 
-                // Set initial Spaces to insert
-                SpacesToInsert = (U8)((((size * 2) + 1) * (16 / size)) + 3);
-                SpacesToInsert--;
+                // Set initial spaces to insert
+                SpacesToInsert = (U8)(((size * 2) + 1) * (16 / size));
 
                 Cons_printf(
                     "%s%08x: ",
@@ -2079,12 +2476,7 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
             if (!bEndLine)
             {
-                if (i == 8)
-                {
-                    SpacesToInsert -= 2;
-                    Cons_printf("- ");
-                }
-                else if (i == 16)
+                if (i == 16)
                 {
                     i        = 0;
                     bEndLine = TRUE;
@@ -2106,7 +2498,12 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 {
                     Cons_printf("%c", buffer[x]);
                 }
-                Cons_printf("\n");
+
+                // Next line but check if user (Q)uit via throttle prompt
+                if (Cons_printf("\n") == 0)
+                {
+                    break;
+                }
 
                 // Check for user cancel for larger reads
                 if ((ByteCount > MIN_BYTE_CHECK_CANCEL) && Cons_kbhit())
@@ -2146,6 +2543,13 @@ BOOLEAN Cmd_MemWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     BOOLEAN    bVerifyArgs;
     PLXCM_ARG *pArg;
 
+
+    // Memory access commands only available in PCI access mode
+    if (pDevice->Key.ApiMode != PLX_API_MODE_PCI)
+    {
+        Cons_printf("Error: '%s' is only available in direct PCI access mode\n", pCmd->szCmd);
+        return FALSE;
+    }
 
     // Set access size
     if (pCmd->szCmd[1] == 'b')
@@ -2360,8 +2764,8 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             // Set initial number of characters to display
             CharsToPrint = 0;
 
-            // Set initial Spaces to insert
-            SpacesToInsert = (U8)((((size * 2) + 1) * (16 / size)) + 3);
+            // Set initial spaces to insert
+            SpacesToInsert = (U8)(((size * 2) + 1) * (16 / size));
 
             Cons_printf("%08x: ", CurrAddr);
         }
@@ -2413,7 +2817,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         {
             Cons_printf(
                 "\n"
-                "Error: Unable to perform I/O read (code=%Xh)\n",
+                "Error: Unable to perform I/O read (status=%02Xh)\n",
                 status
                 );
             break;
@@ -2449,12 +2853,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
         if (!bEndLine)
         {
-            if (i == 8)
-            {
-                SpacesToInsert -= 2;
-                Cons_printf("- ");
-            }
-            else if (i == 16)
+            if (i == 16)
             {
                 i        = 0;
                 bEndLine = TRUE;
@@ -2476,7 +2875,12 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             {
                 Cons_printf("%c", buffer[x]);
             }
-            Cons_printf("\n");
+
+            // Next line but check if user (Q)uit via throttle prompt
+            if (Cons_printf("\n") == 0)
+            {
+                break;
+            }
 
             // Check for user cancel for larger reads
             if ((ByteCount > MIN_BYTE_CHECK_CANCEL) && Cons_kbhit())
@@ -2635,7 +3039,7 @@ BOOLEAN Cmd_IoWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 if (status != PLX_STATUS_OK)
                 {
                     Cons_printf(
-                        "Error: Unable to perform I/O write (code=%Xh)\n",
+                        "Error: Unable to perform I/O write (status=%02Xh)\n",
                         status
                         );
                     break;
@@ -2675,6 +3079,7 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     U32           value;
     BOOLEAN       bRead;
     PLXCM_ARG    *pArg;
+    PLX_STATUS    status;
     DEVICE_NODE  *pNode;
     REGISTER_SET *RegSet;
 
@@ -2689,6 +3094,46 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     {
         Cons_printf("Usage: pcr [offset [value]]\n");
         return FALSE;
+    }
+
+    // Initialize to avoid compiler warning
+    offset = 0;
+    value  = 0;
+
+    // Verify arguments
+    if (pCmd->NumArgs >= 1)
+    {
+        // Get & verify offet
+        pArg = CmdLine_ArgGet( pCmd, 0 );
+
+        if ( (pArg->ArgType != PLXCM_ARG_TYPE_INT) || (pArg->ArgIntHex & 0x3) )
+        {
+            Cons_printf("Error: '%s' is not a valid 4B aliged register offset\n", pArg->ArgString);
+            return FALSE;
+        }
+
+        if (pArg->ArgIntHex >= PCIE_CONFIG_SPACE_SIZE)
+        {
+            Cons_printf("Error: Offset '%s' exceeds PCIe config space (4K)\n", pArg->ArgString);
+            return FALSE;
+        }
+
+        offset = (U16)pArg->ArgIntHex;
+
+        // Get data value if supplied
+        if (pCmd->NumArgs == 2)
+        {
+            pArg = CmdLine_ArgGet( pCmd, 1 );
+
+            if ((pArg->ArgType != PLXCM_ARG_TYPE_INT) ||
+                (PLX_64_HIGH_32(pArg->ArgIntHex) != 0))
+            {
+                Cons_printf("Error: '%s' is not a valid 32-bit value\n", pArg->ArgString);
+                return FALSE;
+            }
+
+            value = (U32)pArg->ArgIntHex;
+        }
     }
 
     // Select register set
@@ -2715,15 +3160,17 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             pNode = DeviceNodeGetByKey( &pDevice->Key );
 
             if (pNode == NULL)
+            {
                 return FALSE;
+            }
 
             // Check Header Type
-            if (pNode->PciHeaderType == 1)
+            if (pNode->PciHeaderType == PCI_HDR_TYPE_1)
             {
                 // Type 1 - P-to-P Bridge
                 RegSet = Pci_Type_1;
             }
-            else if (pNode->PciHeaderType == 2)
+            else if (pNode->PciHeaderType == PCI_HDR_TYPE_2)
             {
                 // Type 2 - CardBus Bridge
                 RegSet = Pci_Type_2;
@@ -2734,40 +3181,6 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 RegSet = Pci_Type_0;
             }
             break;
-    }
-
-    // Initialize to avoid compiler warning
-    offset = 0;
-    value  = 0;
-
-    // Verify arguments
-    if (pCmd->NumArgs >= 1)
-    {
-        // Get & verify offet
-        pArg = CmdLine_ArgGet( pCmd, 0 );
-
-        if ((pArg->ArgType != PLXCM_ARG_TYPE_INT) || (pArg->ArgIntHex & 0x3))
-        {
-            Cons_printf("Error: '%s' is not a valid 32-bit offset\n", pArg->ArgString);
-            return FALSE;
-        }
-
-        offset = (U16)pArg->ArgIntHex;
-
-        // Get data value if supplied
-        if (pCmd->NumArgs == 2)
-        {
-            pArg = CmdLine_ArgGet( pCmd, 1 );
-
-            if ((pArg->ArgType != PLXCM_ARG_TYPE_INT) ||
-                (PLX_64_HIGH_32(pArg->ArgIntHex) != 0))
-            {
-                Cons_printf("Error: '%s' is not a valid 32-bit value\n", pArg->ArgString);
-                return FALSE;
-            }
-
-            value = (U32)pArg->ArgIntHex;
-        }
     }
 
     // Operation is a read if less than 2 parameters
@@ -2794,31 +3207,61 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             // Check for final entry
             if (offset == 0xFFF)
             {
-                goto _Exit_Cmd_RegPci;
+                break;
             }
         }
 
         // Access device
         if (bRead)
         {
-            value = PlxPci_PciRegisterReadFast( pDevice, offset, NULL );
-            Cons_printf( " %03x: %08x", offset, value );
+            value = PlxPci_PciRegisterReadFast( pDevice, offset, &status );
+            Cons_printf( " %03x: ", offset );
 
-            // Store last value in return code
-            Gbl_LastRetVal = value;
-
-            // Display description if available
-            pStr = RegSet_DescrGetByOffset( RegSet, offset );
-            if (pStr != NULL)
+            if (status != PLX_STATUS_OK)
             {
-                Cons_printf( "  %s", pStr );
+                Cons_printf("????????\n");
             }
+            else
+            {
+                Cons_printf("%08x", value);
 
-            Cons_printf("\n");
+                // Store last value in return code
+                Gbl_LastRetVal = value;
+
+                // Display description if available
+                pStr = RegSet_DescrGetByOffset( RegSet, offset );
+                if (pStr != NULL)
+                {
+                    Cons_printf( "  %s", pStr );
+                }
+
+                // Next line but check if user (Q)uit via throttle prompt
+                if (Cons_printf("\n") == 0)
+                {
+                    break;
+                }
+            }
         }
         else
         {
-            PlxPci_PciRegisterWriteFast( pDevice, offset, value );
+            status = PlxPci_PciRegisterWriteFast( pDevice, offset, value );
+        }
+
+        if (status != PLX_STATUS_OK)
+        {
+            if (status == PLX_STATUS_INVALID_OFFSET)
+            {
+                Cons_printf("Error: Register offset invalid or exceeds max\n");
+            }
+            else if (status == PLX_STATUS_UNSUPPORTED)
+            {
+                Cons_printf("Error: PCI register access is not supported\n");
+            }
+            else
+            {
+                Cons_printf("Error: Register access failed (status=%02Xh)\n", status);
+            }
+            break;
         }
 
         // Jump to next item or quit
@@ -2828,12 +3271,11 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         }
         else
         {
-            goto _Exit_Cmd_RegPci;
+            break;
         }
     }
     while (1);
 
-_Exit_Cmd_RegPci:
     // Disable throttle output
     ConsoleIoThrottleSet(FALSE);
 
@@ -2896,7 +3338,7 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
         if ((pArg->ArgType != PLXCM_ARG_TYPE_INT) || (pArg->ArgIntHex & 0x3))
         {
-            Cons_printf("Error: '%s' is not a valid 32-bit offset\n", pArg->ArgString);
+            Cons_printf("Error: '%s' is not a valid 4B aligned offset\n", pArg->ArgString);
             return FALSE;
         }
 
@@ -2926,7 +3368,8 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         ((PlxChip & 0xFF00) == 0x8500) ||
         ((PlxChip & 0xFF00) == 0x8600) ||
         ((PlxChip & 0xFF00) == 0x8700) ||
-        ((PlxChip & 0xFF00) == 0x9700))
+        ((PlxChip & 0xFF00) == 0x9700) ||
+        ((PlxChip & 0xFF00) == 0xC000))
     {
         PlxChip = PlxChip & 0xFF00;
     }
@@ -3063,6 +3506,13 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             }
             break;
 
+        case 0xC000:
+            if (Regs == REGS_LCR)
+            {
+                RegSet = LcrGeneric;
+            }
+            break;
+
         case 0x6000:
             Cons_printf(
                 "Error: %04X PCI-to-PCI Bridge does not contain local registers\n",
@@ -3121,7 +3571,7 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             // Check for final entry
             if (offset == 0xFFF)
             {
-                goto _Exit_Cmd_RegPlx;
+                break;
             }
         }
 
@@ -3137,30 +3587,59 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 value = PlxPci_PlxMappedRegisterRead( pDevice, offset, &status );
             }
 
-            Cons_printf(" %03x: %08x", offset, value );
-
-            // Store last value in return code
-            Gbl_LastRetVal = value;
-
-            // Display description if available
-            pStr = RegSet_DescrGetByOffset( RegSet, offset );
-            if (pStr != NULL)
+            Cons_printf( " %03x: ", offset );
+            if (status != PLX_STATUS_OK)
             {
-                Cons_printf( "  %s", pStr );
+                Cons_printf("????????\n");
             }
+            else
+            {
+                Cons_printf( "%08x", value );
 
-            Cons_printf("\n");
+                // Store last value in return code
+                Gbl_LastRetVal = value;
+
+                // Display description if available
+                pStr = RegSet_DescrGetByOffset( RegSet, offset );
+                if (pStr != NULL)
+                {
+                    Cons_printf( "  %s", pStr );
+                }
+
+                // Next line but check if user (Q)uit via throttle prompt
+                if (Cons_printf("\n") == 0)
+                {
+                    break;
+                }
+            }
         }
         else
         {
             if (bAdjustForPort)
             {
-                PlxPci_PlxRegisterWrite( pDevice, offset, value );
+                status = PlxPci_PlxRegisterWrite( pDevice, offset, value );
             }
             else
             {
-                PlxPci_PlxMappedRegisterWrite( pDevice, offset, value );
+                status = PlxPci_PlxMappedRegisterWrite( pDevice, offset, value );
             }
+        }
+
+        if (status != PLX_STATUS_OK)
+        {
+            if (status == PLX_STATUS_INVALID_OFFSET)
+            {
+                Cons_printf("Error: Register offset invalid or exceeds max\n");
+            }
+            else if (status == PLX_STATUS_UNSUPPORTED)
+            {
+                Cons_printf("Error: Device not supported or doesn't have device-specific registers\n");
+            }
+            else
+            {
+                Cons_printf("Error: Register access failed (status=%d)\n", status);
+            }
+            break;
         }
 
         // Jump to next item or quit
@@ -3170,12 +3649,11 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         }
         else
         {
-            goto _Exit_Cmd_RegPlx;
+            break;
         }
     }
     while (1);
 
-_Exit_Cmd_RegPlx:
     // Disable throttle output
     ConsoleIoThrottleSet(FALSE);
 
@@ -3195,7 +3673,7 @@ _Exit_Cmd_RegPlx:
 BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     int         i;
-    U32         CurrValue;
+    U32         CurrValue = 0;
     U32         ByteCount;
     U32         OffsetEnd;
     static U32  OffsetCurr = 0;
@@ -3246,7 +3724,7 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     if (OffsetCurr & 0x3)
     {
-        Cons_printf("Error: Starting offset must be a multiple of 4B\n");
+        Cons_printf("Error: Starting offset must be 4B aligned\n");
         return FALSE;
     }
 
@@ -3298,7 +3776,15 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             // Perform the register access
             if (bPciRegs)
             {
-                CurrValue = PlxPci_PciRegisterReadFast( pDevice, (U16)OffsetCurr, &status );
+                // Verify offset in valid PCIe config space
+                if (OffsetCurr >= PCIE_CONFIG_SPACE_SIZE)
+                {
+                    status = PLX_STATUS_INVALID_OFFSET;
+                }
+                else
+                {
+                    CurrValue = PlxPci_PciRegisterReadFast( pDevice, (U16)OffsetCurr, &status );
+                }
             }
             else
             {
@@ -3310,17 +3796,17 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 Cons_printf("????????\n");
                 if (status == PLX_STATUS_INVALID_OFFSET)
                 {
-                    Cons_printf("Error: Offset invalid or exceeds max register\n");
+                    Cons_printf("Error: Register offset invalid or exceeds max\n");
                 }
                 else if (status == PLX_STATUS_UNSUPPORTED)
                 {
-                    Cons_printf("Error: Device is not a PLX chip or doesn't have PLX-specific registers\n");
+                    Cons_printf("Error: Device not supported or doesn't have device-specific registers\n");
                 }
                 else
                 {
                     Cons_printf("Error: Register access failed (status=%d)\n", status);
                 }
-                return FALSE;
+                break;
             }
 
             // Store last value in return code
@@ -3340,11 +3826,7 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
             if (!bEndLine)
             {
-                if (i == 8)
-                {
-                    Cons_printf("- ");
-                }
-                else if (i == 16)
+                if (i == 16)
                 {
                     i        = 0;
                     bEndLine = TRUE;
@@ -3354,7 +3836,12 @@ BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             if (bEndLine)
             {
                 bEndLine = FALSE;
-                Cons_printf("\n");
+
+                // Next line but check if user (Q)uit via throttle prompt
+                if (Cons_printf("\n") == 0)
+                {
+                    break;
+                }
 
                 // Check for user cancel for larger reads
                 if ((ByteCount > MIN_BYTE_CHECK_CANCEL) && Cons_kbhit())
@@ -3561,7 +4048,7 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             }
 
             Cons_printf(
-                " -- The PLX chip reports no EEPROM present --\n"
+                " -- The chip reports no EEPROM present --\n"
                 "\n"
                 "Do you want to proceed [y/n]? "
                 );
@@ -3633,7 +4120,9 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
             // Check for final entry
             if (offset == 0xFFF)
-                goto _Exit_Cmd_Eep;
+            {
+                break;
+            }
         }
 
         // Access device
@@ -3663,7 +4152,11 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 Cons_printf( "  %s", pStr );
             }
 
-            Cons_printf("\n");
+            // Next line but check if user (Q)uit via throttle prompt
+            if (Cons_printf("\n") == 0)
+            {
+                break;
+            }
         }
         else
         {
@@ -3684,12 +4177,11 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         }
         else
         {
-            goto _Exit_Cmd_Eep;
+            break;
         }
     }
     while (1);
 
-_Exit_Cmd_Eep:
     // Disable throttle output
     ConsoleIoThrottleSet(FALSE);
 

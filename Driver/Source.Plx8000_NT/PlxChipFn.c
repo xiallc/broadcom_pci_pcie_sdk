@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -31,7 +31,7 @@
  * SOFTWARE.
  ******************************************************************************/
 
-/******************************************************************************
+/*******************************************************************************
  *
  * File Name:
  *
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
@@ -839,7 +839,8 @@ PlxMapRegisterBar(
     {
         // Locate Upstream port
         pPciDevice =
-            pci_get_bus_and_slot(
+            Plx_pci_get_domain_bus_and_slot(
+                pdx->Key.domain,
                 pdx->Key.bus - 1,
                 PCI_DEVFN( 0, 0 )
                 );

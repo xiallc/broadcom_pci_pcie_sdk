@@ -50,6 +50,7 @@
 
 
 #include <ctype.h>
+#include "PciRegs.h"
 #include "PlxApi.h"
 
 #if defined(_WIN32)
@@ -500,7 +501,7 @@ main(
      ************************************************************/
     Cons_printf("Setup NT translation: ");
 
-    // Convert BAR size to range 
+    // Convert BAR size to range
     size = ~((U32)BarProp.Size - 1);
 
     // Calculate BAR offset
@@ -568,7 +569,7 @@ main(
                 break;
             }
         }
-            
+
         // Check if character passed from other side
         if (*(VU32*)pSysMem != 0)
         {
@@ -689,7 +690,7 @@ SelectDevice_NT(
         status =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (status == PLX_STATUS_OK)
@@ -803,7 +804,7 @@ SelectDevice_NT(
  *
  * Function   :  WaitForConnection
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 S8
@@ -1004,7 +1005,7 @@ PlxNT_B2B_Initialize(
     PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0x18, NT_B2B_BAR_BASE + 0x10000000 );
 
     // Enable entry 0 for 0:0.0 in the NTL LUT
-    PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0xDB4, Plx_PciToReqId(0,0,0) | (1 << 0) );
+    PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0xDB4, PCIE_REQID_BUILD(0,0,0) | (1 << 0) );
 
     // Enable device
     PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0x04, (0x7 << 0) );
@@ -1052,7 +1053,7 @@ PlxNT_B2B_Cleanup(
  *
  * Function   :  PlxPci_SetupNtTranslation
  *
- * Description:  
+ * Description:
  *
  *****************************************************************************/
 PLX_STATUS

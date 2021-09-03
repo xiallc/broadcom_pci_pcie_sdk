@@ -111,6 +111,8 @@ extern REGISTER_SET Pci8500[];
 extern REGISTER_SET Lcr8500[];
 extern REGISTER_SET Eep8500[];
 
+extern REGISTER_SET LcrGeneric[];
+
 
 
 

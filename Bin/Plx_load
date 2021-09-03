@@ -188,16 +188,28 @@ if [ ! -f $plx_drv_path/$module.ko ]; then
     exit
 fi
 
+# Get driver & kernel version numbers
+magic_Ker=`uname -r`
+magic_Drv=`modinfo $plx_drv_path/$module.ko | grep magic | awk '{print \$2}'`
+
 # Load module
 if $InsMod $plx_drv_path/$module.ko $Param2 $3 $4 $5 $6 $7 2>/dev/null; then
     echo "Ok ($plx_drv_path)"
 else
-    echo ERROR: Load error or no supported devices found
-    if [ "$Param1" = "8000n" ]; then
-        echo "   -- NOTE: 8000_NT driver is only for PLX switch Non-Transparent(NT) ports --"
-    fi
-    if [ "$Param1" = "8000d" ]; then
-        echo "   -- NOTE: 8000_DMA driver is only for PLX switches with DMA functions --"
+    # Check if built driver magic number doesn't match kernel
+    if [ "$magic_Ker" != "$magic_Drv" ]; then
+        echo ERROR: Load error or no supported devices found
+        echo "      \-- NOTE: $module.ko magic number doesn't match kernel, please rebuid"
+        echo "                   Kernel: $magic_Ker"
+        echo "                   Driver: $magic_Drv"
+    else
+        # Note special 8000-series drivers only for endpoints & not switches
+        if [ "$Param1" = "8000n" ]; then
+            echo "   -- NOTE: 8000_NT driver is only for PLX switch Non-Transparent(NT) ports --"
+        fi
+        if [ "$Param1" = "8000d" ]; then
+            echo "   -- NOTE: 8000_DMA driver is only for PLX switches with DMA functions --"
+        fi
     fi
     echo
     exit

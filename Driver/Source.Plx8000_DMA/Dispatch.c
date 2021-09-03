@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,14 +43,12 @@
  *
  * Revision History:
  *
- *      09-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>  // For copy_to/from_user()
 #include "ApiFunc.h"
 #include "Dispatch.h"
 #include "Driver.h"
@@ -79,7 +77,7 @@ Dispatch_open(
     DEVICE_OBJECT *fdo;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received message ==> OPEN_DEVICE\n"));
 
     if (iminor(inode) == PLX_MNGMT_INTERFACE)
@@ -96,7 +94,9 @@ Dispatch_open(
         fdo = pGbl_DriverObject->DeviceObject;
 
         while (i-- && fdo != NULL)
-           fdo = fdo->NextDevice;
+        {
+            fdo = fdo->NextDevice;
+        }
 
         if (fdo == NULL)
         {
@@ -114,7 +114,6 @@ Dispatch_open(
     }
 
     DebugPrintf(("...device opened\n"));
-
     return 0;
 }
 
@@ -138,7 +137,7 @@ Dispatch_release(
     DEVICE_OBJECT *fdo;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received message ==> CLOSE_DEVICE\n"));
 
     if (iminor(inode) == PLX_MNGMT_INTERFACE)
@@ -179,7 +178,6 @@ Dispatch_release(
     }
 
     DebugPrintf(("...device closed\n"));
-
     return 0;
 }
 
@@ -206,7 +204,7 @@ Dispatch_mmap(
     DEVICE_EXTENSION *pdx;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
     DebugPrintf(("Received message ===> MMAP\n"));
 
     // Get device extension
@@ -283,13 +281,17 @@ Dispatch_mmap(
 
         // Set caching based on BAR properties
         if (pdx->PciBar[offset].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE)
+        {
             vma->vm_page_prot = pgprot_writecombine( vma->vm_page_prot );
+        }
         else
+        {
             vma->vm_page_prot = pgprot_noncached( vma->vm_page_prot );
+        }
 
         // Map device memory
         rc =
-            Plx_io_remap_pfn_range(
+            io_remap_pfn_range(
                 vma,
                 vma->vm_start,
                 AddressToMap >> PAGE_SHIFT,
@@ -301,7 +303,7 @@ Dispatch_mmap(
     {
         // Map system memory
         rc =
-            Plx_remap_pfn_range(
+            remap_pfn_range(
                 vma,
                 vma->vm_start,
                 AddressToMap >> PAGE_SHIFT,
@@ -326,7 +328,6 @@ Dispatch_mmap(
     }
 
     DebugPrintf(("...Completed message\n"));
-
     return rc;
 }
 
@@ -354,7 +355,7 @@ Dispatch_IoControl(
     DEVICE_EXTENSION *pdx;
 
 
-    DebugPrintf_Cont(("\n"));
+    DebugPrintf_Cont((" \n"));
 
     // Get the device extension
     if (iminor(filp->f_path.dentry->d_inode) == PLX_MNGMT_INTERFACE)

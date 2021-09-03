@@ -58,4 +58,3 @@ endif
 ifeq ($(KERNELRELEASE),)
     include $(PLX_DIR)/Makefiles/Targets.def
 endif
-

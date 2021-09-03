@@ -2,7 +2,8 @@
 #define __PLX_TYPES_H
 
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2019 Broadcom Inc.
+ * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -42,11 +43,11 @@
  *
  * Description:
  *
- *      This file includes PLX SDK types and definitions
+ *      This file includes SDK types and definitions
  *
  * Revision:
  *
- *      11-01-16 : PLX SDK v7.25
+ *      01-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
@@ -94,29 +95,24 @@ extern "C" {
 #endif
 
 // Macros to support portable type casting on BE/LE platforms
-#if (PLX_SIZE_64 == 4)
-    #define PLX_64_HIGH_32(value)                 0
-    #define PLX_64_LOW_32(value)                  ((U32)(value))
+#if defined(PLX_BIG_ENDIAN)
+    #define PLX_64_HIGH_32(value)             ((U32)((U64)value))
+    #define PLX_64_LOW_32(value)              ((U32)(((U64)value) >> 32))
+
+    #define PLX_CAST_64_TO_8_PTR( ptr64 )     (U8*) ((U8*)PLX_INT_TO_PTR(ptr64) + (7*sizeof(U8)))
+    #define PLX_CAST_64_TO_16_PTR( ptr64 )    (U16*)((U8*)PLX_INT_TO_PTR(ptr64) + (6*sizeof(U8)))
+    #define PLX_CAST_64_TO_32_PTR( ptr64 )    (U32*)((U8*)PLX_INT_TO_PTR(ptr64) + sizeof(U32))
+
+    #define PLX_LE_U32_BIT( pos )             ((U32)(1 << (31 - (pos))))
 #else
-    #if defined(PLX_BIG_ENDIAN)
-        #define PLX_64_HIGH_32(value)             ((U32)((U64)value))
-        #define PLX_64_LOW_32(value)              ((U32)(((U64)value) >> 32))
+    #define PLX_64_HIGH_32(value)             ((U32)(((U64)value) >> 32))
+    #define PLX_64_LOW_32(value)              ((U32)((U64)value))
 
-        #define PLX_CAST_64_TO_8_PTR( ptr64 )     (U8*) ((U8*)PLX_INT_TO_PTR(ptr64) + (7*sizeof(U8)))
-        #define PLX_CAST_64_TO_16_PTR( ptr64 )    (U16*)((U8*)PLX_INT_TO_PTR(ptr64) + (6*sizeof(U8)))
-        #define PLX_CAST_64_TO_32_PTR( ptr64 )    (U32*)((U8*)PLX_INT_TO_PTR(ptr64) + sizeof(U32))
+    #define PLX_CAST_64_TO_8_PTR( ptr64 )     (U8*) PLX_INT_TO_PTR(ptr64)
+    #define PLX_CAST_64_TO_16_PTR( ptr64 )    (U16*)PLX_INT_TO_PTR(ptr64)
+    #define PLX_CAST_64_TO_32_PTR( ptr64 )    (U32*)PLX_INT_TO_PTR(ptr64)
 
-        #define PLX_LE_U32_BIT( pos )             ((U32)(1 << (31 - (pos))))
-    #else
-        #define PLX_64_HIGH_32(value)             ((U32)(((U64)value) >> 32))
-        #define PLX_64_LOW_32(value)              ((U32)((U64)value))
-
-        #define PLX_CAST_64_TO_8_PTR( ptr64 )     (U8*) PLX_INT_TO_PTR(ptr64)
-        #define PLX_CAST_64_TO_16_PTR( ptr64 )    (U16*)PLX_INT_TO_PTR(ptr64)
-        #define PLX_CAST_64_TO_32_PTR( ptr64 )    (U32*)PLX_INT_TO_PTR(ptr64)
-
-        #define PLX_LE_U32_BIT( pos )             ((U32)(1 << (pos)))
-    #endif
+    #define PLX_LE_U32_BIT( pos )             ((U32)(1 << (pos)))
 #endif
 
 
@@ -155,6 +151,7 @@ extern "C" {
 
 #if defined(PLX_MSWINDOWS)
     #define PLX_TIMEOUT_INFINITE        INFINITE
+    #define PLX_MEM_POOL_TAG            '_XLP'  // "PLX_" tag for driver mem alloc
 #elif defined(PLX_LINUX) || defined(PLX_LINUX_DRIVER)
     #define PLX_TIMEOUT_INFINITE        MAX_SCHEDULE_TIMEOUT
 
@@ -177,50 +174,64 @@ extern "C" {
 
 
 /******************************************
- *   Opaque bit mask type & macros
+ *   Definitions for Generic Bitmasks
  ******************************************/
-// Macro to set bit for single port in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_SET(mask,port)    ( (mask).DW[ (port) / 32 ] |= \
-                                                         ((U32)1 << ((port) % 32)) )
+/// Declare a generic bitmask variable with arbitrary size (auto-aligns to 32-bit multiple)
+#define PEX_BITMASK_T(Name,Bits)            U32 (Name)[ ((Bits) + 31) / 32 ]
 
-// Macro to clear bit for single port in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_CLEAR(mask,port)  ( (mask).DW[ (port) / 32 ] &= \
-                                                         ~((U32)1 << ((port) % 32)) )
+// Set a bit in generic bitmask variable
+#define PEX_BITMASK_SET(Mask,Bit)           ( (Mask)[ (Bit) / 32 ] |= ((U32)1 << ((Bit) % 32)) )
 
-// Macro to clear entire bit mask in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_CLEAR_ALL(mask)   do { \
-                                             (mask).DW[0] = 0; \
-                                             (mask).DW[1] = 0; \
-                                             (mask).DW[2] = 0; \
-                                         } while (0)
+// Set all bits in generic bitmask variable
+#define PEX_BITMASK_SET_ALL(Mask)           memset( (Mask), 0xFF, sizeof((Mask)) )
 
-// Macro to test if bit for single port set in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_TEST(mask,port)   ( (mask).DW[ (port) / 32 ] & \
-                                                         ((U32)1 << ((port) % 32)) )
+// Clear a bit in generic bitmask variable
+#define PEX_BITMASK_CLEAR(Mask,Bit)         ( (Mask)[ (Bit) / 32 ] &= ~((U32)1 << ((Bit) % 32)) )
 
-// Macro to test if bit is set for any port in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_TEST_ANY(mask)    ( ((mask).DW[0] != 0) || \
-                                          ((mask).DW[1] != 0) || \
-                                          ((mask).DW[2] != 0) )
+// Clear all bits in generic bitmask variable
+#define PEX_BITMASK_CLEAR_ALL(Mask)         memset( (Mask), 0, sizeof((Mask)) )
 
-// Macro to AND two bit masks in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_AND(mask1,mask2,maskresult) \
-       (maskresult).DW[0] = (mask1).DW[0] & (mask2).DW[0]; \
-       (maskresult).DW[1] = (mask1).DW[1] & (mask2).DW[1]; \
-       (maskresult).DW[2] = (mask1).DW[2] & (mask2).DW[2]; 
+// Copies one mask to another
+#define PEX_BITMASK_COPY(Src,Dest)          memcpy( (Dest), (Src), sizeof((Dest)) )
 
-// Macro to OR two bit masks in opaque PMG_PORT_MASK structure
-#define PMG_PORT_MASK_OR(mask1,mask2,maskresult) \
-       (maskresult).DW[0] = (mask1).DW[0] | (mask2).DW[0]; \
-       (maskresult).DW[1] = (mask1).DW[1] | (mask2).DW[1]; \
-       (maskresult).DW[2] = (mask1).DW[2] | (mask2).DW[2]; 
+// Test whether a specific bit is set in generic bitmask variable
+#define PEX_BITMASK_TEST(Mask,Bit)          ( ((Mask)[ (Bit) / 32 ] & ((U32)1 << ((Bit) % 32))) != 0 )
 
-// Opaque structure to contain port masks. Use PMG_PORT_MASK_xxx macros to access it.
-// Bit numbers correspond to port numbers, i.e. port 0 = bit 0.
-typedef struct _PMG_PORT_MASK
+// Test whether any bit is set in generic bitmask variable
+#define PEX_BITMASK_TEST_ANY(Mask)          __PEX_BITMASK_TEST_ANY( (Mask), sizeof( (Mask) ) )
+
+// Helper function for PEX_BITMASK_TEST_ANY macro
+static __inline U8 __PEX_BITMASK_TEST_ANY( U32 *PtrBitMask, U32 ByteSize )
 {
-    U32 DW[3];                             // 1-bit per port distributed across 32-bit values
-} PMG_PORT_MASK, *PTR_PMG_PORT_MASK;
+    U32 idx = 0;
+
+    while ( idx < (ByteSize / sizeof(U32)) )
+    {
+        if (PtrBitMask[ idx ] != 0)
+        {
+            return TRUE;
+        }
+        idx++;
+    }
+    return FALSE;
+}
+
+// Return the count of set bits in a mask
+#define PEX_BITMASK_GET_SET_COUNT(Mask)     __PEX_BITMASK_GET_SET_COUNT( (Mask), sizeof( (Mask) ) )
+
+// Helper function for PEX_BITMASK_GET_SET_COUNT macro
+static __inline U32 __PEX_BITMASK_GET_SET_COUNT( U32 *PtrBitMask, U32 ByteSize )
+{
+    U32 bit = 0;
+    U32 bitCount = 0;
+
+    while (bit < (ByteSize * 8))
+    {
+        bitCount += PEX_BITMASK_TEST( PtrBitMask, bit );
+        bit++;
+    }
+    return bitCount;
+}
 
 
 
@@ -232,6 +243,8 @@ typedef enum _PLX_API_MODE
 {
     PLX_API_MODE_PCI,                   // Device accessed via PLX driver over PCI/PCIe
     PLX_API_MODE_I2C_AARDVARK,          // Device accessed via Aardvark I2C USB
+    PLX_API_MODE_MDIO_SPLICE,           // Device accessed via Splice MDIO USB
+    PLX_API_MODE_SDB,                   // Device accessed via Serial Debug Port
     PLX_API_MODE_TCP                    // Device accessed via TCP/IP
 } PLX_API_MODE;
 
@@ -267,8 +280,7 @@ typedef enum _PLX_CHIP_FAMILY
     PLX_FAMILY_DRACO_2,                 // 8713,8717,8725,8733 + [Draco 1 rev BA]
     PLX_FAMILY_MIRA,                    // 2380,3380,3382,8603,8605
     PLX_FAMILY_CAPELLA_1,               // 8714,8718,8734,8750,8764,8780,8796
-    PLX_FAMILY_CAPELLA_2,               // 9712,9713,9716,9717,9733,9734,9749
-                                        //   9750,9765,9766,9781,9782,9797,9798
+    PLX_FAMILY_CAPELLA_2,               // 9712,9716,9733,9749,9750,9765,9781,9797
     PLX_FAMILY_ATLAS,                   // C010,C011,C012
     PLX_FAMILY_LAST_ENTRY               // -- Must be final entry --
 } PLX_CHIP_FAMILY;
@@ -416,11 +428,9 @@ typedef enum _PLX_CRC_STATUS
 typedef enum _PLX_LINK_SPEED
 {
     PLX_LINK_SPEED_2_5_GBPS     = 1,
-    PLX_LINK_SPEED_5_0_GBPS     = 2,
-    PLX_LINK_SPEED_8_0_GBPS     = 3,
-    PLX_PCIE_GEN_1_0            = PLX_LINK_SPEED_2_5_GBPS,
-    PLX_PCIE_GEN_2_0            = PLX_LINK_SPEED_5_0_GBPS,
-    PLX_PCIE_GEN_3_0            = PLX_LINK_SPEED_8_0_GBPS
+    PLX_LINK_SPEED_5_GBPS       = 2,
+    PLX_LINK_SPEED_8_GBPS       = 3,
+    PLX_LINK_SPEED_16_GBPS      = 4
 } PLX_LINK_SPEED;
 
 
@@ -466,12 +476,14 @@ typedef enum _PLX_SPECIFIC_PORT_TYPE
     PLX_SPEC_PORT_HOST          = 8,            // Host port
     PLX_SPEC_PORT_FABRIC        = 9,            // Fabric port
     PLX_SPEC_PORT_GEP           = 10,           // Global EP
-    PLX_SPEC_PORT_SYNTH_NIC     = 11,           // Synthetic NIC VF
-    PLX_SPEC_PORT_SYNTH_TWC     = 12,           // Synthetic TWC EP
-    PLX_SPEC_PORT_SYNTH_EN_EP   = 13,           // Synthetic Enabler EP
-    PLX_SPEC_PORT_SYNTH_NT      = 14,           // Synthetic NT 2.0 EP
-    PLX_SPEC_PORT_SYNTH_MPT     = 15,           // Synthetic MPT SAS controller EP
-    PLX_SPEC_PORT_MPT           = 16            // MPT SAS controller EP
+    PLX_SPEC_PORT_MPT           = 11,           // MPT SAS controller EP
+    PLX_SPEC_PORT_MPT_NO_SES    = 12,           // MPT EP (No SES)
+    PLX_SPEC_PORT_SYNTH_NIC     = 13,           // Synthetic NIC VF
+    PLX_SPEC_PORT_SYNTH_TWC     = 14,           // Synthetic TWC EP
+    PLX_SPEC_PORT_SYNTH_EN_EP   = 15,           // Synthetic Enabler EP
+    PLX_SPEC_PORT_SYNTH_NT      = 16,           // Synthetic NT 2.0 EP
+    PLX_SPEC_PORT_SYNTH_MPT     = 17,           // Synthetic MPT SAS controller EP
+    PLX_SPEC_PORT_SYNTH_GDMA    = 18            // Synthetic gDMA EP
 
     // Following definitions are deprecated & only remain for compatibility
    ,PLX_NT_PORT_NONE            = PLX_SPEC_PORT_UNKNOWN,
@@ -607,10 +619,34 @@ typedef struct _PLX_MODE_PROP
 
         struct
         {
+            U8    Port;
+            U32   ClockRate;
+            char *StrPath;
+        } Mdio;
+
+        struct
+        {
+            U8 Port;
+            U8 Baud;
+            U8 Cable;
+        } Sdb;
+
+        struct
+        {
             U64 IpAddress;
         } Tcp;
     };
 } PLX_MODE_PROP;
+
+// Types of supported UART cable connections for SDB
+#define SDB_UART_CABLE_DEFAULT          0
+#define SDB_UART_CABLE_UART             1
+#define SDB_UART_CABLE_USB              2
+
+// Baud rates supported by SDB
+#define SDB_BAUD_RATE_DEFAULT           0
+#define SDB_BAUD_RATE_19200             1
+#define SDB_BAUD_RATE_115200            2
 
 
 // PLX version information
@@ -800,12 +836,6 @@ typedef struct _PLX_INTERRUPT
     U8  NTV_LE_Uncorrectable   :1;
     U8  NTV_LE_LinkStateChange :1;
     U8  NTV_LE_UncorrErrorMsg  :1;
-
-    // Management software events
-    PMG_PORT_MASK LinkStateUp;
-    PMG_PORT_MASK LinkStateDown;
-    PMG_PORT_MASK HotPlugAdd;
-    PMG_PORT_MASK HotPlugRemove;
 } PLX_INTERRUPT;
 
 
@@ -891,40 +921,40 @@ typedef struct _PLX_PERF_PROP
     // Ingress counters
     U32 IngressPostedHeader;
     U32 IngressPostedDW;
+    U32 IngressNonpostedHdr;
     U32 IngressNonpostedDW;
     U32 IngressCplHeader;
     U32 IngressCplDW;
     U32 IngressDllp;
-    U32 IngressPhy;
 
     // Egress counters
     U32 EgressPostedHeader;
     U32 EgressPostedDW;
+    U32 EgressNonpostedHdr;
     U32 EgressNonpostedDW;
     U32 EgressCplHeader;
     U32 EgressCplDW;
     U32 EgressDllp;
-    U32 EgressPhy;
 
     // Storage for previous counter values
 
     // Previous Ingress counters
     U32 Prev_IngressPostedHeader;
     U32 Prev_IngressPostedDW;
+    U32 Prev_IngressNonpostedHdr;
     U32 Prev_IngressNonpostedDW;
     U32 Prev_IngressCplHeader;
     U32 Prev_IngressCplDW;
     U32 Prev_IngressDllp;
-    U32 Prev_IngressPhy;
 
     // Previous Egress counters
     U32 Prev_EgressPostedHeader;
     U32 Prev_EgressPostedDW;
+    U32 Prev_EgressNonpostedHdr;
     U32 Prev_EgressNonpostedDW;
     U32 Prev_EgressCplHeader;
     U32 Prev_EgressCplDW;
     U32 Prev_EgressDllp;
-    U32 Prev_EgressPhy;
 } PLX_PERF_PROP;
 
 

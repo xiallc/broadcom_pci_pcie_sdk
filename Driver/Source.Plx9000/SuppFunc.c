@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2016 Avago Technologies
+ * Copyright 2013-2019 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,16 +43,16 @@
  *
  * Revision History:
  *
- *      12-01-16 : PLX SDK v7.25
+ *      03-01-19 : PCI/PCIe SDK v8.00
  *
  ******************************************************************************/
 
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>   // For user page access
 #include <linux/ctype.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
-#include <linux/pagemap.h>
+#include <linux/mm.h>
 #include <linux/sched.h>
 #include "ApiFunc.h"
 #include "PciFunc.h"
@@ -611,8 +611,8 @@ Plx_dma_buffer_alloc(
      *                little harder" in the allocation effort.
      ********************************************************/
     pMemObject->pKernelVa =
-        Plx_dma_alloc_coherent(
-            pdx,
+        dma_alloc_coherent(
+            &(pdx->pPciDevice->dev),
             pMemObject->Size,
             &BusAddress,
             GFP_KERNEL | __GFP_NOWARN
@@ -643,10 +643,7 @@ Plx_dma_buffer_alloc(
             );
 
     // Clear the buffer
-    RtlZeroMemory(
-        pMemObject->pKernelVa,
-        pMemObject->Size
-        );
+    RtlZeroMemory( pMemObject->pKernelVa, pMemObject->Size );
 
     DebugPrintf(("Allocated physical memory...\n"));
 
@@ -711,8 +708,8 @@ Plx_dma_buffer_free(
     }
 
     // Release the buffer
-    Plx_dma_free_coherent(
-        pdx,
+    dma_free_coherent(
+        &(pdx->pPciDevice->dev),
         pMemObject->Size,
         pMemObject->pKernelVa,
         (dma_addr_t)pMemObject->BusPhysical
@@ -820,8 +817,8 @@ PlxSglDmaTransferComplete(
         VaSgl += (4 * sizeof(U32));
 
         // Unmap the page
-        Plx_dma_unmap_page(
-            pdx,
+        dma_unmap_page(
+            &(pdx->pPciDevice->dev),
             BusAddr,
             BlockSize,
             pdx->DmaInfo[channel].direction
@@ -838,7 +835,7 @@ PlxSglDmaTransferComplete(
         }
 
         // Unlock the page
-        page_cache_release( pdx->DmaInfo[channel].PageList[i] );
+        put_page( pdx->DmaInfo[channel].PageList[i] );
     }
 
     // Release page-list memory
@@ -960,15 +957,12 @@ PlxLockBufferAndBuildSgl(
 
     // Attempt to lock the user buffer into memory
     rc =
-        get_user_pages(
-            current,                          // Task performing I/O
-            current->mm,                      // The tasks memory-management structure
-            UserVa & PAGE_MASK,               // Page-aligned starting address of user buffer
-            TotalDescr,                       // Length of the buffer in pages
-            bDirLocalToPci,                   // Map for write access (i.e. user app performing a read)?
-            0,                                // Do not force an override of page protections
-            pdx->DmaInfo[channel].PageList,   // Will contain list of page pointers describing buffer
-            NULL                              // Will contain list of associated VMAs
+        Plx_get_user_pages(
+            UserVa & PAGE_MASK,                // Page-aligned user buffer start address
+            TotalDescr,                        // Length of the buffer in pages
+            (bDirLocalToPci ? FOLL_WRITE : 0), // Flags
+            pdx->DmaInfo[channel].PageList,    // List of page pointers describing buffer
+            NULL                               // List of associated VMAs
             );
 
     // Release mmap semaphore
@@ -990,10 +984,9 @@ PlxLockBufferAndBuildSgl(
             // Unlock user buffer pages that were mapped
             for (i = 0; i < rc; i++)
             {
-                page_cache_release( pdx->DmaInfo[channel].PageList[i] );
+                put_page( pdx->DmaInfo[channel].PageList[i] );
             }
         }
-
         kfree( pdx->DmaInfo[channel].PageList );
         return PLX_STATUS_PAGE_LOCK_ERROR;
     }
@@ -1078,7 +1071,7 @@ PlxLockBufferAndBuildSgl(
             // Unlock user buffer pages
             for (i = 0; i < TotalDescr; i++)
             {
-                page_cache_release( pdx->DmaInfo[channel].PageList[i] );
+                put_page( pdx->DmaInfo[channel].PageList[i] );
             }
             kfree( pdx->DmaInfo[channel].PageList );
             return PLX_STATUS_INSUFFICIENT_RES;
@@ -1131,8 +1124,8 @@ PlxLockBufferAndBuildSgl(
 
         // Get bus address of buffer
         BusAddr =
-            Plx_dma_map_page(
-                pdx,
+            dma_map_page(
+                &(pdx->pPciDevice->dev),
                 pdx->DmaInfo[channel].PageList[i],
                 offset,
                 BlockSize,

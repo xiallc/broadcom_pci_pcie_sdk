@@ -149,8 +149,12 @@
  * access_ok
  *
  * access_ok() removed type param in 5.0
+ *
+ * NOTICE: XIA modified this macro to fix a compilation
+ *         issue present on the CentOS 8
+ *         4.18.0-305.12.1.el8_4.x86_64 kernel.
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0))
     #define Plx_access_ok                     access_ok
 #else
     #define Plx_access_ok(type,addr,size)     access_ok( (addr),(size) )

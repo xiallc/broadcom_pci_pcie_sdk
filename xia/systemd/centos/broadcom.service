@@ -1,0 +1,16 @@
+[Unit]
+Description=Broadcom PCI/PCIe 9054 Driver
+After=network.target
+
+[Service]
+Type=oneshot
+Environment=PLX_SDK_DIR=/usr/local/broadcom/current
+ExecStartPre=setenforce Permissive
+ExecStart=/bin/bash /usr/local/broadcom/current/Bin/Plx_load 9054
+ExecStartPost=setenforce 1
+ExecStop=/bin/bash /usr/local/broadcom/current/Bin/Plx_unload 9054
+ExecStopPost=setenforce 1
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

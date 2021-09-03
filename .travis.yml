@@ -1,0 +1,49 @@
+env:
+  global:
+    - MAKEFLAGS="-j 8"
+language: cpp
+dist: focal
+os: linux
+arch: amd64
+
+jobs:
+  include:
+    - name: GCC 7 Test
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+            - linux-headers-$(uname -r)
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+    - name: GCC 8 Test
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-8
+            - linux-headers-$(uname -r)
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+    - name: GCC 9 Test
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - linux-headers-$(uname -r)
+      env:
+        - MATRIX_EVAL=""
+
+before_install:
+  - eval "${MATRIX_EVAL}"
+  - export PLX_SDK_DIR=${PWD}
+
+script:
+  - make -C ${PLX_SDK_DIR}/PlxApi PLX_NO_CLEAR_SCREEN=1
+  - test -e ${PLX_SDK_DIR}/PlxApi/Library/PlxApi.a | exit 1
+  - MAKEFLAGS="-j 1" PLX_CHIP=9054 make -C ${PLX_SDK_DIR}/Driver PLX_NO_CLEAR_SCREEN=1
+  - test -e ${PLX_SDK_DIR}/Driver/Source.Plx9000/Output/Plx9054.ko | exit 3

@@ -1,6 +1,39 @@
 #ifndef _CONSFUNC_H
 #define _CONSFUNC_H
 
+/*******************************************************************************
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -13,7 +46,7 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      04-01-16 : PLX SDK v7.30
  *
  ******************************************************************************/
 
@@ -68,7 +101,7 @@
     #define Plx_strcmp                  strcmp
     #define Plx_strcasecmp              strcasecmp
     #define Plx_strncasecmp             strncasecmp
-    #define Cons_clear()                system("clear")
+    #define Cons_clear                  Plx_clrscr
     #define Cons_fflush                 fflush
     #define Cons_flushinp               do {while (Plx_kbhit()) Plx_getch();} while (0)
     #define Cons_fputs                  Plx_fputs
@@ -145,6 +178,7 @@
 #define CONS_KEY_NEWLINE                    '\n'
 #define CONS_KEY_CARRIAGE_RET               '\r'
 #define CONS_KEY_TAB                        '\t'
+#define CONS_KEY_BACKSPACE                  '\b'
 
 // 1st extended key code
 #if defined(PLX_LINUX)
@@ -160,7 +194,7 @@
 
 // Extended key codes
 #if defined(PLX_LINUX)
-    #define CONS_KEY_BACKSPACE              127
+    #define CONS_KEY_EXT_BACKSPACE          127
     #define CONS_KEY_ARROW_UP               65
     #define CONS_KEY_ARROW_DOWN             66
     #define CONS_KEY_ARROW_LEFT             68
@@ -174,7 +208,7 @@
     #define CONS_KEY_PAGE_UP                53
     #define CONS_KEY_PAGE_DOWN              54
 #else
-    #define CONS_KEY_BACKSPACE              '\b'
+    #define CONS_KEY_EXT_BACKSPACE          127
     #define CONS_KEY_ARROW_UP               72
     #define CONS_KEY_ARROW_DOWN             80
     #define CONS_KEY_ARROW_LEFT             75
@@ -226,14 +260,24 @@ ConsoleCursorPropertiesSet(
     int size
     );
 
+unsigned char
+ConsoleIoThrottleGet(
+    void
+    );
+
 void
-ConsoleIoThrottle(
+ConsoleIoThrottleSet(
     unsigned char bEnable
     );
 
 void
 ConsoleIoThrottleReset(
     void
+    );
+
+void
+ConsoleIoThrottleLock(
+    unsigned char bLock
     );
 
 void
@@ -258,21 +302,13 @@ Plx_printf(
     ...
     );
 
-
-// Windows-specific functions
-#if defined(PLX_MSWINDOWS)
-
 void
 Plx_clrscr(
     void
     );
 
-#endif
-
-
 // Linux-specific functions
 #if defined(PLX_LINUX)
-
 int
 Plx_kbhit(
     void
@@ -282,7 +318,6 @@ int
 Plx_getch(
     void
     );
-
 #endif
 
 

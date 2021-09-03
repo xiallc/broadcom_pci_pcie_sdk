@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2015 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -10,7 +43,7 @@
  *
  * Revision History:
  *
- *      07-01-08 : PLX SDK v6.00
+ *      07-01-14 : PLX SDK v7.20
  *
  ******************************************************************************/
 
@@ -136,7 +169,7 @@ main(
             &Device
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("\n   ERROR: Unable to find or select a PLX device\n");
         PlxSdkErrorDisplay(rc);
@@ -264,7 +297,7 @@ TestChipTypeGet(
             &Revision
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -321,7 +354,8 @@ TestPlxRegister(
 
     if (((ChipTypeSelected & 0xFF00) == 0x8500) ||
         ((ChipTypeSelected & 0xFF00) == 0x8600) ||
-        ((ChipTypeSelected & 0xFF00) == 0x8700))
+        ((ChipTypeSelected & 0xFF00) == 0x8700) ||
+        ((ChipTypeSelected & 0xFF00) == 0x9700))
     {
         PlxChip &= 0xFF00;
     }
@@ -338,6 +372,7 @@ TestPlxRegister(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             // Get PCI header type
             PciHeaderType = PlxPci_PciRegisterReadFast( pDevice, 0xC, NULL );
             PciHeaderType = (U8)((PciHeaderType >> 16) & 0x7F);
@@ -386,7 +421,7 @@ TestPlxRegister(
             &rc
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -403,7 +438,7 @@ TestPlxRegister(
             ValueToWrite
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -420,7 +455,7 @@ TestPlxRegister(
             &rc
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -445,7 +480,7 @@ TestPlxRegister(
             RegSave
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -465,13 +500,13 @@ TestPlxRegister(
             &rc
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
-        if ((rc == ApiUnsupportedFunction) &&
+        if ((rc == PLX_STATUS_UNSUPPORTED) &&
             ((ChipTypeSelected == 0x8111) ||
              (ChipTypeSelected == 0x8112)))
         {
-            Cons_printf("Ok (Expected rc=ApiUnsupportedFunction)\n");
+            Cons_printf("Ok (Expected rc=STATUS_UNSUPPORTED)\n");
         }
         else
         {
@@ -496,7 +531,7 @@ TestPlxRegister(
             ValueToWrite
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -513,7 +548,7 @@ TestPlxRegister(
             &rc
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -538,7 +573,7 @@ TestPlxRegister(
             RegSave
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -644,7 +679,7 @@ TestCommonBuffer(
             &CommonBuffer
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - rc=%s\n", PlxSdkErrorText(status));
     }
@@ -661,7 +696,7 @@ TestCommonBuffer(
             &Va
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         // Handle case where buffer not allocated
         if (CommonBuffer.Size == 0)
@@ -697,7 +732,7 @@ TestCommonBuffer(
             &Va
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         // Handle case where buffer not allocated
         if (CommonBuffer.Size == 0)
@@ -746,11 +781,11 @@ TestPhysicalMemAllocate(
             TRUE             // Smaller buffer ok
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
-        if (rc == ApiUnsupportedFunction)
+        if (rc == PLX_STATUS_UNSUPPORTED)
         {
-            Cons_printf("*ERROR* - ApiUnsupportedFunction returned\n");
+            Cons_printf("*ERROR* - STATUS_UNSUPPORTED returned\n");
             Cons_printf("     -- PLX Service driver used, Physical Mem API not supported --\n");
         }
         else
@@ -769,7 +804,7 @@ TestPhysicalMemAllocate(
             &PhysBuffer
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - (rc=%s)\n", PlxSdkErrorText(rc));
     }
@@ -819,7 +854,7 @@ TestPhysicalMemAllocate(
             &PhysBuffer
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - Unable to free physical buffer\n");
         PlxSdkErrorDisplay(rc);
@@ -861,7 +896,8 @@ TestEeprom(
     PlxChip = (U16)ChipTypeSelected;
 
     if (((ChipTypeSelected & 0xFF00) == 0x8600) ||
-        ((ChipTypeSelected & 0xFF00) == 0x8700))
+        ((ChipTypeSelected & 0xFF00) == 0x8700) ||
+        ((ChipTypeSelected & 0xFF00) == 0x9700))
     {
         PlxChip &= 0xFF00;
     }
@@ -878,6 +914,7 @@ TestEeprom(
         case 0x8548:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             offset = 0x0;
             bCrc   = FALSE;
             break;
@@ -925,7 +962,7 @@ TestEeprom(
             &rc
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -952,7 +989,7 @@ TestEeprom(
             &rc
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -984,7 +1021,7 @@ TestEeprom(
             &ReadSave_16
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1008,7 +1045,7 @@ TestEeprom(
             (U16)WriteValue
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1032,7 +1069,7 @@ TestEeprom(
             &ReadValue_16
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1066,7 +1103,7 @@ TestEeprom(
             ReadSave_16
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1085,7 +1122,7 @@ TestEeprom(
             &ReadSave
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1109,7 +1146,7 @@ TestEeprom(
             WriteValue
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1133,7 +1170,7 @@ TestEeprom(
             &ReadValue
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1167,7 +1204,7 @@ TestEeprom(
             ReadSave
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API call failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1185,11 +1222,11 @@ TestEeprom(
             &CrcStatus
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
-        if ((rc == ApiUnsupportedFunction) && (bCrc == FALSE))
+        if ((rc == PLX_STATUS_UNSUPPORTED) && (bCrc == FALSE))
         {
-            Cons_printf("Ok (Expected rc=ApiUnsupportedFunction)\n");
+            Cons_printf("Ok (Expected rc=STATUS_UNSUPPORTED)\n");
         }
         else
         {
@@ -1216,11 +1253,11 @@ TestEeprom(
             FALSE       // Don't update EEPROM
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
-        if ((rc == ApiUnsupportedFunction) && (bCrc == FALSE))
+        if ((rc == PLX_STATUS_UNSUPPORTED) && (bCrc == FALSE))
         {
-            Cons_printf("Ok (Expected rc=ApiUnsupportedFunction)\n");
+            Cons_printf("Ok (Expected rc=STATUS_UNSUPPORTED)\n");
         }
         else
         {
@@ -1315,7 +1352,7 @@ TestInterruptNotification(
         Offset_IrqBase = 0xC4C;
 
     // Add offset based on virtual or link side
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
         // Skip over Virtual-side registers
         Offset_IrqBase += 0x10;
@@ -1347,11 +1384,11 @@ TestInterruptNotification(
             &NotifyObject
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
-        if (rc == ApiUnsupportedFunction)
+        if (rc == PLX_STATUS_UNSUPPORTED)
         {
-            Cons_printf("*ERROR* - ApiUnsupportedFunction returned\n");
+            Cons_printf("*ERROR* - STATUS_UNSUPPORTED returned\n");
             Cons_printf("     -- PLX Service driver used, Notification API not supported --\n");
             return;
         }
@@ -1408,15 +1445,15 @@ TestInterruptNotification(
 
     switch (rc)
     {
-        case ApiSuccess:
+        case PLX_STATUS_OK:
             Cons_printf("Ok (Int received)\n");
             break;
 
-        case ApiWaitTimeout:
+        case PLX_STATUS_TIMEOUT:
             Cons_printf("*ERROR* - Timeout waiting for Int Event\n");
             break;
 
-        case ApiWaitCanceled:
+        case PLX_STATUS_CANCELED:
             Cons_printf("*ERROR* - Interrupt event cancelled\n");
             break;
 
@@ -1436,7 +1473,7 @@ TestInterruptNotification(
             &PlxInterrupt
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1457,7 +1494,7 @@ TestInterruptNotification(
             &NotifyObject
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -1502,7 +1539,7 @@ TestPortInfo(
             &PortProp
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);

@@ -1,3 +1,4 @@
+# Set the folders to build
 SUBDIRS	= \
 	  PlxApi                   \
 	  Samples/ApiTest          \
@@ -16,16 +17,35 @@ SUBDIRS	= \
 	  Samples/PlxNotification
 
 
-all:      $(SUBDIRS)
-	for i in $(SUBDIRS); do $(MAKE) -C $$i all; sleep 2; done
+# Targets
+all: $(SUBDIRS)
+	@clear
+	@for i in $(SUBDIRS); \
+	 do \
+	    echo '   ------------------'; \
+	    $(MAKE) -C $$i PLX_NO_CLEAR_SCREEN=1 --no-print-directory; \
+	    sleep 1; \
+	 done
 	@echo
 
 
-clean:    $(SUBDIRS)
-	for i in $(SUBDIRS); do $(MAKE) -C $$i clean; sleep 1; done
+clean: $(SUBDIRS)
+	@clear
+	@for i in $(SUBDIRS); \
+	 do \
+	    echo '   ------------------'; \
+	    $(MAKE) -C $$i clean --no-print-directory; \
+	    sleep 1; \
+	 done
 	@echo
 
 
-cleanall: $(SUBDIRS)
-	for i in $(SUBDIRS); do $(MAKE) -C $$i cleanall; sleep 1; done
+cleanobj: $(SUBDIRS)
+	@clear
+	@for i in $(SUBDIRS); \
+	 do \
+	    echo '   ------------------'; \
+	    $(MAKE) -C $$i cleanobj --no-print-directory; \
+	    sleep 1; \
+	 done
 	@echo

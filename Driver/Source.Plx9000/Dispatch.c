@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision History:
  *
- *      02-01-13 : PLX SDK v7.00
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -191,7 +203,7 @@ Dispatch_mmap(
     int               rc;
     off_t             offset;
     BOOLEAN           bDeviceMem;
-    PLX_UINT_PTR      AddressToMap;
+    U64               AddressToMap;
     DEVICE_EXTENSION *pdx;
 
 
@@ -220,17 +232,13 @@ Dispatch_mmap(
                     "ERROR - PCI BAR %d is an I/O space, cannot map to user space\n",
                     (U8)offset
                     ));
-
                 return -ENODEV;
             }
 
-            DebugPrintf((
-                "Map PCI BAR %d...\n",
-                (U8)offset
-                ));
+            DebugPrintf(("Map PCI BAR %d...\n", (U8)offset));
 
             // Use the BAR physical address for the mapping
-            AddressToMap = (PLX_UINT_PTR)pdx->PciBar[offset].Properties.Physical;
+            AddressToMap = pdx->PciBar[offset].Properties.Physical;
 
             // Flag that the mapping is to IO memory
             bDeviceMem = TRUE;
@@ -238,7 +246,7 @@ Dispatch_mmap(
 
         default:
             // Use provided offset as CPU physical address for mapping
-            AddressToMap = (PLX_UINT_PTR)offset << PAGE_SHIFT;
+            AddressToMap = (U64)offset << PAGE_SHIFT;
 
             // Flag that the mapping is to system memory
             bDeviceMem = FALSE;
@@ -249,10 +257,9 @@ Dispatch_mmap(
     if (AddressToMap == 0)
     {
         DebugPrintf((
-            "ERROR - Invalid physical (%08lx), cannot map to user space\n",
+            "ERROR - Invalid physical (%08llx), cannot map to user space\n",
             AddressToMap
             ));
-
         return -ENODEV;
     }
 
@@ -275,11 +282,11 @@ Dispatch_mmap(
         // Set flag for I/O resource
         vma->vm_flags |= VM_IO;
 
-        // The region must be marked as non-cached
-        vma->vm_page_prot =
-            pgprot_noncached(
-                vma->vm_page_prot
-                );
+        // Set caching based on BAR properties
+        if (pdx->PciBar[offset].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE)
+            vma->vm_page_prot = pgprot_writecombine( vma->vm_page_prot );
+        else
+            vma->vm_page_prot = pgprot_noncached( vma->vm_page_prot );
 
         // Map device memory
         rc =
@@ -306,15 +313,15 @@ Dispatch_mmap(
 
     if (rc != 0)
     {
-        DebugPrintf((
-            "ERROR - Unable to map Physical (%08lx) ==> User space\n",
+        ErrorPrintf((
+            "ERROR - Unable to map Physical (%08llx) ==> User space\n",
             AddressToMap
             ));
     }
     else
     {
         DebugPrintf((
-            "Mapped Phys (%08lx) ==> User VA (%08lx)\n",
+            "Mapped Phys (%08llx) ==> User VA (%08lx)\n",
             AddressToMap, vma->vm_start
             ));
     }
@@ -334,11 +341,8 @@ Dispatch_mmap(
  * Description:  Processes the IOCTL messages sent to this device
  *
  ******************************************************************************/
-PLX_RET_IOCTL
+long
 Dispatch_IoControl(
-  #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
-    struct inode  *inode,
-  #endif
     struct file   *filp,
     unsigned int   cmd,
     unsigned long  args
@@ -351,10 +355,8 @@ Dispatch_IoControl(
     DEVICE_EXTENSION *pdx;
 
 
-    DebugPrintf_Cont(("\n"));
-
     // Get the device extension
-    if (iminor(filp->f_dentry->d_inode) == PLX_MNGMT_INTERFACE)
+    if (iminor(filp->f_path.dentry->d_inode) == PLX_MNGMT_INTERFACE)
     {
         // Management interface node only supports some IOCTLS
         pdx = NULL;
@@ -374,10 +376,7 @@ Dispatch_IoControl(
 
     if (status != 0)
     {
-        ErrorPrintf((
-            "ERROR - Unable to copy user I/O message data\n"
-            ));
-
+        ErrorPrintf(("ERROR - Unable to copy user I/O message data\n"));
         return (-EFAULT);
     }
 
@@ -386,39 +385,42 @@ Dispatch_IoControl(
 
     pIoBuffer = &IoBuffer;
 
-    DebugPrintf(("Received PLX message ===> "));
-
     // Check for messages that require D0 power state
     if (pdx->PowerState > MIN_WORKING_POWER_STATE)
     {
         switch (cmd)
         {
-            case PLX_IOCTL_CHIP_TYPE_GET:
-            case PLX_IOCTL_REGISTER_READ:
-            case PLX_IOCTL_REGISTER_WRITE:
-            case PLX_IOCTL_MAPPED_REGISTER_READ:
-            case PLX_IOCTL_MAPPED_REGISTER_WRITE:
-            case PLX_IOCTL_EEPROM_PRESENT:
-            case PLX_IOCTL_EEPROM_PROBE:
-            case PLX_IOCTL_EEPROM_READ_BY_OFFSET:
-            case PLX_IOCTL_EEPROM_WRITE_BY_OFFSET:
-            case PLX_IOCTL_EEPROM_READ_BY_OFFSET_16:
-            case PLX_IOCTL_EEPROM_WRITE_BY_OFFSET_16:
-            case PLX_IOCTL_INTR_ENABLE:
-            case PLX_IOCTL_INTR_DISABLE:
-            case PLX_IOCTL_PCI_BAR_SPACE_READ:
-            case PLX_IOCTL_PCI_BAR_SPACE_WRITE:
-            case PLX_IOCTL_DMA_CONTROL:
-            case PLX_IOCTL_DMA_STATUS:
-            case PLX_IOCTL_DMA_CHANNEL_OPEN:
-            case PLX_IOCTL_DMA_TRANSFER_BLOCK:
-            case PLX_IOCTL_DMA_TRANSFER_USER_BUFFER:
-            case PLX_IOCTL_DMA_CHANNEL_CLOSE:
+            // API calls allowed while device is in low power state
+            case PLX_IOCTL_PCI_DEVICE_FIND:
+            case PLX_IOCTL_DRIVER_VERSION:
+            case PLX_IOCTL_DRIVER_PROPERTIES:
+            case PLX_IOCTL_DRIVER_SCHEDULE_RESCAN:
+            case PLX_IOCTL_GET_PORT_PROPERTIES:
+            case PLX_IOCTL_PCI_REGISTER_READ:
+            case PLX_IOCTL_PCI_REGISTER_WRITE:
+            case PLX_IOCTL_PCI_REG_READ_BYPASS_OS:
+            case PLX_IOCTL_PCI_REG_WRITE_BYPASS_OS:
+            case PLX_IOCTL_IO_PORT_READ:
+            case PLX_IOCTL_IO_PORT_WRITE:
+            case PLX_IOCTL_PCI_BAR_PROPERTIES:
+            case PLX_IOCTL_PCI_BAR_MAP:
+            case PLX_IOCTL_PCI_BAR_UNMAP:
+            case PLX_IOCTL_PHYSICAL_MEM_ALLOCATE:
+            case PLX_IOCTL_PHYSICAL_MEM_FREE:
+            case PLX_IOCTL_PHYSICAL_MEM_MAP:
+            case PLX_IOCTL_PHYSICAL_MEM_UNMAP:
+            case PLX_IOCTL_COMMON_BUFFER_PROPERTIES:
+                break;
+
+            default:
                 DebugPrintf(("ERROR - Device is in low power state, cannot continue\n"));
-                pIoBuffer->ReturnCode = ApiPowerDown;
+                pIoBuffer->ReturnCode = PLX_STATUS_LOW_POWER;
                 goto _Exit_Dispatch_IoControl;
         }
     }
+
+    DebugPrintf_Cont(("\n"));
+    DebugPrintf(("Received PLX message ===> "));
 
     // Handle the PLX specific message
     switch (cmd)
@@ -500,7 +502,7 @@ Dispatch_IoControl(
 
             pIoBuffer->ReturnCode =
                 PlxPciRegisterRead_UseOS(
-                    pdx,
+                    pdx->pPciDevice,
                     (U16)pIoBuffer->value[0],
                     PLX_CAST_64_TO_32_PTR( &(pIoBuffer->value[1]) )
                     );
@@ -517,7 +519,7 @@ Dispatch_IoControl(
 
             pIoBuffer->ReturnCode =
                 PlxPciRegisterWrite_UseOS(
-                    pdx,
+                    pdx->pPciDevice,
                     (U16)pIoBuffer->value[0],
                     (U32)pIoBuffer->value[1]
                     );
@@ -534,6 +536,7 @@ Dispatch_IoControl(
 
             pIoBuffer->ReturnCode =
                 PlxPciRegisterRead_BypassOS(
+                    pIoBuffer->Key.domain,
                     pIoBuffer->Key.bus,
                     pIoBuffer->Key.slot,
                     pIoBuffer->Key.function,
@@ -547,6 +550,7 @@ Dispatch_IoControl(
 
             pIoBuffer->ReturnCode =
                 PlxPciRegisterWrite_BypassOS(
+                    pIoBuffer->Key.domain,
                     pIoBuffer->Key.bus,
                     pIoBuffer->Key.slot,
                     pIoBuffer->Key.function,
@@ -755,13 +759,13 @@ Dispatch_IoControl(
             pIoBuffer->ReturnCode =
                 PlxEepromReadByOffset(
                     pdx,
-                    (U16)pIoBuffer->value[0],
+                    (U32)pIoBuffer->value[0],
                     PLX_CAST_64_TO_32_PTR( &(pIoBuffer->value[1]) )
                     );
 
             DebugPrintf((
                 "EEPROM Offset %02X = %08X\n",
-                (U16)pIoBuffer->value[0],
+                (U32)pIoBuffer->value[0],
                 (U32)pIoBuffer->value[1]
                 ));
             break;
@@ -772,14 +776,14 @@ Dispatch_IoControl(
             pIoBuffer->ReturnCode =
                 PlxEepromWriteByOffset(
                     pdx,
-                    (U16)pIoBuffer->value[0],
+                    (U32)pIoBuffer->value[0],
                     (U32)pIoBuffer->value[1]
                     );
 
             DebugPrintf((
                 "Wrote %08X to EEPROM Offset %02X\n",
                 (U32)pIoBuffer->value[1],
-                (U16)pIoBuffer->value[0]
+                (U32)pIoBuffer->value[0]
                 ));
             break;
 
@@ -789,13 +793,13 @@ Dispatch_IoControl(
             pIoBuffer->ReturnCode =
                 PlxEepromReadByOffset_16(
                     pdx,
-                    (U16)pIoBuffer->value[0],
+                    (U32)pIoBuffer->value[0],
                     PLX_CAST_64_TO_16_PTR( &(pIoBuffer->value[1]) )
                     );
 
             DebugPrintf((
                 "EEPROM Offset %02X = %04X\n",
-                (U16)pIoBuffer->value[0],
+                (U32)pIoBuffer->value[0],
                 (U16)pIoBuffer->value[1]
                 ));
             break;
@@ -806,14 +810,14 @@ Dispatch_IoControl(
             pIoBuffer->ReturnCode =
                 PlxEepromWriteByOffset_16(
                     pdx,
-                    (U16)pIoBuffer->value[0],
+                    (U32)pIoBuffer->value[0],
                     (U16)pIoBuffer->value[1]
                     );
 
             DebugPrintf((
                 "Wrote %04X to EEPROM Offset %02X\n",
                 (U16)pIoBuffer->value[1],
-                (U16)pIoBuffer->value[0]
+                (U32)pIoBuffer->value[0]
                 ));
             break;
 
@@ -898,7 +902,7 @@ Dispatch_IoControl(
         case PLX_IOCTL_COMMON_BUFFER_PROPERTIES:
             DebugPrintf_Cont(("PLX_IOCTL_COMMON_BUFFER_PROPERTIES\n"));
 
-            pIoBuffer->ReturnCode = ApiSuccess;
+            pIoBuffer->ReturnCode = PLX_STATUS_OK;
 
             // Return buffer information
             pIoBuffer->u.PciMemory.PhysicalAddr =
@@ -1147,7 +1151,7 @@ Dispatch_IoControl(
                 _IOC_NR(cmd)
                 ));
 
-            pIoBuffer->ReturnCode = ApiUnsupportedFunction;
+            pIoBuffer->ReturnCode = PLX_STATUS_UNSUPPORTED;
             break;
     }
 

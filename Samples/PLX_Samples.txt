@@ -39,13 +39,6 @@ bypassing the PLX API/driver & resulting in greater performance, especially
 for small transfers.  The application is responsible for initializing the
 BAR space, such as setup of translation/remap registers.
 
-- HotPlugDemo
-This is not true Hot Plug. It's just provided to demonstrate the hardware
-Hot Plug feature of PLX switches. It polls hot plug registers to wait for
-events, then notifies the OS by forcing a PCI bus rescan through Device Manager.
-True Hot Plug support is actually the responsibility of the OS & beyond the
-scope of the sample.
-
 - LocalToPciInt [9000-series & 8311]
 Demonstrates how to wait for a generic Local-to-PCI interrupt using the
 PLX Notification API.

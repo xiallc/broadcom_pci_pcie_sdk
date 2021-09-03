@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /*******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision History:
  *
- *      12-01-07 : PLX SDK v5.20
+ *      07-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -59,11 +71,7 @@ Plx9000_EepromPresent(
 
 
     // Get EEPROM status register
-    RegValue =
-        PLX_9000_REG_READ(
-            pdx,
-            REG_EEPROM_CTRL
-            );
+    RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
 
     if (RegValue & (1 << 28))
     {
@@ -74,7 +82,7 @@ Plx9000_EepromPresent(
         *pStatus = PLX_EEPROM_STATUS_NONE;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -90,7 +98,7 @@ Plx9000_EepromPresent(
 PLX_STATUS
 Plx9000_EepromReadByOffset(
     DEVICE_EXTENSION *pdx,
-    U16               offset,
+    U32               offset,
     U32              *pValue
     )
 {
@@ -116,7 +124,7 @@ Plx9000_EepromReadByOffset(
 
         default:
             *pValue = 0;
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     // Send EEPROM read command and offset to EEPROM
@@ -138,28 +146,18 @@ Plx9000_EepromReadByOffset(
      ****************************************************/
 
     // Set EEPROM write output bit
-    RegValue =
-        PLX_9000_REG_READ(
-            pdx,
-            REG_EEPROM_CTRL
-            );
+    RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
 
     // Set EEDO Input enable for some PLX chips
     RegValue |= (1 << 31);
 
-    PLX_9000_REG_WRITE(
-        pdx,
-        REG_EEPROM_CTRL,
-        RegValue | (1 << 26)
-        );
+    PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue | (1 << 26) );
 
     // Get 32-bit value from EEPROM - one bit at a time
     for (BitPos = 0; BitPos < 32; BitPos++)
     {
         // Trigger the EEPROM clock
-        Plx9000_EepromClock(
-            pdx
-            );
+        Plx9000_EepromClock( pdx );
 
         /*****************************************************
          * Note: After the EEPROM clock, a delay is sometimes
@@ -175,14 +173,10 @@ Plx9000_EepromReadByOffset(
          *       enough delay for the EEPROM data to propagate.
          ****************************************************/
 
-        for (count=0; count < 20; count++)
+        for (count = 0; count < 20; count++)
         {
             // Get the result bit
-            RegValue =
-                PLX_9000_REG_READ(
-                    pdx,
-                    REG_EEPROM_CTRL
-                    );
+            RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
         }
 
         // Get bit value and shift into result
@@ -206,7 +200,7 @@ Plx9000_EepromReadByOffset(
         RegValue & ~(0xF << 24)
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -222,7 +216,7 @@ Plx9000_EepromReadByOffset(
 PLX_STATUS
 Plx9000_EepromWriteByOffset(
     DEVICE_EXTENSION *pdx,
-    U16               offset,
+    U32               offset,
     U32               value
     )
 {
@@ -249,11 +243,11 @@ Plx9000_EepromWriteByOffset(
             break;
 
         default:
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     // Write EEPROM 16-bits at a time
-    for (i=0; i<2; i++)
+    for (i = 0; i < 2; i++)
     {
         // Set 16-bit value to write
         if (i == 0)
@@ -282,11 +276,7 @@ Plx9000_EepromWriteByOffset(
             CommandLength
             );
 
-        RegValue =
-            PLX_9000_REG_READ(
-                pdx,
-                REG_EEPROM_CTRL
-                );
+        RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
 
         // Clear all EEPROM bits
         RegValue &= ~(0xF << 24);
@@ -319,9 +309,7 @@ Plx9000_EepromWriteByOffset(
             }
 
             // Trigger the EEPROM clock
-            Plx9000_EepromClock(
-                pdx
-                );
+            Plx9000_EepromClock( pdx );
         }
 
         // Deselect Chip
@@ -356,12 +344,7 @@ Plx9000_EepromWriteByOffset(
         Timeout = 0;
         do
         {
-            RegValue =
-                PLX_9000_REG_READ(
-                    pdx,
-                    REG_EEPROM_CTRL
-                    );
-
+            RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
             Timeout++;
         }
         while (((RegValue & (1 << 27)) == 0) && (Timeout < 20000));
@@ -381,7 +364,7 @@ Plx9000_EepromWriteByOffset(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -405,30 +388,18 @@ Plx9000_EepromSendCommand(
     U32 RegValue;
 
 
-    RegValue =
-        PLX_9000_REG_READ(
-            pdx,
-            REG_EEPROM_CTRL
-            );
+    RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
 
     // Clear all EEPROM bits
     RegValue &= ~(0xF << 24);
 
     // Toggle EEPROM's Chip select to get it out of Shift Register Mode
-    PLX_9000_REG_WRITE(
-        pdx,
-        REG_EEPROM_CTRL,
-        RegValue
-        );
+    PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue );
 
     // Enable EEPROM Chip Select
     RegValue |= (1 << 25);
 
-    PLX_9000_REG_WRITE(
-        pdx,
-        REG_EEPROM_CTRL,
-        RegValue
-        );
+    PLX_9000_REG_WRITE( pdx, REG_EEPROM_CTRL, RegValue );
 
     // Send EEPROM command - one bit at a time
     for (BitPos = (S8)(DataLengthInBits-1); BitPos >= 0; BitPos--)
@@ -451,9 +422,7 @@ Plx9000_EepromSendCommand(
                 );
         }
 
-        Plx9000_EepromClock(
-            pdx
-            );
+        Plx9000_EepromClock( pdx );
     }
 }
 
@@ -476,11 +445,7 @@ Plx9000_EepromClock(
     U32 RegValue;
 
 
-    RegValue =
-        PLX_9000_REG_READ(
-            pdx,
-            REG_EEPROM_CTRL
-            );
+    RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
 
     // Set EEPROM clock High
     PLX_9000_REG_WRITE(
@@ -490,13 +455,9 @@ Plx9000_EepromClock(
         );
 
     // Need a small delay, perform dummy register reads
-    for (i=0; i<20; i++)
+    for (i = 0; i < 20; i++)
     {
-        RegValue =
-            PLX_9000_REG_READ(
-                pdx,
-                REG_EEPROM_CTRL
-                );
+        RegValue = PLX_9000_REG_READ( pdx, REG_EEPROM_CTRL );
     }
 
     // Set EEPROM clock Low

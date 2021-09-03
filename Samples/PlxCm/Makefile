@@ -27,20 +27,36 @@ TGT_TYPE  = App
 
 
 #=============================================================================
-# Put all object files here
+# Additional source files. Any .C files in source folder are auto-added.
 #=============================================================================
-PLX_OBJECTS = \
-	$(OBJ_DIR)/CmdLine.o  \
-	$(OBJ_DIR)/MonCmds.o  \
-	$(OBJ_DIR)/Monitor.o  \
-	$(OBJ_DIR)/PciDev.o   \
-	$(OBJ_DIR)/RegDefs.o
 
-# Additional PLX files with shared functions
-PLX_OBJECTS += $(OBJ_DIR)/ConsFunc.o $(OBJ_DIR)/PlxLists.o
+# Additional shared files
+C_SRC += ConsFunc.c PlxLists.c
+
+
+#=============================================================================
+# Set default SDK path if not set
+# Note: Since shared between projects, account for SDK & System SW variables
+#=============================================================================
+ifndef PLX_SDK_DIR
+    PLX_SDK_DIR := $(shell cd ../..;pwd)
+endif
+
+ifndef PLX_SYS_DIR
+    PLX_SYS_DIR := $(shell cd ../..;pwd)
+endif
+
+# Decide which directory to use
+PLX_DIR = $(shell cd ../..;pwd)
+ifeq ( $PLX_DIR, $PLX_SDK_DIR )
+    PLX_DIR = $PLX_SDK_DIR
+endif
+ifeq ( $PLX_DIR, $PLX_SYS_DIR )
+    PLX_DIR = $PLX_SYS_DIR
+endif
 
 
 #=============================================================================
 # Include shared PLX makefile
 #=============================================================================
-include $(PLX_SDK_DIR)/Makefiles/PlxMake.def
+include $(PLX_DIR)/Makefiles/PlxMake.def

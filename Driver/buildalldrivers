@@ -11,40 +11,18 @@ clear
 # Remove comment to display script commands as it runs
 #set -x
 
-
-# Set sleep delay depending upon build or clean
-sd=2
-
-if [ "$1" = "c" ];        then sd=1; fi
-if [ "$2" = "c" ];        then sd=1; fi
-if [ "$1" = "a" ];        then sd=1; fi
-if [ "$2" = "a" ];        then sd=1; fi
-if [ "$1" = "clean" ];    then sd=1; fi
-if [ "$2" = "clean" ];    then sd=1; fi
-if [ "$1" = "cleanall" ]; then sd=1; fi
-if [ "$2" = "cleanall" ]; then sd=1; fi
+# Set flag to avoid screen clear in driver makefile
+export PLX_NO_CLEAR_SCREEN=1
 
 
-./builddriver 8000n $1 $2
-sleep $sd
-./builddriver 8000d $1 $2
-sleep $sd
-./builddriver 6000n $1 $2
-sleep $sd
-./builddriver 9050 $1 $2
-sleep $sd
-./builddriver 9030 $1 $2
-sleep $sd
-./builddriver 9080 $1 $2
-sleep $sd
-./builddriver 9054 $1 $2
-sleep $sd
-./builddriver 9056 $1 $2
-sleep $sd
-./builddriver 9656 $1 $2
-sleep $sd
-./builddriver 8311 $1 $2
-sleep $sd
-./builddriver Svc $1 $2
-sleep $sd
+# List of drivers to build
+DRIVER_LIST="8000n 8000d 6000n 9050 9030 9080 9054 9056 9656 8311 Svc"
 
+
+# Execute command for all drivers in list
+for driver in $DRIVER_LIST;
+do
+    echo '   ------------------'
+    ./builddriver $driver $1 $2
+    sleep 1
+done

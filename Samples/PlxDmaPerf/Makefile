@@ -27,13 +27,19 @@ TGT_TYPE    = App
 
 
 #=============================================================================
-# Put all object files here
+# Additional source files. Any .C files in source folder are auto-added.
 #=============================================================================
-PLX_OBJECTS = \
-	$(OBJ_DIR)/PlxDmaPerf.o
 
-# Additional PLX files with shared functions
-PLX_OBJECTS += $(OBJ_DIR)/ConsFunc.o $(OBJ_DIR)/PlxInit.o
+# Additional shared files
+C_SRC += ConsFunc.c PlxInit.c
+
+
+#=============================================================================
+# Set default SDK path if not set
+#=============================================================================
+ifndef PLX_SDK_DIR
+    PLX_SDK_DIR := $(shell cd ../..;pwd)
+endif
 
 
 #=============================================================================

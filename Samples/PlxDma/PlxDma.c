@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2015 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -99,7 +132,7 @@ main(
             &Device
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("\n   ERROR: Unable to find or select a PLX device\n");
         PlxSdkErrorDisplay(rc);
@@ -201,7 +234,7 @@ SelectDevice_DMA(
                 (U16)i
                 );
 
-        if (status == ApiSuccess)
+        if (status == PLX_STATUS_OK)
         {
             // Default to add device
             bAddDevice = TRUE;
@@ -280,7 +313,7 @@ SelectDevice_DMA(
         // Go to next devices
         i++;
     }
-    while ((status == ApiSuccess) && (NumDevices < MAX_DEVICES_TO_LIST));
+    while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
         return 0;
@@ -380,7 +413,7 @@ PerformDma_9000(
             &DmaProp
             );
 
-    if (rc == ApiSuccess)
+    if (rc == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
@@ -406,7 +439,7 @@ PerformDma_9000(
             &NotifyObject
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -436,7 +469,7 @@ PerformDma_9000(
             0          // Don't wait for completion
             );
 
-    if (rc == ApiSuccess)
+    if (rc == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
 
@@ -451,15 +484,15 @@ PerformDma_9000(
 
         switch (rc)
         {
-            case ApiSuccess:
+            case PLX_STATUS_OK:
                 Cons_printf("Ok (DMA Int received)\n");
                 break;
 
-            case ApiWaitTimeout:
+            case PLX_STATUS_TIMEOUT:
                 Cons_printf("*ERROR* - Timeout waiting for Int Event\n");
                 break;
 
-            case ApiWaitCanceled:
+            case PLX_STATUS_CANCELED:
                 Cons_printf("*ERROR* - Interrupt event cancelled\n");
                 break;
 
@@ -484,7 +517,7 @@ PerformDma_9000(
             &PlxInterrupt
             );
 
-    if (rc == ApiSuccess)
+    if (rc == PLX_STATUS_OK)
     {
         Cons_printf("Ok (triggered ints:");
 
@@ -525,7 +558,7 @@ PerformDma_9000(
             200         // Specify a timeout to let API perform wait
             );
 
-    if (rc == ApiSuccess)
+    if (rc == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
@@ -544,7 +577,7 @@ PerformDma_9000(
             &NotifyObject
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(rc);
@@ -562,7 +595,7 @@ PerformDma_9000(
             DmaChannel
             );
 
-    if (rc == ApiSuccess)
+    if (rc == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
@@ -644,7 +677,7 @@ PerformDma_8000(
             NULL
             );
 
-    if (status == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
@@ -664,7 +697,7 @@ PerformDma_8000(
             &DmaProp
             );
 
-    if (status == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
@@ -686,7 +719,7 @@ PerformDma_8000(
             &DmaProp
             );
 
-    if (status == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }
@@ -712,7 +745,7 @@ PerformDma_8000(
             &NotifyObject
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -756,7 +789,7 @@ PerformDma_8000(
             0          // Don't wait for completion
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -776,7 +809,7 @@ PerformDma_8000(
 
         switch (status)
         {
-            case ApiSuccess:
+            case PLX_STATUS_OK:
                 Cons_printf("Ok (DMA Int received)\n");
 
                 /*****************************************
@@ -802,11 +835,11 @@ PerformDma_8000(
                 Cons_printf("Ok\n");
                 break;
 
-            case ApiWaitTimeout:
+            case PLX_STATUS_TIMEOUT:
                 Cons_printf("*ERROR* - Timeout waiting for Int Event\n");
                 break;
 
-            case ApiWaitCanceled:
+            case PLX_STATUS_CANCELED:
                 Cons_printf("*ERROR* - Interrupt event cancelled\n");
                 break;
 
@@ -826,7 +859,7 @@ PerformDma_8000(
             &PlxInterrupt
             );
 
-    if (status == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
         Cons_printf("Ok (triggered ints:");
 
@@ -873,7 +906,7 @@ PerformDma_8000(
             0
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -893,7 +926,7 @@ PerformDma_8000(
 
         switch (status)
         {
-            case ApiSuccess:
+            case PLX_STATUS_OK:
                 Cons_printf("Ok (DMA Int received)\n");
 
                 /*****************************************
@@ -919,11 +952,11 @@ PerformDma_8000(
                 Cons_printf("Ok\n");
                 break;
 
-            case ApiWaitTimeout:
+            case PLX_STATUS_TIMEOUT:
                 Cons_printf("*ERROR* - Timeout waiting for Int Event\n");
                 break;
 
-            case ApiWaitCanceled:
+            case PLX_STATUS_CANCELED:
                 Cons_printf("*ERROR* - Interrupt event cancelled\n");
                 break;
 
@@ -942,7 +975,7 @@ PerformDma_8000(
             &NotifyObject
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -960,7 +993,7 @@ PerformDma_8000(
             DmaChannel
             );
 
-    if (status == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
         Cons_printf("Ok\n");
     }

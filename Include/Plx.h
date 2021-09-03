@@ -2,24 +2,36 @@
 #define __PLX_H
 
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2017 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -34,7 +46,7 @@
  *
  * Revision:
  *
- *      04-01-13 : PLX SDK v7.10
+ *      07-07-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -51,17 +63,15 @@ extern "C" {
 **********************************************/
 // SDK Version information
 #define PLX_SDK_VERSION_MAJOR            7
-#define PLX_SDK_VERSION_MINOR            10
-#define PLX_SDK_VERSION_STRING           "7.10"
-#define PLX_SDK_COPYRIGHT_STRING         "\251 PLX Technology, Inc. 2013"
+#define PLX_SDK_VERSION_MINOR            25
+#define PLX_SDK_VERSION_STRING           "7.25"
+#define PLX_SDK_COPYRIGHT_STRING         "\251 Avago Technologies, Inc. 2017"
 
-#define MAX_PCI_BUS                      255            // Max PCI Buses
-#define MAX_PCI_DEV                      32             // Max PCI Slots
-#define MAX_PCI_FUNC                     8              // Max PCI Functions
+#define PCI_MAX_BUS                      256            // Max PCI Buses
+#define PCI_MAX_DEV                      32             // Max PCI Slots
+#define PCI_MAX_FUNC                     8              // Max PCI Functions
 #define PCI_NUM_BARS_TYPE_00             6              // Total PCI BARs for Type 0 Header
 #define PCI_NUM_BARS_TYPE_01             2              // Total PCI BARs for Type 1 Header
-
-#define PLX_VENDOR_ID                    0x10B5         // PLX Vendor ID
 
 // Device object validity codes
 #define PLX_TAG_VALID                    0x5F504C58     // "_PLX" in Hex
@@ -82,9 +92,12 @@ extern "C" {
 #define FIND_AMOUNT_MATCHED              80001
 
 // Used for performance counter calculations
+#define PERF_MAX_PORTS                   30                             // Max # ports in a switch
+#define PERF_COUNTERS_PER_PORT           14                             // Number of counters per port
 #define PERF_TLP_OH_DW                   2                              // Overhead DW per TLP
 #define PERF_TLP_DW                      (3 + PERF_TLP_OH_DW)           // DW per TLP
-#define PERF_TLP_SIZE                    (PERF_TLP_DW * sizeof(U32))    // Bytes per TLP w/o payload
+#define PERF_TLP_SIZE                    (PERF_TLP_DW * sizeof(U32))    // TLP header bytes with overhead
+#define PERF_TLP_SIZE_NO_OH              (3 * sizeof(U32))              // TLP header bytes w/o overhead
 #define PERF_DLLP_SIZE                   (2 * sizeof(U32))              // Bytes per DLLP
 #define PERF_MAX_BPS_GEN_1_0             ((U64)250000000)               // 250 MBps (2.5 Gbps * 80%)
 #define PERF_MAX_BPS_GEN_2_0             ((U64)500000000)               // 500 MBps (5 Gbps * 80%)
@@ -100,10 +113,20 @@ extern "C" {
                                            ((((value) >> 16) & 0xffff) <<  0) )
 
 // PCIe ReqID support macros
-#define Plx_PciToReqId(bus,slot,fn)     (((U16)bus << 8) | (slot << 3) | (fn << 0))
-#define Plx_ReqId_Bus(ReqId)            ((U8)(ReqId >> 8) & 0xFF)
-#define Plx_ReqId_Slot(ReqId)           ((U8)(ReqId >> 3) & 0x1F)
-#define Plx_ReqId_Fn(ReqId)             ((U8)(ReqId >> 0) & 0x7)
+#define Plx_PciToReqId(bus,slot,fn)     (((U16)(bus) << 8) | ((slot) << 3) | ((fn) << 0))
+#define Plx_ReqId_Bus(ReqId)            ((U8)((ReqId) >> 8) & 0xFF)
+#define Plx_ReqId_Slot(ReqId)           ((U8)((ReqId) >> 3) & 0x1F)
+#define Plx_ReqId_Fn(ReqId)             ((U8)((ReqId) >> 0) & 0x7)
+
+
+// PCI SIG VENDOR IDS
+#define PLX_PCI_VENDOR_ID_LSI            0x1000
+#define PLX_PCI_VENDOR_ID_PLX            0x10B5
+#define PLX_PCI_VENDOR_ID_INTEL          0x8086
+#define PLX_PCI_VENDOR_ID_NVIDIA         0x10DE
+
+// For compatibility with legacy code
+#define PLX_VENDOR_ID                    PLX_PCI_VENDOR_ID_PLX
 
 
 // Device IDs of PLX reference boards

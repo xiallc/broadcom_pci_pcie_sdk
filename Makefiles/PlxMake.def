@@ -16,6 +16,27 @@ endif
 
 
 #=============================================================================
+# Build list of files to compile
+#=============================================================================
+ifeq ($(TGT_TYPE), Driver)
+    # Setup corresponding objects
+    PLX_OBJECTS += $(foreach file,$(C_SRC),$(basename $(COMMON_DIR)/$(file)).o)
+
+    # Convert chip-specific files if any
+    ifneq ($(C_SRC_CHIP),)
+        PLX_OBJECTS += $(foreach file,$(C_SRC_CHIP),$(basename $(PLX_CHIP_DIR)/$(file)).o)
+    endif
+else
+    # Get C files from source folder
+    C_SRC += $(notdir $(wildcard *.c ))
+
+    # Setup corresponding objects
+    PLX_OBJECTS += $(foreach file,$(C_SRC),$(OBJ_DIR)/$(basename $(file)).o)
+endif
+
+
+
+#=============================================================================
 # Include standard common definitions
 #=============================================================================
 include $(PLX_DIR)/Makefiles/Common.def
@@ -37,3 +58,4 @@ endif
 ifeq ($(KERNELRELEASE),)
     include $(PLX_DIR)/Makefiles/Targets.def
 endif
+

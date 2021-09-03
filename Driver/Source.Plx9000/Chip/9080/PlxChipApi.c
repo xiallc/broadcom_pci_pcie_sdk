@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -58,6 +70,7 @@ PlxChip_BoardReset(
 {
     U8  MU_Enabled;
     U32 RegValue;
+    U32 DelayLoop;
     U32 RegInterrupt;
 
 
@@ -111,8 +124,11 @@ PlxChip_BoardReset(
         RegValue | (1 << 30)
         );
 
-    // Delay for a bit
-    Plx_sleep(100);
+    // Delay for a bit using dummy register reads (1 read = ~1us)
+    for (DelayLoop = 0; DelayLoop < (100 * 1000); DelayLoop++)
+    {
+        PLX_9000_REG_READ( pdx, 0 );
+    }
 
     // Bring chip out of reset
     PLX_9000_REG_WRITE(
@@ -128,8 +144,11 @@ PlxChip_BoardReset(
         RegValue | (1 << 29)
         );
 
-    // Delay for a bit
-    Plx_sleep(10);
+    // Delay for a bit using dummy register reads (1 read = ~1us)
+    for (DelayLoop = 0; DelayLoop < (10 * 1000); DelayLoop++)
+    {
+        PLX_9000_REG_READ( pdx, 0 );
+    }
 
     // Clear EEPROM reload
     PLX_9000_REG_WRITE(
@@ -162,7 +181,7 @@ PlxChip_BoardReset(
         RegInterrupt
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -189,7 +208,7 @@ PlxChip_MailboxRead(
     if (((S16)mailbox < 0) || ((S16)mailbox > 7))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidIndex;
+            *pStatus = PLX_STATUS_INVALID_DATA;
         return 0;
     }
 
@@ -201,7 +220,7 @@ PlxChip_MailboxRead(
 
     // Set status code
     if (pStatus != NULL)
-        *pStatus = ApiSuccess;
+        *pStatus = PLX_STATUS_OK;
 
     // Calculate mailbox offset
     offset = offset + (mailbox * sizeof(U32));
@@ -236,7 +255,7 @@ PlxChip_MailboxWrite(
     // Verify valid mailbox
     if (((S16)mailbox < 0) || ((S16)mailbox > 7))
     {
-        return ApiInvalidIndex;
+        return PLX_STATUS_INVALID_DATA;
     }
 
     // Set mailbox register base
@@ -255,7 +274,7 @@ PlxChip_MailboxWrite(
         value
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -382,7 +401,7 @@ PlxChip_InterruptEnable(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -514,7 +533,7 @@ PlxChip_InterruptDisable(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -530,7 +549,7 @@ PlxChip_InterruptDisable(
 PLX_STATUS
 PlxChip_EepromReadByOffset(
     DEVICE_EXTENSION *pdx,
-    U16               offset,
+    U32               offset,
     U32              *pValue
     )
 {
@@ -538,7 +557,7 @@ PlxChip_EepromReadByOffset(
     if ((offset & 0x3) || (offset > 0x200))
     {
         DebugPrintf(("ERROR - Invalid EEPROM offset\n"));
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
     // Read EEPROM
@@ -548,7 +567,7 @@ PlxChip_EepromReadByOffset(
         pValue
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -564,7 +583,7 @@ PlxChip_EepromReadByOffset(
 PLX_STATUS
 PlxChip_EepromWriteByOffset(
     DEVICE_EXTENSION *pdx,
-    U16               offset,
+    U32               offset,
     U32               value
     )
 {
@@ -572,7 +591,7 @@ PlxChip_EepromWriteByOffset(
     if ((offset & 0x3) || (offset > 0x200))
     {
         DebugPrintf(("ERROR - Invalid EEPROM offset\n"));
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
     // 9080 does not protect the EEPROM from write access, do nothing
@@ -584,7 +603,7 @@ PlxChip_EepromWriteByOffset(
         value
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -616,7 +635,7 @@ PlxChip_DmaChannelOpen(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     spin_lock(
@@ -627,12 +646,8 @@ PlxChip_DmaChannelOpen(
     if (pdx->DmaInfo[channel].bOpen)
     {
         DebugPrintf(("ERROR - DMA channel already opened\n"));
-
-        spin_unlock(
-            &(pdx->Lock_Dma[channel])
-            );
-
-        return ApiDmaChannelUnavailable;
+        spin_unlock( &(pdx->Lock_Dma[channel]) );
+        return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Open the channel
@@ -669,7 +684,7 @@ PlxChip_DmaChannelOpen(
         channel
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -706,7 +721,7 @@ PlxChip_DmaGetProperties(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Get DMA mode
@@ -735,7 +750,7 @@ PlxChip_DmaGetProperties(
     pProp->ClearCountMode    = (U8)(RegValue >> 16) & 0x1;
     pProp->RouteIntToPci     = (U8)(RegValue >> 17) & 0x1;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -773,14 +788,14 @@ PlxChip_DmaSetProperties(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify owner
     if ((pdx->DmaInfo[channel].bOpen) && (pdx->DmaInfo[channel].pOwner != pOwner))
     {
         DebugPrintf(("ERROR - DMA owned by different process\n"));
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
     }
 
     // Verify DMA not in progress
@@ -788,10 +803,10 @@ PlxChip_DmaSetProperties(
             pdx,
             channel,
             pOwner
-            ) != ApiDmaDone)
+            ) != PLX_STATUS_COMPLETE)
     {
         DebugPrintf(("ERROR - DMA transfer in progress\n"));
-        return ApiDmaInProgress;
+        return PLX_STATUS_IN_PROGRESS;
     }
 
     // Set DMA properties
@@ -818,7 +833,7 @@ PlxChip_DmaSetProperties(
         RegValue
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -852,14 +867,14 @@ PlxChip_DmaControl(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify owner
     if ((pdx->DmaInfo[channel].bOpen) && (pdx->DmaInfo[channel].pOwner != pOwner))
     {
         DebugPrintf(("ERROR - DMA owned by different process\n"));
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
     }
 
     // Set shift for status register
@@ -889,7 +904,7 @@ PlxChip_DmaControl(
                     );
 
             if (RegValue & ((1 << 4) << shift))
-                return ApiDmaDone;
+                return PLX_STATUS_COMPLETE;
             break;
 
         case DmaResume:
@@ -910,7 +925,7 @@ PlxChip_DmaControl(
             }
             else
             {
-                return ApiDmaInProgress;
+                return PLX_STATUS_IN_PROGRESS;
             }
             break;
 
@@ -936,7 +951,7 @@ PlxChip_DmaControl(
                     );
 
             if (RegValue & ((1 << 4) << shift))
-                return ApiDmaDone;
+                return PLX_STATUS_COMPLETE;
 
             // Abort the transfer (should cause an interrupt)
             PLX_9000_REG_WRITE(
@@ -947,10 +962,10 @@ PlxChip_DmaControl(
             break;
 
         default:
-            return ApiDmaCommandInvalid;
+            return PLX_STATUS_INVALID_DATA;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -982,12 +997,12 @@ PlxChip_DmaStatus(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Check if DMA owned by another caller
     if ((pdx->DmaInfo[channel].bOpen) && (pdx->DmaInfo[channel].pOwner != pOwner))
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
 
     // Return the current DMA status
     RegValue =
@@ -1001,12 +1016,12 @@ PlxChip_DmaStatus(
         RegValue = RegValue >> 8;
 
     if ((RegValue & ((1 << 4) | (1 << 0))) == 0)
-        return ApiDmaPaused;
+        return PLX_STATUS_PAUSED;
 
     if (RegValue & (1 << 4))
-        return ApiDmaDone;
+        return PLX_STATUS_COMPLETE;
 
-    return ApiDmaInProgress;
+    return PLX_STATUS_IN_PROGRESS;
 }
 
 
@@ -1045,14 +1060,14 @@ PlxChip_DmaTransferBlock(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify owner
     if (pdx->DmaInfo[channel].pOwner != pOwner)
     {
         DebugPrintf(("ERROR - DMA owned by different process\n"));
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
     }
 
     // Set shift for status register
@@ -1068,7 +1083,7 @@ PlxChip_DmaTransferBlock(
     if ((RegValue & ((1 << 4) << shift)) == 0)
     {
         DebugPrintf(("ERROR - DMA channel is currently active\n"));
-        return ApiDmaInProgress;
+        return PLX_STATUS_IN_PROGRESS;
     }
 
     spin_lock(
@@ -1079,12 +1094,8 @@ PlxChip_DmaTransferBlock(
     if (pdx->DmaInfo[channel].bOpen == FALSE)
     {
         DebugPrintf(("ERROR - DMA channel has not been opened\n"));
-
-        spin_unlock(
-            &(pdx->Lock_Dma[channel])
-            );
-
-        return ApiDmaChannelUnavailable;
+        spin_unlock( &(pdx->Lock_Dma[channel]) );
+        return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Get DMA mode
@@ -1171,7 +1182,7 @@ PlxChip_DmaTransferBlock(
         RegValue | (((1 << 0) | (1 << 1)) << shift)
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1213,14 +1224,14 @@ PlxChip_DmaTransferUserBuffer(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify owner
     if (pdx->DmaInfo[channel].pOwner != pOwner)
     {
         DebugPrintf(("ERROR - DMA owned by different process\n"));
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
     }
 
     // Set shift for status register
@@ -1236,7 +1247,7 @@ PlxChip_DmaTransferUserBuffer(
     if ((RegValue & ((1 << 4) << shift)) == 0)
     {
         DebugPrintf(("ERROR - DMA channel is currently active\n"));
-        return ApiDmaInProgress;
+        return PLX_STATUS_IN_PROGRESS;
     }
 
     spin_lock(
@@ -1247,24 +1258,16 @@ PlxChip_DmaTransferUserBuffer(
     if (pdx->DmaInfo[channel].bOpen == FALSE)
     {
         DebugPrintf(("ERROR - DMA channel has not been opened\n"));
-
-        spin_unlock(
-            &(pdx->Lock_Dma[channel])
-            );
-
-        return ApiDmaChannelUnavailable;
+        spin_unlock( &(pdx->Lock_Dma[channel]) );
+        return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify an SGL DMA transfer is not pending
     if (pdx->DmaInfo[channel].bSglPending)
     {
         DebugPrintf(("ERROR - An SGL DMA transfer is currently pending\n"));
-
-        spin_unlock(
-            &(pdx->Lock_Dma[channel])
-            );
-
-        return ApiDmaInProgress;
+        spin_unlock( &(pdx->Lock_Dma[channel]) );
+        return PLX_STATUS_IN_PROGRESS;
     }
 
     // Set the SGL DMA pending flag
@@ -1297,7 +1300,7 @@ PlxChip_DmaTransferUserBuffer(
             &bBits64
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         DebugPrintf(("ERROR - Unable to lock buffer and build SGL list\n"));
         pdx->DmaInfo[channel].bSglPending = FALSE;
@@ -1350,7 +1353,7 @@ PlxChip_DmaTransferUserBuffer(
         RegValue | (((1 << 0) | (1 << 1)) << shift)
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1385,21 +1388,21 @@ PlxChip_DmaChannelClose(
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify DMA channel was opened
     if (pdx->DmaInfo[channel].bOpen == FALSE)
     {
         DebugPrintf(("ERROR - DMA channel has not been opened\n"));
-        return ApiDmaChannelUnavailable;
+        return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify owner
     if (pdx->DmaInfo[channel].pOwner != pOwner)
     {
         DebugPrintf(("ERROR - DMA owned by different process\n"));
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
     }
 
     // Check DMA status
@@ -1411,7 +1414,7 @@ PlxChip_DmaChannelClose(
             );
 
     // Verify DMA is not in progress
-    if (status != ApiDmaDone)
+    if (status != PLX_STATUS_COMPLETE)
     {
         // DMA is still in progress
         if (bCheckInProgress)
@@ -1465,5 +1468,5 @@ PlxChip_DmaChannelClose(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }

@@ -2,24 +2,36 @@
 #define __DRIVER_DEFS_H
 
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -34,7 +46,7 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -104,22 +116,27 @@
 
 // Macros to support Kernel-level logging in Debug builds
 #if defined(PLX_DEBUG)
-    #define DebugPrintf(arg)                _Debug_Print_Macro      arg
-    #define DebugPrintf_Cont(arg)           _Debug_Print_Cont_Macro arg
+    #define DebugPrintf(arg)                         _Debug_Print_Macro      arg
+    #define DebugPrintf_Cont(arg)                    _Debug_Print_Cont_Macro arg
 #else
-    #define DebugPrintf(arg)                do { } while(0)
-    #define DebugPrintf_Cont(arg)           do { } while(0)
+    #define DebugPrintf(arg)                         do { } while(0)
+    #define DebugPrintf_Cont(arg)                    do { } while(0)
 #endif
-#define ErrorPrintf(arg)                    _Error_Print_Macro      arg
-#define ErrorPrintf_Cont(arg)               _Error_Print_Cont_Macro arg
+#define InfoPrintf(arg)                              _Info_Print_Macro       arg
+#define InfoPrintf_Cont(arg)                         _Info_Print_Cont_Macro  arg
+#define ErrorPrintf(arg)                             _Error_Print_Macro      arg
+#define ErrorPrintf_Cont(arg)                        _Error_Print_Cont_Macro arg
 
-#define _Debug_Print_Macro(fmt, args...)             printk(KERN_DEBUG   PLX_DRIVER_NAME ": " fmt, ## args)
-#define _Error_Print_Macro(fmt, args...)             printk(KERN_WARNING PLX_DRIVER_NAME ": " fmt, ## args)
+#define _Debug_Print_Macro(fmt, args...)             printk(KERN_DEBUG PLX_DRIVER_NAME ": " fmt, ## args)
+#define _Info_Print_Macro(fmt, args...)              printk(KERN_INFO  PLX_DRIVER_NAME ": " fmt, ## args)
+#define _Error_Print_Macro(fmt, args...)             printk(KERN_ERR   PLX_DRIVER_NAME ": " fmt, ## args)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
-    #define _Debug_Print_Cont_Macro(fmt, args...)    printk(KERN_DEBUG   "\b\b\b   \b\b\b" fmt, ## args)
-    #define _Error_Print_Cont_Macro(fmt, args...)    printk(KERN_WARNING "\b\b\b   \b\b\b" fmt, ## args)
+    #define _Debug_Print_Cont_Macro(fmt, args...)    printk(KERN_DEBUG "\b\b\b   \b\b\b" fmt, ## args)
+    #define _Info_Print_Cont_Macro(fmt, args...)     printk(KERN_INFO  "\b\b\b   \b\b\b" fmt, ## args)
+    #define _Error_Print_Cont_Macro(fmt, args...)    printk(KERN_ERR   "\b\b\b   \b\b\b" fmt, ## args)
 #else
     #define _Debug_Print_Cont_Macro(fmt, args...)    printk(KERN_CONT  fmt, ## args)
+    #define _Info_Print_Cont_Macro(fmt, args...)     printk(KERN_CONT  fmt, ## args)
     #define _Error_Print_Cont_Macro(fmt, args...)    printk(KERN_CONT  fmt, ## args)
 #endif
 
@@ -292,10 +309,10 @@ typedef struct _DEVICE_EXTENSION
 typedef struct _DRIVER_OBJECT
 {
     struct _DEVICE_OBJECT  *DeviceObject;     // Pointer to first device in list
-    U8                      DeviceCount;      // Number of devices in list
     spinlock_t              Lock_DeviceList;  // Spinlock for device list
     int                     MajorID;          // The OS-assigned driver Major ID
-    BOOLEAN                 bPciDriverReg;    // Flag whether the driver was registered as PCI
+    U8                      DeviceCount;      // Number of devices in list
+    U8                      bPciDriverReg;    // Flag whether the driver was registered as PCI
     PLX_PHYS_MEM_OBJECT     CommonBuffer;     // Contiguous memory to be shared by all processes
     struct file_operations  DispatchTable;    // Driver dispatch table
 } DRIVER_OBJECT;

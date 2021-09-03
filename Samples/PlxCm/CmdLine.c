@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /*********************************************************************
  *
  * Module Name:
@@ -9,6 +42,11 @@
  *     Functions to support Command-line processing
  *
  ********************************************************************/
+
+
+#if defined(_WIN32)
+    #define _CRT_NONSTDC_NO_WARNINGS        // Prevents POSIX function warnings
+#endif
 
 
 #include <ctype.h>      // isxdigit, isspace
@@ -75,11 +113,17 @@ htol(
         value = value << 4;
 
         if ( (hexString[count] >= 'A') && (hexString[count] <= 'F') )
+        {
             value = value + (hexString[count] - 'A' + 0xA);
+        }
         else if ( (hexString[count] >= 'a') && (hexString[count] <= 'f') )
+        {
             value = value + (hexString[count] - 'a' + 0xA);
+        }
         else
+        {
             value = value + (hexString[count] - '0');
+        }
     }
 
     return value;
@@ -100,7 +144,7 @@ CmdLine_IsHexValue(
     char *pStr
     )
 {
-    U8 count;
+    size_t count;
 
 
     // Get string length
@@ -108,14 +152,18 @@ CmdLine_IsHexValue(
 
     // Verify string length (2 chars/byte)
     if ((count == 0) || (count > (sizeof(U64) * 2)))
+    {
         return FALSE;
+    }
 
     // Check each character
     do
     {
         count--;
         if (!isxdigit( pStr[count] ))
+        {
             return FALSE;
+        }
     }
     while (count);
 
@@ -141,7 +189,9 @@ CmdLine_GetNextToken(
 {
     // Remove leading whitespaces
     while (isspace( **pStr ))
+    {
         (*pStr)++;
+    }
 
     // Check for operations
     if (bAllowOps)
@@ -162,7 +212,9 @@ CmdLine_GetNextToken(
     {
         // Check for terminating characters
         if ((**pStr == '\0') || isspace( **pStr ))
+        {
             break;
+        }
 
         // Check for operations if allowed
         if (bAllowOps && ((**pStr == '+')  || (**pStr == '-') ||
@@ -263,7 +315,9 @@ CmdLine_VarLookup(
                 );
 
         if (Plx_strcasecmp( pVar->strName, pStr ) == 0)
+        {
             return pVar;
+        }
 
         // Jump to next item
         pEntry = pEntry->Flink;
@@ -344,11 +398,15 @@ CmdLine_VarDelete(
     pVar = CmdLine_VarLookup( pStrVar );
 
     if (pVar == NULL)
+    {
         return FALSE;
+    }
 
     // Don't allow user to delete system variables
     if ((pVar->bSystemVar == TRUE) && (bSystemVar == FALSE))
+    {
         return FALSE;
+    }
 
     // Remove from list
     Plx_RemoveEntryList( &pVar->ListEntry );
@@ -424,15 +482,21 @@ CmdLine_CmdAdd(
 
     // Remove leading empty characters
     while (isspace( *buffer ))
+    {
         buffer++;
+    }
 
     // Ignore empty commands
     if (*buffer == '\0')
+    {
         return NULL;
+    }
 
     // Ignore comment lines
-    if (strncmp( buffer, "//", 2 ) == 0)
+    if ((buffer[0] == '#') || (strncmp( buffer, "//", 2 ) == 0))
+    {
         return NULL;
+    }
 
     // Get existing command if it exists
     pCmd = CmdLine_CmdExists( buffer );
@@ -443,7 +507,9 @@ CmdLine_CmdAdd(
         pCmd = (PLXCM_COMMAND*)malloc( sizeof(PLXCM_COMMAND) );
 
         if (pCmd == NULL)
+        {
             return NULL;
+        }
 
         RtlZeroMemory( pCmd, sizeof(PLXCM_COMMAND) );
 
@@ -470,7 +536,9 @@ CmdLine_CmdAdd(
 
     // Parse command and arguments if not already
     if (pCmd->bParsed == FALSE)
+    {
         CmdLine_CmdParse( pCmd, pFnTable );
+    }
 
     // Add item to head of list
     Plx_InsertTailList( &Gbl_ListCmds, &pCmd->ListEntry );
@@ -568,7 +636,9 @@ CmdLine_CmdExists(
                 );
 
         if (strcmp( pCmd->szCmdLine, buffer ) == 0)
+        {
             return pCmd;
+        }
 
         // Jump to next item
         pEntry = pEntry->Flink;
@@ -612,7 +682,9 @@ CmdLine_CmdParse(
     {
         CmdLine_CmdLookup( pCmd, pFnTable );
         if (pCmd->pCmdRoutine == NULL)
+        {
             return pCmd->bErrorParse;
+        }
     }
 
     // Start with no operations
@@ -694,7 +766,9 @@ CmdLine_CmdParse(
 
                 // If argument was variable store it
                 if (pVar != NULL)
+                {
                     pArg->pVar = pVar;
+                }
 
                 // If value is a number, convert it
                 if (CmdLine_IsHexValue( strArg ))
@@ -824,7 +898,9 @@ CmdLine_CmdLookup(
 
 
     if (pFnTable == NULL)
+    {
         return FALSE;
+    }
 
     // Lookup command in function table to assign pointer
     i = 0;
@@ -881,7 +957,9 @@ CmdLine_ArgGet(
 
     // Verify argument exists
     if ((pCmd->NumArgs == 0) || (ArgNum >= pCmd->NumArgs))
+    {
         return NULL;
+    }
 
     count  = 0;
     pEntry = pCmd->List_Args.Flink;
@@ -936,7 +1014,9 @@ CmdLine_ArgDeleteAll(
 
         // Return if no more items
         if (pEntry == &pCmd->List_Args)
+        {
             return;
+        }
 
         // Get the object
         pArg =

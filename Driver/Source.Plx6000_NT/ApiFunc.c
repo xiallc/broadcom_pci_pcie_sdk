@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /*******************************************************************************
@@ -31,11 +43,12 @@
  *
  * Revision History:
  *
- *      02-01-13 : PLX SDK v7.00
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
 
+#include <asm/uaccess.h>    // For copy_to/from_user()
 #include <linux/sched.h>    // For MAX_SCHED_TIMEOUT & TASK_UNINTERRUPTIBLE
 #include "ApiFunc.h"
 #include "Eep_6000.h"
@@ -171,12 +184,11 @@ PlxDeviceFind(
                 *pKey = pdx->Key;
 
                 DebugPrintf((
-                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%x]\n",
+                    "Criteria matched device %04X_%04X [%02x:%02x.%x]\n",
                     pdx->Key.DeviceId, pdx->Key.VendorId,
                     pdx->Key.bus, pdx->Key.slot, pdx->Key.function
                     ));
-
-                return ApiSuccess;
+                return PLX_STATUS_OK;
             }
 
             // Increment device count
@@ -192,7 +204,7 @@ PlxDeviceFind(
 
     DebugPrintf(("Criteria did not match any devices\n"));
 
-    return ApiInvalidDeviceInfo;
+    return PLX_STATUS_INVALID_OBJECT;
 }
 
 
@@ -220,7 +232,7 @@ PlxChipTypeGet(
         *pChipType, *pRevision
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -241,7 +253,7 @@ PlxChipTypeSet(
     )
 {
     // Setting the PLX chip type is not supported in this PnP driver
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -271,7 +283,7 @@ PlxGetPortProperties(
     // Default to a legacy endpoint
     pPortProp->PortType = PLX_PORT_LEGACY_ENDPOINT;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -290,7 +302,7 @@ PlxPciDeviceReset(
     )
 {
     // Device reset not implemented
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -312,7 +324,7 @@ PlxRegisterRead(
     )
 {
     // 6000 series devices do not have PLX-specific local registers
-    *pStatus = ApiUnsupportedFunction;
+    *pStatus = PLX_STATUS_UNSUPPORTED;
     return 0;
 }
 
@@ -335,7 +347,7 @@ PlxRegisterWrite(
     )
 {
     // 6000 series devices do not have PLX-specific local registers
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -367,7 +379,7 @@ PlxPciBarProperties(
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Return BAR properties
@@ -377,7 +389,7 @@ PlxPciBarProperties(
     if (pdx->PciBar[BarIndex].Properties.Size == 0)
     {
         DebugPrintf(("BAR %d is disabled\n", BarIndex));
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     DebugPrintf((
@@ -391,12 +403,18 @@ PlxPciBarProperties(
         ));
 
     DebugPrintf((
-        "    Size     : %08llX (%lld %s)\n",
+        "    Size     : %llXh (%lld%s)\n",
         pdx->PciBar[BarIndex].Properties.Size,
-        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ?
-            pdx->PciBar[BarIndex].Properties.Size :
-            pdx->PciBar[BarIndex].Properties.Size >> 10,
-        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ? "Bytes" : "KB"
+        pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 30) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 30) :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 20) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 20) :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 10) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 10) :
+           pdx->PciBar[BarIndex].Properties.Size,
+        pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 30) ? "GB" :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 20) ? "MB" :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 10) ? "KB" : "B"
         ));
 
     DebugPrintf((
@@ -405,7 +423,7 @@ PlxPciBarProperties(
         (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_64_BIT) ? 64 : 32
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -427,7 +445,7 @@ PlxPciBarMap(
     )
 {
     // Handled in Dispatch_mmap() in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -448,7 +466,7 @@ PlxPciBarUnmap(
     )
 {
     // Handled at user API level in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -482,11 +500,15 @@ PlxEepromPresent(
         );
 
     if (bFlag)
+    {
         *pStatus = PLX_EEPROM_STATUS_VALID;
+    }
     else
+    {
         *pStatus = PLX_EEPROM_STATUS_NONE;
+    }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -528,8 +550,10 @@ PlxEepromProbe(
             &ValueOriginal
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
     // Prepare inverse value to write
     ValueWrite = (U16)~ValueOriginal;
@@ -542,8 +566,10 @@ PlxEepromProbe(
             ValueWrite
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
     // Read updated value
     status =
@@ -553,8 +579,10 @@ PlxEepromProbe(
             &ValueRead
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
     // Check if value was written properly
     if (ValueRead == ValueWrite)
@@ -575,7 +603,7 @@ PlxEepromProbe(
         DebugPrintf(("Probe did not detect an EEPROM\n"));
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -600,7 +628,7 @@ PlxEepromCrcGet(
     *pCrcStatus = PLX_CRC_UNSUPPORTED;
 
     // CRC not supported
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -624,7 +652,7 @@ PlxEepromCrcUpdate(
     *pCrc = 0;
 
     // CRC not supported
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -648,7 +676,7 @@ PlxEepromReadByOffset(
     if (offset & (3 << 0))
     {
         *pValue = 0;
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
     Plx6000_EepromReadByOffset_16(
@@ -663,7 +691,7 @@ PlxEepromReadByOffset(
         (U16*)((U8*)pValue + sizeof(U16))
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -685,7 +713,9 @@ PlxEepromWriteByOffset(
 {
     // Make sure offset is aligned on 32-bit boundary
     if (offset & (3 << 0))
-        return ApiInvalidOffset;
+    {
+        return PLX_STATUS_INVALID_OFFSET;
+    }
 
     Plx6000_EepromWriteByOffset_16(
         pdx,
@@ -699,7 +729,7 @@ PlxEepromWriteByOffset(
         (U16)(value >> 16)
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -723,7 +753,7 @@ PlxEepromReadByOffset_16(
     if (offset & (1 << 0))
     {
         *pValue = 0;
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
     return Plx6000_EepromReadByOffset_16(
@@ -752,7 +782,9 @@ PlxEepromWriteByOffset_16(
 {
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-        return ApiInvalidOffset;
+    {
+        return PLX_STATUS_INVALID_OFFSET;
+    }
 
     return Plx6000_EepromWriteByOffset_16(
         pdx,
@@ -780,53 +812,52 @@ PlxPciIoPortTransfer(
     BOOLEAN          bReadOperation
     )
 {
-    U8 AccessSize;
+    U8  AlignMask;
+    U8  AccessSize;
+    U32 Value;
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+    {
+        return PLX_STATUS_NULL_PARAM;
+    }
 
     // Verify size & type
     switch (AccessType)
     {
         case BitSize8:
+            AlignMask  = 0;
             AccessSize = sizeof(U8);
             break;
 
         case BitSize16:
-            if (IoPort & (1 << 0))
-            {
-                DebugPrintf(("ERROR - I/O port not aligned on 16-bit boundary\n"));
-                return ApiInvalidAddress;
-            }
-
-            if (SizeInBytes & (1 << 0))
-            {
-                DebugPrintf(("ERROR - Byte count not aligned on 16-bit boundary\n"));
-                return ApiInvalidSize;
-            }
+            AlignMask  = (1 << 0);
             AccessSize = sizeof(U16);
             break;
 
         case BitSize32:
-            if (IoPort & 0x3)
-            {
-                DebugPrintf(("ERROR - I/O port not aligned on 32-bit boundary\n"));
-                return ApiInvalidAddress;
-            }
-
-            if (SizeInBytes & 0x3)
-            {
-                DebugPrintf(("ERROR - Byte count not aligned on 32-bit boundary\n"));
-                return ApiInvalidSize;
-            }
+            AlignMask  = (3 << 0);
             AccessSize = sizeof(U32);
             break;
 
         default:
-            return ApiInvalidAccessType;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
+    // Verify alignments
+    if (IoPort & AlignMask)
+    {
+        DebugPrintf(("ERROR - I/O port not %d-bit aligned\n", (AccessSize * 8)));
+        return PLX_STATUS_INVALID_ADDR;
+    }
+
+    if (SizeInBytes & AlignMask)
+    {
+        DebugPrintf(("ERROR - Byte count not %d-bit aligned\n", (AccessSize * 8)));
+        return PLX_STATUS_INVALID_SIZE;
+    }
+
+    // Perform operation
     while (SizeInBytes)
     {
         if (bReadOperation)
@@ -834,45 +865,48 @@ PlxPciIoPortTransfer(
             switch (AccessType)
             {
                 case BitSize8:
-                    *(U8*)pBuffer = IO_PORT_READ_8( IoPort );
+                    Value = IO_PORT_READ_8( IoPort );
                     break;
 
                 case BitSize16:
-                    *(U16*)pBuffer = IO_PORT_READ_16( IoPort );
+                    Value = IO_PORT_READ_16( IoPort );
                     break;
 
                 case BitSize32:
-                    *(U32*)pBuffer = IO_PORT_READ_32( IoPort );
+                    Value = IO_PORT_READ_32( IoPort );
                     break;
 
                 default:
                     // Added to avoid compiler warnings
                     break;
             }
+
+            // Copy value to user buffer
+            if (copy_to_user( pBuffer, &Value, AccessSize ) != 0)
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
         }
         else
         {
+            // Copy next value from user buffer
+            if (copy_from_user( &Value, pBuffer, AccessSize ) != 0)
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
+
             switch (AccessType)
             {
                 case BitSize8:
-                    IO_PORT_WRITE_8(
-                        IoPort,
-                        *(U8*)pBuffer
-                        );
+                    IO_PORT_WRITE_8( IoPort, (U8)Value );
                     break;
 
                 case BitSize16:
-                    IO_PORT_WRITE_16(
-                        IoPort,
-                        *(U16*)pBuffer
-                        );
+                    IO_PORT_WRITE_16( IoPort, (U16)Value );
                     break;
 
                 case BitSize32:
-                    IO_PORT_WRITE_32(
-                        IoPort,
-                        *(U32*)pBuffer
-                        );
+                    IO_PORT_WRITE_32( IoPort, (U32)Value );
                     break;
 
                 default:
@@ -882,11 +916,11 @@ PlxPciIoPortTransfer(
         }
 
         // Adjust pointer & byte count
-        pBuffer      = (VOID*)((PLX_UINT_PTR)pBuffer + AccessSize);
+        pBuffer      = (U8*)pBuffer + AccessSize;
         SizeInBytes -= AccessSize;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -925,7 +959,7 @@ PlxPciPhysicalMemoryAllocate(
      ******************************************************/
     if (pPciMem->Size == 0)
     {
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Allocate memory for new list object
@@ -934,11 +968,10 @@ PlxPciPhysicalMemoryAllocate(
             sizeof(PLX_PHYS_MEM_OBJECT),
             GFP_KERNEL
             );
-
     if (pMemObject == NULL)
     {
         DebugPrintf(("ERROR - Memory allocation for list object failed\n"));
-        return ApiInsufficientResources;
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Clear object
@@ -951,7 +984,7 @@ PlxPciPhysicalMemoryAllocate(
     DecrementAmount = (pPciMem->Size / 10);
 
     DebugPrintf((
-        "Attempt to allocate physical memory (%d Kb)...\n",
+        "Attempt to allocate physical memory (%dKB)\n",
         (pPciMem->Size >> 10)
         ));
 
@@ -973,16 +1006,10 @@ PlxPciPhysicalMemoryAllocate(
             }
             else
             {
-                // Release the list object
-                kfree(
-                    pMemObject
-                    );
-
-                DebugPrintf(("ERROR - Physical memory allocation failed\n"));
-
+                ErrorPrintf(("ERROR - Physical memory allocation failed\n"));
+                kfree( pMemObject );
                 pPciMem->Size = 0;
-
-                return ApiInsufficientResources;
+                return PLX_STATUS_INSUFFICIENT_RES;
             }
         }
     }
@@ -1019,12 +1046,10 @@ PlxPciPhysicalMemoryAllocate(
         pGbl_DriverObject->CommonBuffer = *pMemObject;
 
         // Release the list object
-        kfree(
-            pMemObject
-            );
+        kfree( pMemObject );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1047,9 +1072,7 @@ PlxPciPhysicalMemoryFree(
     PLX_PHYS_MEM_OBJECT *pMemObject;
 
 
-    spin_lock(
-        &(pdx->Lock_PhysicalMemList)
-        );
+    spin_lock( &(pdx->Lock_PhysicalMemList) );
 
     pEntry = pdx->List_PhysicalMem.next;
 
@@ -1068,39 +1091,28 @@ PlxPciPhysicalMemoryFree(
         if (pMemObject->BusPhysical == pPciMem->PhysicalAddr)
         {
             // Remove the object from the list
-            list_del(
-                pEntry
-                );
+            list_del( pEntry );
 
-            spin_unlock(
-                &(pdx->Lock_PhysicalMemList)
-                );
+            spin_unlock( &(pdx->Lock_PhysicalMemList) );
 
             // Release the buffer
-            Plx_dma_buffer_free(
-                pdx,
-                pMemObject
-                );
+            Plx_dma_buffer_free( pdx, pMemObject );
 
             // Release the list object
-            kfree(
-                pMemObject
-                );
+            kfree( pMemObject );
 
-            return ApiSuccess;
+            return PLX_STATUS_OK;
         }
 
         // Jump to next item in the list
         pEntry = pEntry->next;
     }
 
-    spin_unlock(
-        &(pdx->Lock_PhysicalMemList)
-        );
+    spin_unlock( &(pdx->Lock_PhysicalMemList) );
 
     DebugPrintf(("ERROR - buffer object not found in list\n"));
 
-    return ApiInvalidData;
+    return PLX_STATUS_INVALID_DATA;
 }
 
 
@@ -1121,7 +1133,7 @@ PlxPciPhysicalMemoryMap(
     )
 {
     // Handled in Dispatch_mmap() in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1142,7 +1154,7 @@ PlxPciPhysicalMemoryUnmap(
     )
 {
     // Handled by user-level API in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1193,28 +1205,44 @@ PlxInterruptEnable(
     RegData.BitsToClear = 0;
 
     if (pPlxIntr->Message & (1 << 0))
+    {
         RegData.BitsToSet |= (1 << 24);
+    }
 
     if (pPlxIntr->Message & (1 << 1))
+    {
         RegData.BitsToSet |= (1 << 25);
+    }
 
     if (pPlxIntr->Message & (1 << 2))
+    {
         RegData.BitsToSet |= (1 << 26);
+    }
 
     if (pPlxIntr->Message & (1 << 3))
+    {
         RegData.BitsToSet |= (1 << 27);
+    }
 
     if (pPlxIntr->ResetDeassert)
+    {
         RegData.BitsToSet |= (1 << 28);
+    }
 
     if (pPlxIntr->PmeDeassert)
+    {
         RegData.BitsToSet |= (1 << 29);
+    }
 
     if (pPlxIntr->GPIO_14_15)
+    {
         RegData.BitsToSet |= (1 << 30);
+    }
 
     if (pPlxIntr->GPIO_4_5)
+    {
         RegData.BitsToSet |= (1 << 31);
+    }
 
     // Write register values if they have changed
     if (RegData.BitsToSet != 0)
@@ -1225,7 +1253,7 @@ PlxInterruptEnable(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1277,28 +1305,44 @@ PlxInterruptDisable(
     RegData.BitsToClear = 0;
 
     if (pPlxIntr->Message & (1 << 0))
+    {
         RegData.BitsToClear |= (1 << 24);
+    }
 
     if (pPlxIntr->Message & (1 << 1))
+    {
         RegData.BitsToClear |= (1 << 25);
+    }
 
     if (pPlxIntr->Message & (1 << 2))
+    {
         RegData.BitsToClear |= (1 << 26);
+    }
 
     if (pPlxIntr->Message & (1 << 3))
+    {
         RegData.BitsToClear |= (1 << 27);
+    }
 
     if (pPlxIntr->ResetDeassert)
+    {
         RegData.BitsToClear |= (1 << 28);
+    }
 
     if (pPlxIntr->PmeDeassert)
+    {
         RegData.BitsToClear |= (1 << 29);
+    }
 
     if (pPlxIntr->GPIO_14_15)
+    {
         RegData.BitsToClear |= (1 << 30);
+    }
 
     if (pPlxIntr->GPIO_4_5)
+    {
         RegData.BitsToClear |= (1 << 31);
+    }
 
     // Write register values if they have changed
     if (RegData.BitsToClear != 0)
@@ -1309,7 +1353,7 @@ PlxInterruptDisable(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1343,11 +1387,8 @@ PlxNotificationRegisterFor(
 
     if (pWaitObject == NULL)
     {
-        DebugPrintf((
-            "ERROR - memory allocation for interrupt wait object failed\n"
-            ));
-
-        return ApiInsufficientResources;
+        DebugPrintf(("ERROR - Allocation for interrupt wait object failed\n"));
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Provide the wait object to the user app
@@ -1363,9 +1404,7 @@ PlxNotificationRegisterFor(
     atomic_set( &pWaitObject->SleepCount, 0 );
 
     // Initialize wait queue
-    init_waitqueue_head(
-        &(pWaitObject->WaitQueue)
-        );
+    init_waitqueue_head( &(pWaitObject->WaitQueue) );
 
     // Clear interrupt source
     pWaitObject->Source_Ints     = INTR_TYPE_NONE;
@@ -1376,28 +1415,44 @@ PlxNotificationRegisterFor(
     pWaitObject->Notify_Doorbell = pPlxIntr->Doorbell;
 
     if (pPlxIntr->ResetDeassert)
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_RSTIN;
+    }
 
     if (pPlxIntr->PmeDeassert)
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_PME;
+    }
 
     if (pPlxIntr->GPIO_4_5)
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_GPIO_4_5;
+    }
 
     if (pPlxIntr->GPIO_14_15)
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_GPIO_14_15;
+    }
 
     if (pPlxIntr->Message & (1 << 0))
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_MESSAGE_0;
+    }
 
     if (pPlxIntr->Message & (1 << 1))
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_MESSAGE_1;
+    }
 
     if (pPlxIntr->Message & (1 << 2))
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_MESSAGE_2;
+    }
 
     if (pPlxIntr->Message & (1 << 3))
+    {
         pWaitObject->Notify_Flags |= INTR_TYPE_MESSAGE_3;
+    }
 
     // Add to list of waiting objects
     spin_lock_irqsave(
@@ -1420,7 +1475,7 @@ PlxNotificationRegisterFor(
         pWaitObject
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1544,24 +1599,26 @@ PlxNotificationWait(
             {
                 // Condition met or interrupt occurred
                 DebugPrintf(("Interrupt wait object awakened\n"));
-                rc = ApiSuccess;
+                rc = PLX_STATUS_OK;
             }
             else if (Wait_rc == 0)
             {
                 // Timeout reached
                 DebugPrintf(("Timeout waiting for interrupt\n"));
-                rc = ApiWaitTimeout;
+                rc = PLX_STATUS_TIMEOUT;
             }
             else
             {
                 // Interrupted by a signal
                 DebugPrintf(("Interrupt wait object interrupted by signal or error\n"));
-                rc = ApiWaitCanceled;
+                rc = PLX_STATUS_CANCELED;
             }
 
             // If object is in triggered state, rest to waiting state
             if (pWaitObject->state == PLX_STATE_TRIGGERED)
+            {
                 pWaitObject->state = PLX_STATE_WAITING;
+            }
 
             // Decrement number of sleeping threads
             atomic_dec( &pWaitObject->SleepCount );
@@ -1584,7 +1641,7 @@ PlxNotificationWait(
         ));
 
     // Object not found at this point
-    return ApiFailed;
+    return PLX_STATUS_FAILED;
 }
 
 
@@ -1650,38 +1707,51 @@ PlxNotificationStatus(
                 ));
 
             // Set triggered interrupts
-            RtlZeroMemory(
-                pPlxIntr,
-                sizeof(PLX_INTERRUPT)
-                );
+            RtlZeroMemory( pPlxIntr, sizeof(PLX_INTERRUPT) );
 
             pPlxIntr->Doorbell = IntData.Source_Doorbell;
 
             if (IntData.Source_Ints & INTR_TYPE_RSTIN)
+            {
                 pPlxIntr->ResetDeassert = 1;
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_PME)
+            {
                 pPlxIntr->PmeDeassert = 1;
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_GPIO_4_5)
+            {
                 pPlxIntr->GPIO_4_5 = 1;
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_GPIO_14_15)
+            {
                 pPlxIntr->GPIO_14_15 = 1;
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_MESSAGE_0)
+            {
                 pPlxIntr->Message |= (1 << 0);
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_MESSAGE_1)
+            {
                 pPlxIntr->Message |= (1 << 1);
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_MESSAGE_2)
+            {
                 pPlxIntr->Message |= (1 << 2);
+            }
 
             if (IntData.Source_Ints & INTR_TYPE_MESSAGE_3)
+            {
                 pPlxIntr->Message |= (1 << 3);
+            }
 
-            return ApiSuccess;
+            return PLX_STATUS_OK;
         }
 
         // Jump to next item in the list
@@ -1693,7 +1763,7 @@ PlxNotificationStatus(
         flags
         );
 
-    return ApiFailed;
+    return PLX_STATUS_FAILED;
 }
 
 
@@ -1817,7 +1887,9 @@ PlxNotificationCancel(
 
             // Return if removing only a specific object
             if (pUserWaitObject != NULL)
-                return ApiSuccess;
+            {
+                return PLX_STATUS_OK;
+            }
 
             // Reset to beginning of list
             spin_lock_irqsave(
@@ -1839,5 +1911,5 @@ PlxNotificationCancel(
         flags
         );
 
-    return ApiFailed;
+    return PLX_STATUS_FAILED;
 }

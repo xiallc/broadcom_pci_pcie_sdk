@@ -9,9 +9,11 @@
 #=============================================================================
 # Target build options:
 #
-# TGT_TYPE    = Type of Target image [App | Lib | Driver]
+# ImageName = Name of the build target (without extension)
+# TGT_TYPE  = Type of Target image [App | Lib | Driver]
 #=============================================================================
-TGT_TYPE = Driver
+ImageName = Plx$(PLX_CHIP)$(DBG)
+TGT_TYPE  = Driver
 
 
 

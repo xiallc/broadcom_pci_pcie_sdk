@@ -2,24 +2,36 @@
 #define __PCI_TYPES_H
 
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2017 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -34,7 +46,7 @@
  *
  * Revision:
  *
- *      02-01-12 : PLX SDK v7.00
+ *      01-01-17 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -171,9 +183,39 @@ extern "C" {
 
     #if (WINVER < 0x602)
         #define NTDDI_WIN8                          0x06020000
+        #define NTDDI_WIN10                         0x0A000000
     #endif
 
-    #if (WINVER < 0x601)
+    #if (WINVER < 0x603)
+        #define NTDDI_WINBLUE                       0x06030000  // Windows 8.1
+    #endif
+
+    #if (WINVER < 0xA00)
+        #define NTDDI_WIN10                         0x0A000000
+    #endif
+
+    // Additional Win8+ DDK definitions
+    #if (NTDDI_VER < NTDDI_WIN8)
+        // More POOL_TYPEs added, needed for no-execute
+        typedef enum _PLX_POOL_TYPE
+        {
+            NonPagedPoolBase                      = 0,
+            NonPagedPoolBaseMustSucceed           = NonPagedPoolBase + 2,
+            NonPagedPoolBaseCacheAligned          = NonPagedPoolBase + 4,
+            NonPagedPoolBaseCacheAlignedMustS     = NonPagedPoolBase + 6,
+
+            NonPagedPoolNx                        = 512,
+            NonPagedPoolNxCacheAligned            = NonPagedPoolNx + 4,
+            NonPagedPoolSessionNx                 = NonPagedPoolNx + 32
+        } PLX_POOL_TYPE;
+
+        // Additional -OR- flags for MM_PAGE_PRIORITY 
+        #define MdlMappingNoWrite       0x80000000  // Create the mapping as nowrite
+        #define MdlMappingNoExecute     0x40000000  // Create the mapping as noexecute
+    #endif
+
+    #if (NTDDI_VER < NTDDI_WIN7)
+        // Win7 DDK added typedef's for registered functions for declaration
         typedef
         NTSTATUS
         DRIVER_INITIALIZE(
@@ -298,6 +340,35 @@ typedef volatile S32          VS32;
 typedef volatile U32          VU32;
 typedef volatile S64          VS64;
 typedef volatile U64          VU64;
+
+
+
+/*******************************************
+ *    Definitions used for ACPI probe
+ ******************************************/
+// Used to scan ROM for services
+#define BIOS_MEM_START                  0x000E0000
+#define BIOS_MEM_END                    0x00100000
+
+// ACPI probe states
+#define ACPI_PCIE_NOT_PROBED            0
+#define ACPI_PCIE_BYPASS_OS_OK          1
+#define ACPI_PCIE_DEFAULT_TO_OS         2
+#define ACPI_PCIE_ALWAYS_USE_OS         3
+
+
+// ACPI RSDT v1.0 structure
+typedef struct _ACPI_RSDT_v1_0
+{
+    U32 Signature;
+    U32 Length;
+    U8  Revision;
+    U8  Oem_Id[6];
+    U8  Oem_Table_Id[8];
+    U32 Oem_Revision;
+    U32 Creator_Id;
+    U32 Creator_Revision;
+} ACPI_RSDT_v1_0;
 
 
 

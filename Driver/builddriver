@@ -37,7 +37,7 @@ if [ "${PLX_SDK_DIR}1" = "1" ]; then
 
     if [ "${PLX_SDK_DIR}1" = "1" ]; then
         # Add environment variable
-        export PLX_SDK_DIR=$HOME/PLX_DIR
+        export PLX_SDK_DIR=$HOME/$PLX_DIR
 
         echo
         echo "  Note:"
@@ -56,8 +56,8 @@ else
     export PLX_SDK_DIR=${PLX_SDK_DIR}
 fi
 
-
 # Store parameters
+Param1=`echo $1 |awk '{print tolower($0)}'`
 Param2=$2
 Param3=$3
 Param4=$4
@@ -75,9 +75,9 @@ fi
 
 # Check for clean option
 if [ "$2" = "c" ]; then Param2=clean;    fi
-if [ "$2" = "a" ]; then Param2=cleanall; fi
+if [ "$2" = "o" ]; then Param2=cleanobj; fi
 if [ "$3" = "c" ]; then Param3=clean;    fi
-if [ "$3" = "a" ]; then Param3=cleanall; fi
+if [ "$3" = "o" ]; then Param3=cleanobj; fi
 
 
 # Check for verbose option
@@ -86,24 +86,19 @@ if [ "$3" = "v" ]; then Param3=V=1; fi
 if [ "$4" = "v" ]; then Param4=V=1; fi
 
 
-# Set default chip type
-PLX_CHIP=$1
-
-
 # Verify command-line
-case "$1" in
+case "$Param1" in
     8000n) PLX_CHIP=8000_NT  ;;
     8000d) PLX_CHIP=8000_DMA ;;
     6000n) PLX_CHIP=6000_NT  ;;
-
-    9050)  ;;
-    9030)  ;;
-    9080)  ;;
-    9054)  ;;
-    9056)  ;;
-    9656)  ;;
-    8311)  ;;
-    Svc)   ;;
+    9050)  PLX_CHIP=$1       ;;
+    9030)  PLX_CHIP=$1       ;;
+    9080)  PLX_CHIP=$1       ;;
+    9054)  PLX_CHIP=$1       ;;
+    9056)  PLX_CHIP=$1       ;;
+    9656)  PLX_CHIP=$1       ;;
+    8311)  PLX_CHIP=$1       ;;
+    svc)   PLX_CHIP=Svc      ;;
 
     *)
     echo
@@ -128,20 +123,20 @@ case "$1" in
     echo "                   'd'        : Build Debug build of module"
     echo
     echo "     CleanOption = <none>     : Build the driver"
-    echo "                   'clean'    : Remove intermediate build files"
-    echo "                   'cleanall' : Remove all build files"
+    echo "                   'cleanobj' : Remove intermediate build files only"
+    echo "                   'clean'    : Remove all build files"
     echo
     echo "  E.g.: builddriver 9054 d      - Build 9054 module debug version"
     echo "        builddriver Svc         - Build PlxSvc service module release version"
-    echo "        builddriver 8000n clean - Remove intermediate build files of 8000-NT module"
+    echo "        builddriver 8000n clean - Remove all build files of 8000-NT module"
     echo
     exit
     ;;
 esac
 
-# Set PLX chip in environment
+
+# Set PLX Chip type
 export PLX_CHIP=$PLX_CHIP
 
-
 # Build the driver
-make $Param2 $Param3 $Param4 $5 $6 $7
+make $Param2 $Param3 $Param4 --no-print-directory $5 $6 $7

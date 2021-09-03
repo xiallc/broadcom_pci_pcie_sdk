@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /*******************************************************************************
@@ -31,17 +43,20 @@
  *
  * Revision History:
  *
- *      02-01-13 : PLX SDK v7.00
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
 
+#include <linux/slab.h>     // For kmalloc()
+#include <asm/uaccess.h>    // For copy_to/from_user()
 #include "ApiFunc.h"
 #include "ChipFunc.h"
 #include "Eep_6000.h"
 #include "Eep_8000.h"
 #include "Eep_8111.h"
 #include "PciFunc.h"
+#include "PciRegs.h"
 #include "SuppFunc.h"
 
 
@@ -62,7 +77,6 @@ PlxDeviceFind(
     )
 {
     U16               DeviceCount;
-    U32               RegValue;
     BOOLEAN           bMatchId;
     BOOLEAN           bMatchLoc;
     PLX_DEVICE_NODE  *pDevice;
@@ -141,22 +155,9 @@ PlxDeviceFind(
             }
         }
 
-        // Subsystem ID only valid in PCI header 0 type
-        if (pDevice->PciHeaderType == 0)
+        // Subsystem ID
+        if (pDevice->Key.SubVendorId != 0)
         {
-            // Get the Subsystem Device/Vendor ID
-            if (pDevice->Key.SubVendorId == 0)
-            {
-                PLX_PCI_REG_READ(
-                    pDevice,
-                    0x2c,        // PCI Subsystem ID
-                    &RegValue
-                    );
-
-                pDevice->Key.SubVendorId = (U16)(RegValue & 0xffff);
-                pDevice->Key.SubDeviceId = (U16)(RegValue >> 16);
-            }
-
             // Compare Subsystem Vendor ID
             if (pKey->SubVendorId != (U16)PCI_FIELD_IGNORE)
             {
@@ -174,18 +175,6 @@ PlxDeviceFind(
                     bMatchId = FALSE;
                 }
             }
-        }
-
-        // Get the Revision ID if haven't yet
-        if (pDevice->Key.Revision == 0)
-        {
-            PLX_PCI_REG_READ(
-                pDevice,
-                0x08,        // PCI Revision ID
-                &RegValue
-                );
-
-            pDevice->Key.Revision = (U8)(RegValue & 0xFF);
         }
 
         // Compare Revision
@@ -207,12 +196,11 @@ PlxDeviceFind(
                 *pKey = pDevice->Key;
 
                 DebugPrintf((
-                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%x]\n",
+                    "Criteria matched device %04X_%04X [%02x:%02x.%x]\n",
                     pDevice->Key.DeviceId, pDevice->Key.VendorId,
                     pDevice->Key.bus, pDevice->Key.slot, pDevice->Key.function
                     ));
-
-                return ApiSuccess;
+                return PLX_STATUS_OK;
             }
 
             // Increment device count
@@ -228,7 +216,7 @@ PlxDeviceFind(
 
     DebugPrintf(("Criteria did not match any devices\n"));
 
-    return ApiInvalidDeviceInfo;
+    return PLX_STATUS_INVALID_OBJECT;
 }
 
 
@@ -257,7 +245,7 @@ PlxChipTypeGet(
         *pChipType, *pRevision
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -304,6 +292,7 @@ PlxChipTypeSet(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -344,7 +333,7 @@ PlxChipTypeSet(
             if (PortProp.PortType != PLX_PORT_UPSTREAM)
             {
                 DebugPrintf(("ERROR - Chip type may only be changed on upstream port\n"));
-                return ApiUnsupportedFunction;
+                return PLX_STATUS_UNSUPPORTED;
             }
 
             // Flag to update upstream node
@@ -352,11 +341,8 @@ PlxChipTypeSet(
             break;
 
         default:
-            DebugPrintf((
-                "ERROR - Invalid or unsupported chip type (%04X)\n",
-                ChipType
-                ));
-            return ApiInvalidData;
+            DebugPrintf(("ERROR - Invalid or unsupported chip type (%04X)\n", ChipType));
+            return PLX_STATUS_INVALID_DATA;
     }
 
     // Set the new chip type
@@ -398,7 +384,7 @@ PlxChipTypeSet(
         pdx->Key.PlxChip, pdx->Key.PlxRevision
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -425,27 +411,34 @@ PlxGetPortProperties(
     // Set default properties
     RtlZeroMemory(pPortProp, sizeof(PLX_PORT_PROP));
 
-    // Get the offset of the PCI Express capability 
+    // Get the offset of the PCI Express capability
     Offset_PcieCap =
-        PlxGetExtendedCapabilityOffset(
+        PlxPciFindCapability(
             pdx,
-            0x10       // CAP_ID_PCI_EXPRESS
+            PCI_CAP_ID_PCI_EXPRESS,
+            FALSE,
+            0
             );
-
     if (Offset_PcieCap == 0)
     {
-        DebugPrintf(("Device does not support PCI Express Capability\n"));
+        DebugPrintf((
+            "[D%d %02X:%02X.%X] Does not contain PCIe capability\n",
+            pdx->Key.domain, pdx->Key.bus, pdx->Key.slot, pdx->Key.function
+            ));
 
         // Mark device as non-PCIe
         pPortProp->bNonPcieDevice = TRUE;
 
         // Default to a legacy endpoint
         if (pdx->PciHeaderType == 0)
+        {
             pPortProp->PortType = PLX_PORT_LEGACY_ENDPOINT;
+        }
         else
+        {
             pPortProp->PortType = PLX_PORT_UNKNOWN;
-
-        return ApiSuccess;
+        }
+        return PLX_STATUS_OK;
     }
 
     // Get PCIe Capability
@@ -469,8 +462,7 @@ PlxGetPortProperties(
     MaxSize = (U8)(RegValue >> 0) & 0x7;
 
     // Set max payload size (=128 * (2 ^ MaxPaySizeField))
-    if (MaxSize <= 5)
-        pPortProp->MaxPayloadSupported = 128 * ((U16)Plx_pow_int(2, MaxSize));
+    pPortProp->MaxPayloadSupported = PCIE_MPS_MRR_TO_BYTES( MaxSize );
 
     // Get PCIe Device Control
     PLX_PCI_REG_READ(
@@ -483,15 +475,13 @@ PlxGetPortProperties(
     MaxSize = (U8)(RegValue >> 5) & 0x7;
 
     // Set max payload size (=128 * (2 ^ MaxPaySizeField))
-    if (MaxSize <= 5)
-        pPortProp->MaxPayloadSize = 128 * ((U16)Plx_pow_int(2, MaxSize));
+    pPortProp->MaxPayloadSize = PCIE_MPS_MRR_TO_BYTES( MaxSize );
 
     // Get max read request size field
     MaxSize = (U8)(RegValue >> 12) & 0x7;
 
     // Set max read request size (=128 * (2 ^ MaxReadReqSizeField))
-    if (MaxSize <= 5)
-        pPortProp->MaxReadReqSize = 128 * ((U16)Plx_pow_int(2, MaxSize));
+    pPortProp->MaxReadReqSize = PCIE_MPS_MRR_TO_BYTES( MaxSize );
 
     // Get PCIe Link Capabilities
     PLX_PCI_REG_READ(
@@ -557,15 +547,16 @@ PlxGetPortProperties(
     pdx->PortNumber = pPortProp->PortNumber;
 
     DebugPrintf((
-        "Type=%d Num=%d MaxPd=%d/%d MaxRdReq=%d LW=x%d/x%d LS=%d/%d\n",
-        pPortProp->PortType, pPortProp->PortNumber,
+        "[D%d %02X:%02X.%X] P=%d T=%d MPS=%d/%d MRR=%d L=G%dx%d/G%dx%d\n",
+        pdx->Key.domain, pdx->Key.bus, pdx->Key.slot, pdx->Key.function,
+        pPortProp->PortNumber, pPortProp->PortType,
         pPortProp->MaxPayloadSize, pPortProp->MaxPayloadSupported,
         pPortProp->MaxReadReqSize,
-        pPortProp->LinkWidth, pPortProp->MaxLinkWidth,
-        pPortProp->LinkSpeed, pPortProp->MaxLinkSpeed
+        pPortProp->LinkSpeed, pPortProp->LinkWidth,
+        pPortProp->MaxLinkSpeed, pPortProp->MaxLinkWidth
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -584,7 +575,7 @@ PlxPciDeviceReset(
     )
 {
     // Device reset not implemented
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -616,6 +607,7 @@ PlxRegisterRead(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -647,7 +639,9 @@ PlxRegisterRead(
     }
 
     if (pStatus != NULL)
-        *pStatus = ApiUnsupportedFunction;
+    {
+        *pStatus = PLX_STATUS_UNSUPPORTED;
+    }
 
     return 0;
 }
@@ -681,6 +675,7 @@ PlxRegisterWrite(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -711,7 +706,7 @@ PlxRegisterWrite(
                 );
     }
 
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -736,19 +731,21 @@ PlxPciBarProperties(
     {
         case 0:
             if ((BarIndex != 0) && (BarIndex > 5))
-                return ApiInvalidIndex;
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
             break;
 
         case 1:
             if ((BarIndex != 0) && (BarIndex != 1))
             {
                 DebugPrintf(("BAR %d does not exist on PCI type 1 header\n", BarIndex));
-                return ApiInvalidIndex;
+                return PLX_STATUS_INVALID_ACCESS;
             }
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Return BAR properties
@@ -758,14 +755,14 @@ PlxPciBarProperties(
     if (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_UPPER_32)
     {
         DebugPrintf(("BAR %d is upper address of 64-bit BAR %d\n", BarIndex, BarIndex-1));
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Display BAR properties if enabled
-    if (pdx->PciBar[BarIndex].Properties.Size == 0)
+    if (pdx->PciBar[BarIndex].Properties.BarValue == 0)
     {
         DebugPrintf(("BAR %d is disabled\n", BarIndex));
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     DebugPrintf((
@@ -784,12 +781,18 @@ PlxPciBarProperties(
         ));
 
     DebugPrintf((
-        "    Size     : %08llX (%lld %s)\n",
+        "    Size     : %llXh (%lld%s)\n",
         pdx->PciBar[BarIndex].Properties.Size,
-        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ?
-            pdx->PciBar[BarIndex].Properties.Size :
-            pdx->PciBar[BarIndex].Properties.Size >> 10,
-        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ? "Bytes" : "KB"
+        pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 30) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 30) :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 20) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 20) :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 10) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 10) :
+           pdx->PciBar[BarIndex].Properties.Size,
+        pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 30) ? "GB" :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 20) ? "MB" :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 10) ? "KB" : "B"
         ));
 
     if (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_MEM)
@@ -801,7 +804,7 @@ PlxPciBarProperties(
             ));
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -839,7 +842,7 @@ PlxPciBarMap(
     if (pObject == NULL)
     {
         DebugPrintf(("ERROR - memory allocation for map object failed\n"));
-        return ApiInsufficientResources;
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Save the intended device node
@@ -853,16 +856,16 @@ PlxPciBarMap(
 
     // Add to list of map objects
     spin_lock(
-        &(pdx->pdx->Lock_MapParamsList)
+        &(pdx->pdo->Lock_MapParamsList)
         );
 
     list_add_tail(
         &(pObject->ListEntry),
-        &(pdx->pdx->List_MapParams)
+        &(pdx->pdo->List_MapParams)
         );
 
     spin_unlock(
-        &(pdx->pdx->Lock_MapParamsList)
+        &(pdx->pdo->Lock_MapParamsList)
         );
 
     DebugPrintf((
@@ -870,7 +873,7 @@ PlxPciBarMap(
         pObject, pdx
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -890,7 +893,7 @@ PlxPciBarUnmap(
     )
 {
     // Handled at user API level in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -924,6 +927,7 @@ PlxEepromPresent(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -949,11 +953,14 @@ PlxEepromPresent(
                 );
 
             if (bFlag)
+            {
                 *pStatus = PLX_EEPROM_STATUS_VALID;
+            }
             else
+            {
                 *pStatus = PLX_EEPROM_STATUS_NONE;
-
-            return ApiSuccess;
+            }
+            return PLX_STATUS_OK;
 
         case 0x8111:
         case 0x8112:
@@ -970,7 +977,7 @@ PlxEepromPresent(
                 );
     }
 
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1007,6 +1014,7 @@ PlxEepromProbe(
         case 0x3300:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = pdx->Key.PlxChip & 0xFF00;
             break;
 
@@ -1031,9 +1039,13 @@ PlxEepromProbe(
 
         case 0x8114:
             if (pdx->Key.PlxRevision >= 0xBA)
+            {
                 OffsetProbe = 0x3EC + sizeof(U32);
+            }
             else
+            {
                 OffsetProbe = 0x378 + sizeof(U32);
+            }
             break;
 
         case 0x8508:
@@ -1061,6 +1073,7 @@ PlxEepromProbe(
         case 0x8548:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             OffsetProbe = 0x10;     // No CRC, just use any reasonable address
             break;
 
@@ -1070,7 +1083,7 @@ PlxEepromProbe(
                 "ERROR - Not a supported PLX device (%04X)\n",
                 pdx->Key.PlxChip
                 ));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     DebugPrintf(("Probe EEPROM at offset %02xh\n", OffsetProbe));
@@ -1083,8 +1096,10 @@ PlxEepromProbe(
             &ValueOriginal
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
     // Prepare inverse value to write
     ValueWrite = ~(ValueOriginal);
@@ -1097,8 +1112,10 @@ PlxEepromProbe(
             ValueWrite
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
     // Read updated value
     status =
@@ -1108,8 +1125,10 @@ PlxEepromProbe(
             &ValueRead
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
     // Check if value was written properly
     if (ValueRead == ValueWrite)
@@ -1130,7 +1149,7 @@ PlxEepromProbe(
         DebugPrintf(("Probe did not detect an EEPROM\n"));
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1167,6 +1186,7 @@ PlxEepromGetAddressWidth(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             status =
                 Plx8000_EepromGetAddressWidth(
                     pdx,
@@ -1179,7 +1199,7 @@ PlxEepromGetAddressWidth(
                 "ERROR - Chip (%04X) does not support address width\n",
                 pdx->Key.PlxChip
                 ));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     DebugPrintf(("EEPROM address width = %dB\n", *pWidth));
@@ -1215,7 +1235,7 @@ PlxEepromSetAddressWidth(
 
         default:
             DebugPrintf(("ERROR - Invalid address width (%d)\n", width));
-            return ApiInvalidData;
+            return PLX_STATUS_INVALID_DATA;
     }
 
     switch (pdx->Key.PlxChip & 0xFF00)
@@ -1232,6 +1252,7 @@ PlxEepromSetAddressWidth(
         case 0x3300:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             status =
                 Plx8000_EepromSetAddressWidth(
                     pdx,
@@ -1244,12 +1265,12 @@ PlxEepromSetAddressWidth(
                 "ERROR - Chip (%04X) does not support address width override\n",
                 pdx->Key.PlxChip
                 ));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     DebugPrintf((
        "%s EEPROM address width to %dB\n",
-       (status == ApiSuccess) ? "Set" : "ERROR - Unable to set",
+       (status == PLX_STATUS_OK) ? "Set" : "ERROR - Unable to set",
        width
        ));
 
@@ -1277,9 +1298,11 @@ PlxEepromCrcGet(
     *pCrc       = 0;
     *pCrcStatus = PLX_CRC_UNSUPPORTED;
 
-    switch (pdx->Key.PlxChip & 0xF000)
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        case 0x8000:
+        case 0x8500:
+        case 0x8700:
+        case 0x9700:
             return Plx8000_EepromCrcGet(
                 pdx,
                 pCrc,
@@ -1288,7 +1311,7 @@ PlxEepromCrcGet(
     }
 
     // CRC not supported
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1311,9 +1334,11 @@ PlxEepromCrcUpdate(
     // Clear return value
     *pCrc = 0;
 
-    switch (pdx->Key.PlxChip & 0xF000)
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        case 0x8000:
+        case 0x8500:
+        case 0x8700:
+        case 0x9700:
             return Plx8000_EepromCrcUpdate(
                 pdx,
                 pCrc,
@@ -1322,7 +1347,7 @@ PlxEepromCrcUpdate(
     }
 
     // CRC not supported
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1350,7 +1375,9 @@ PlxEepromReadByOffset(
 
     // Make sure offset is aligned on 32-bit boundary
     if (offset & (3 << 0))
-        return ApiInvalidOffset;
+    {
+        return PLX_STATUS_INVALID_OFFSET;
+    }
 
     // Generalize by device type
     switch (pdx->Key.PlxChip & 0xFF00)
@@ -1360,6 +1387,7 @@ PlxEepromReadByOffset(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -1407,10 +1435,10 @@ PlxEepromReadByOffset(
 
         case 0x6140:  // 6140 does not support an EEPROM
         default:
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1435,7 +1463,9 @@ PlxEepromWriteByOffset(
 
     // Make sure offset is aligned on 32-bit boundary
     if (offset & (3 << 0))
-        return ApiInvalidOffset;
+    {
+        return PLX_STATUS_INVALID_OFFSET;
+    }
 
     // Generalize by device type
     switch (pdx->Key.PlxChip & 0xFF00)
@@ -1445,6 +1475,7 @@ PlxEepromWriteByOffset(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -1492,10 +1523,10 @@ PlxEepromWriteByOffset(
 
         case 0x6140:  // 6140 does not support an EEPROM
         default:
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1525,7 +1556,9 @@ PlxEepromReadByOffset_16(
 
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-        return ApiInvalidOffset;
+    {
+        return PLX_STATUS_INVALID_OFFSET;
+    }
 
     // Generalize by device type
     switch (pdx->Key.PlxChip & 0xFF00)
@@ -1535,6 +1568,7 @@ PlxEepromReadByOffset_16(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -1582,8 +1616,10 @@ PlxEepromReadByOffset_16(
                     &Value_32
                     );
 
-            if (status != ApiSuccess)
+            if (status != PLX_STATUS_OK)
+            {
                 return status;
+            }
 
             // Return desired 16-bit portion
             if (offset & 0x3)
@@ -1602,10 +1638,10 @@ PlxEepromReadByOffset_16(
                 "ERROR - Device (%04X) does not support 16-bit EEPROM access\n",
                 pdx->Key.PlxChip
                 ));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1632,7 +1668,9 @@ PlxEepromWriteByOffset_16(
 
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-        return ApiInvalidOffset;
+    {
+        return PLX_STATUS_INVALID_OFFSET;
+    }
 
     // Generalize by device type
     switch (pdx->Key.PlxChip & 0xFF00)
@@ -1642,6 +1680,7 @@ PlxEepromWriteByOffset_16(
         case 0x8500:
         case 0x8600:
         case 0x8700:
+        case 0x9700:
             TempChip = 0x8000;
             break;
 
@@ -1689,8 +1728,10 @@ PlxEepromWriteByOffset_16(
                     &Value_32
                     );
 
-            if (status != ApiSuccess)
+            if (status != PLX_STATUS_OK)
+            {
                 return status;
+            }
 
             // Insert new 16-bit value in correct location
             if (offset & 0x3)
@@ -1715,10 +1756,10 @@ PlxEepromWriteByOffset_16(
                 "ERROR - Device (%04X) does not support 16-bit EEPROM access\n",
                 pdx->Key.PlxChip
                 ));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1740,53 +1781,52 @@ PlxPciIoPortTransfer(
     BOOLEAN          bReadOperation
     )
 {
-    U8 AccessSize;
+    U8  AlignMask;
+    U8  AccessSize;
+    U32 Value;
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+    {
+        return PLX_STATUS_NULL_PARAM;
+    }
 
     // Verify size & type
     switch (AccessType)
     {
         case BitSize8:
+            AlignMask  = 0;
             AccessSize = sizeof(U8);
             break;
 
         case BitSize16:
-            if (IoPort & (1 << 0))
-            {
-                DebugPrintf(("ERROR - I/O port not aligned on 16-bit boundary\n"));
-                return ApiInvalidAddress;
-            }
-
-            if (SizeInBytes & (1 << 0))
-            {
-                DebugPrintf(("ERROR - Byte count not aligned on 16-bit boundary\n"));
-                return ApiInvalidSize;
-            }
+            AlignMask  = (1 << 0);
             AccessSize = sizeof(U16);
             break;
 
         case BitSize32:
-            if (IoPort & 0x3)
-            {
-                DebugPrintf(("ERROR - I/O port not aligned on 32-bit boundary\n"));
-                return ApiInvalidAddress;
-            }
-
-            if (SizeInBytes & 0x3)
-            {
-                DebugPrintf(("ERROR - Byte count not aligned on 32-bit boundary\n"));
-                return ApiInvalidSize;
-            }
+            AlignMask  = (3 << 0);
             AccessSize = sizeof(U32);
             break;
 
         default:
-            return ApiInvalidAccessType;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
+    // Verify alignments
+    if (IoPort & AlignMask)
+    {
+        DebugPrintf(("ERROR - I/O port not %d-bit aligned\n", (AccessSize * 8)));
+        return PLX_STATUS_INVALID_ADDR;
+    }
+
+    if (SizeInBytes & AlignMask)
+    {
+        DebugPrintf(("ERROR - Byte count not %d-bit aligned\n", (AccessSize * 8)));
+        return PLX_STATUS_INVALID_SIZE;
+    }
+
+    // Perform operation
     while (SizeInBytes)
     {
         if (bReadOperation)
@@ -1794,45 +1834,48 @@ PlxPciIoPortTransfer(
             switch (AccessType)
             {
                 case BitSize8:
-                    *(U8*)pBuffer = IO_PORT_READ_8( IoPort );
+                    Value = IO_PORT_READ_8( IoPort );
                     break;
 
                 case BitSize16:
-                    *(U16*)pBuffer = IO_PORT_READ_16( IoPort );
+                    Value = IO_PORT_READ_16( IoPort );
                     break;
 
                 case BitSize32:
-                    *(U32*)pBuffer = IO_PORT_READ_32( IoPort );
+                    Value = IO_PORT_READ_32( IoPort );
                     break;
 
                 default:
                     // Added to avoid compiler warnings
                     break;
             }
+
+            // Copy value to user buffer
+            if (copy_to_user( pBuffer, &Value, AccessSize ) != 0)
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
         }
         else
         {
+            // Copy next value from user buffer
+            if (copy_from_user( &Value, pBuffer, AccessSize ) != 0)
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
+
             switch (AccessType)
             {
                 case BitSize8:
-                    IO_PORT_WRITE_8(
-                        IoPort,
-                        *(U8*)pBuffer
-                        );
+                    IO_PORT_WRITE_8( IoPort, (U8)Value );
                     break;
 
                 case BitSize16:
-                    IO_PORT_WRITE_16(
-                        IoPort,
-                        *(U16*)pBuffer
-                        );
+                    IO_PORT_WRITE_16( IoPort, (U16)Value );
                     break;
 
                 case BitSize32:
-                    IO_PORT_WRITE_32(
-                        IoPort,
-                        *(U32*)pBuffer
-                        );
+                    IO_PORT_WRITE_32( IoPort, (U32)Value );
                     break;
 
                 default:
@@ -1842,11 +1885,11 @@ PlxPciIoPortTransfer(
         }
 
         // Adjust pointer & byte count
-        pBuffer      = (VOID*)((PLX_UINT_PTR)pBuffer + AccessSize);
+        pBuffer      = (U8*)pBuffer + AccessSize;
         SizeInBytes -= AccessSize;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1866,7 +1909,7 @@ PlxPciPhysicalMemoryAllocate(
     BOOLEAN           bSmallerOk
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1885,7 +1928,7 @@ PlxPciPhysicalMemoryFree(
     PLX_PHYSICAL_MEM *pPciMem
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1904,7 +1947,7 @@ PlxPciPhysicalMemoryMap(
     PLX_PHYSICAL_MEM *pPciMem
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1923,7 +1966,7 @@ PlxPciPhysicalMemoryUnmap(
     PLX_PHYSICAL_MEM *pPciMem
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1942,68 +1985,67 @@ PlxPciPerformanceInitializeProperties(
     PLX_PERF_PROP   *pPerfProp
     )
 {
-    U8            PortsPerStation;
+    U8            StnPortCount;
+    PLX_PERF_PROP PerfProp;
     PLX_PORT_PROP PortProp;
 
 
     // Clear performance object
-    RtlZeroMemory( pPerfProp, sizeof(PLX_PERF_PROP) );
+    RtlZeroMemory( &PerfProp, sizeof(PLX_PERF_PROP) );
 
     // Verify supported device & set number of ports per station
     switch (pdx->Key.PlxFamily)
     {
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_CYGNUS:
-            PortsPerStation = 4;
+        case PLX_FAMILY_MIRA:
+        case PLX_FAMILY_CAPELLA_1:
+        case PLX_FAMILY_CAPELLA_2:
+            StnPortCount = 4;
             break;
 
         case PLX_FAMILY_SIRIUS:
-            PortsPerStation = 16;
+            StnPortCount = 16;
             break;
 
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
-            PortsPerStation = 8;    // Device actually only uses 6 ports out of 8
-            break;
-
-        case PLX_FAMILY_CAPELLA_1:
-            if ((pdx->Key.PlxChip == 0x8714) || (pdx->Key.PlxChip == 0x8718))
-                PortsPerStation = 5;
-            else
-                PortsPerStation = 4;
-            break;
-
-        case PLX_FAMILY_MIRA:
-            PortsPerStation = 4;
+            StnPortCount = 8;    // Device actually only uses 6 ports out of 8
             break;
 
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     // Get port properties
-    PlxGetPortProperties(
-        pdx,
-        &PortProp
-        );
+    PlxGetPortProperties( pdx, &PortProp );
 
-    if (PortProp.PortNumber >= 24)
+    if (PortProp.PortNumber >= PERF_MAX_PORTS)
     {
-        DebugPrintf(("ERROR - Port number exceeds maximum (%d)\n", (24-1)));
-        return ApiUnsupportedFunction;
+        DebugPrintf(("ERROR - Port number exceeds maximum (%d)\n", (PERF_MAX_PORTS-1)));
+        return PLX_STATUS_UNSUPPORTED;
     }
 
+    // Store PLX chip family
+    PerfProp.PlxFamily = pdx->Key.PlxFamily;
+
     // Store relevant port properties for later calculations
-    pPerfProp->PortNumber = PortProp.PortNumber;
-    pPerfProp->LinkWidth  = PortProp.LinkWidth;
-    pPerfProp->LinkSpeed  = PortProp.LinkSpeed;
+    PerfProp.PortNumber = PortProp.PortNumber;
+    PerfProp.LinkWidth  = PortProp.LinkWidth;
+    PerfProp.LinkSpeed  = PortProp.LinkSpeed;
 
     // Determine station and port number within station
-    pPerfProp->Station     = (U8)(PortProp.PortNumber / PortsPerStation);
-    pPerfProp->StationPort = (U8)(PortProp.PortNumber % PortsPerStation);
+    PerfProp.Station     = (U8)(PortProp.PortNumber / StnPortCount);
+    PerfProp.StationPort = (U8)(PortProp.PortNumber % StnPortCount);
 
-    return ApiSuccess;
+    // Copy result to user buffer
+    if (copy_to_user( pPerfProp, &PerfProp, sizeof(PLX_PERF_PROP) ) != 0)
+    {
+        return PLX_STATUS_INVALID_ACCESS;
+    }
+
+    return PLX_STATUS_OK;
 }
 
 
@@ -2023,12 +2065,15 @@ PlxPciPerformanceMonitorControl(
     )
 {
     U8  Bit_EgressEn;
-    U16 Offset_Control;
+    U8  bStationBased;
+    U8  bEgressAllPorts;
+    U32 i;
     U32 offset;
     U32 RegValue;
     U32 RegCommand;
-    U32 NumStations;
-    U32 PortsPerStation;
+    U32 StnCount;
+    U32 StnPortCount;
+    U32 Offset_Control;
 
 
     // Verify supported device
@@ -2036,26 +2081,28 @@ PlxPciPerformanceMonitorControl(
     {
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_SIRIUS:
+        case PLX_FAMILY_MIRA:
             Offset_Control = 0x568;
+
+            // Offset changes for MIRA in legacy EP mode
+            if ((pdx->Key.PlxFamily == PLX_FAMILY_MIRA) &&
+                (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT))
+            {
+                Offset_Control = 0x1568;
+            }
             break;
 
         case PLX_FAMILY_CYGNUS:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
         case PLX_FAMILY_CAPELLA_1:
+        case PLX_FAMILY_CAPELLA_2:
             Offset_Control = 0x3E0;
-            break;
-
-        case PLX_FAMILY_MIRA:
-            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
-                Offset_Control = 0x1568;
-            else
-                Offset_Control = 0x568;
             break;
 
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     switch (command)
@@ -2071,13 +2118,17 @@ PlxPciPerformanceMonitorControl(
             break;
 
         default:
-            return ApiInvalidData;
+            return PLX_STATUS_INVALID_DATA;
     }
 
     // Added to avoid compiler warning
-    Bit_EgressEn    = 0;
-    NumStations     = 0;
-    PortsPerStation = 0;
+    Bit_EgressEn = 0;
+    StnCount     = 0;
+    StnPortCount = 0;
+
+    // Default to single station access
+    bStationBased   = FALSE;
+    bEgressAllPorts = FALSE;
 
     // Set control offset & enable/disable counters in stations
     switch (pdx->Key.PlxFamily)
@@ -2115,19 +2166,20 @@ PlxPciPerformanceMonitorControl(
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
         case PLX_FAMILY_CAPELLA_1:
+        case PLX_FAMILY_CAPELLA_2:
             // Set device configuration
             if (pdx->Key.PlxFamily == PLX_FAMILY_CYGNUS)
             {
-                Bit_EgressEn    = 7;
-                NumStations     = 6;
-                PortsPerStation = 4;
+                Bit_EgressEn = 7;
+                StnCount     = 6;
+                StnPortCount = 4;
             }
             else if ((pdx->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
                      (pdx->Key.PlxFamily == PLX_FAMILY_DRACO_2))
             {
-                Bit_EgressEn    = 6;
-                NumStations     = 3;
-                PortsPerStation = 8;    // Device actually only uses 6 ports out of 8
+                Bit_EgressEn = 6;
+                StnCount     = 3;
+                StnPortCount = 8;    // Device actually only uses 6 ports out of 8
 
                 // Set 3F0[9:8] to disable probe mode interval timer
                 // & avoid RAM pointer corruption
@@ -2137,46 +2189,69 @@ PlxPciPerformanceMonitorControl(
                     PLX_8000_REG_WRITE( pdx, 0x3F0, RegValue | (3 << 8) );
                 }
             }
-            else if (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1)
+            else if ((pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
+                     (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
             {
-                Bit_EgressEn = 6;
-                NumStations  = 6;
-                if ((pdx->Key.PlxChip == 0x8714) || (pdx->Key.PlxChip == 0x8718))
-                    PortsPerStation = 5;
-                else
-                    PortsPerStation = 4;
+                Bit_EgressEn    = 6;
+                StnCount        = 6;
+                StnPortCount    = 4;
+                bStationBased   = TRUE;
+                bEgressAllPorts = TRUE;
             }
 
-            // Enable/Disable Performance Counter in each station
-            for (offset = 0; offset < (NumStations * (PortsPerStation * 0x1000)); offset += (PortsPerStation * 0x1000))
+            // Enable/Disable Performance Counter in each station (or ports if applicable)
+            for (i = 0; i < (StnCount * StnPortCount); i++)
             {
-                // Ingress ports
-                RegValue = PLX_8000_REG_READ( pdx, offset + 0x768 );
+                // Set port base offset
+                offset = (i * 0x1000);
 
-                if (command == PLX_PERF_CMD_START)
-                    PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue | (1 << 29) );
-                else
-                    PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue & ~(1 << 29) );
+                // Ingress ports (in station port 0 only)
+                if ((i % StnPortCount) == 0)
+                {
+                    RegValue = PLX_8000_REG_READ( pdx, offset + 0x768 );
+
+                    if (command == PLX_PERF_CMD_START)
+                    {
+                        PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue | (1 << 29) );
+                    }
+                    else
+                    {
+                        PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue & ~(1 << 29) );
+                    }
+                }
 
                 // Egress ports
-                RegValue = PLX_8000_REG_READ( pdx, offset + 0xF30 );
+                if (bEgressAllPorts || ((i % StnPortCount) == 0))
+                {
+                    RegValue = PLX_8000_REG_READ( pdx, offset + 0xF30 );
 
-                if (command == PLX_PERF_CMD_START)
-                    PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue | (1 << Bit_EgressEn) );
-                else
-                    PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue & ~(1 << Bit_EgressEn) );
+                    if (command == PLX_PERF_CMD_START)
+                    {
+                        PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue | (1 << Bit_EgressEn) );
+                    }
+                    else
+                    {
+                        PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue & ~(1 << Bit_EgressEn) );
+                    }
+                }
             }
             break;
     }
 
     // Update monitor
-    PLX_8000_REG_WRITE(
-        pdx,
-        Offset_Control,
-        RegCommand
-        );
+    for (i = 0; i < StnCount; i++)
+    {
+        if ((i == 0) || bStationBased)
+        {
+            PLX_8000_REG_WRITE(
+                pdx,
+                Offset_Control + (i * StnPortCount * 0x1000),
+                RegCommand
+                );
+        }
+    }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2194,7 +2269,10 @@ PlxPciPerformanceResetCounters(
     PLX_DEVICE_NODE *pdx
     )
 {
-    U16 Offset_Control;
+    U32 i;
+    U32 StnCount;
+    U32 StnPortCount;
+    U32 Offset_Control;
 
 
     // Verify supported device
@@ -2202,36 +2280,54 @@ PlxPciPerformanceResetCounters(
     {
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_SIRIUS:
+        case PLX_FAMILY_MIRA:
             Offset_Control = 0x568;
+
+            // Offset changes for MIRA in legacy EP mode
+            if ((pdx->Key.PlxFamily == PLX_FAMILY_MIRA) &&
+                (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT))
+            {
+                Offset_Control = 0x1568;
+            }
             break;
 
         case PLX_FAMILY_CYGNUS:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
         case PLX_FAMILY_CAPELLA_1:
+        case PLX_FAMILY_CAPELLA_2:
             Offset_Control = 0x3E0;
-            break;
-
-        case PLX_FAMILY_MIRA:
-            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
-                Offset_Control = 0x1568;
-            else
-                Offset_Control = 0x568;
             break;
 
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    // Reset (30) & enable monitor (31) & infinite sampling (28) & start (27)
-    PLX_8000_REG_WRITE(
-        pdx,
-        Offset_Control,
-        (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27)
-        );
+    // Set station counts for station-based monitor chips
+    if ((pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
+        (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
+    {
+        StnCount     = 6;
+        StnPortCount = 4;
+    }
+    else
+    {
+        StnCount     = 1;
+        StnPortCount = 0;
+    }
 
-    return ApiSuccess;
+    for (i = 0; i < StnCount; i++)
+    {
+        // Reset (30) & enable monitor (31) & infinite sampling (28) & start (27)
+        PLX_8000_REG_WRITE(
+            pdx,
+            Offset_Control + (i * StnPortCount * 0x1000),
+            (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27)
+            );
+    }
+
+    return PLX_STATUS_OK;
 }
 
 
@@ -2282,140 +2378,163 @@ PlxPciPerformanceResetCounters(
  *          |       :         |        |       :         |        |       :          |
  *          |       :         |        |       :         |        |       :          |
  *        24| Port 1 IN CPLDW |      24| Port 1 IN CPLDW |      24| Port 1 IN CPLDW  |
- *          |-----------------|        |-----------------|        |/\/\/\/\/\/\/\/\/\|
- *        28| Port 2 IN PH    |      28| Port 2 IN PH    |        |       :          |
+ *          |-----------------|        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
+ *        28| Port 2 IN PH    |        |       :         |        |       :          |
  *          |       :         |        |       :         |        |       :          |
  *          |       :         |        |       :         |        |       :          |
- *        38| Port 2 IN CPLDW |      38| Port 2 IN CPLDW |        |       :          |
- *          |-----------------|        |-----------------|        |       :          |
- *        3C| Port 3 IN PH    |      3C| Port 3 IN PH    |        |/\/\/\/\/\/\/\/\/\|
- *          |       :         |        |       :         |     12C| Port 15 IN PH    |
+ *        38| Port 2 IN CPLDW |        |       :         |        |       :          |
+ *          |-----------------|        |       :         |        |       :          |
+ *        3C| Port 3 IN PH    |        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
+ *          |       :         |      64| Port 5 IN PH    |     12C| Port 15 IN PH    |
  *          |       :         |        |       :         |        |       :          |
- *        4C| Port 3 IN CPLDW |      4C| Port 3 IN CPLDW |        |       :          |
- *          |-----------------|        |-----------------|     13C| Port 15 IN CPLDW |
- *        50| Port 0 EG PH    |      50| Port 4 IN PH    |        |------------------|
- *        54| Port 0 EG PDW   |        |       :         |     140| Port 0 EG PH     |
- *        58| Port 0 EG NPDW  |        |       :         |     144| Port 0 EG PDW    |
- *        5C| Port 0 EG CPLH  |      60| Port 4 IN CPLDW |     148| Port 0 EG NPDW   |
- *        60| Port 0 EG CPLDW |        |-----------------|     14C| Port 0 EG CPLH   |
- *          |-----------------|      64| Port 5 IN PH    |     150| Port 0 EG CPLDW  |
- *        64| Port 1 EG PH    |        |       :         |        |------------------|
- *          |       :         |        |       :         |     154| Port 1 EG PH     |
- *          |       :         |      74| Port 5 IN CPLDW |        |       :          |
- *        74| Port 1 EG CPLDW |        |-----------------|        |       :          |
- *          |-----------------|      78| Port 0 EG PH    |     164| Port 1 EG CPLDW  |
- *        78| Port 2 EG PH    |      7C| Port 0 EG PDW   |        |/\/\/\/\/\/\/\/\/\|
- *          |       :         |      80| Port 0 EG NPDW  |        |       :          |
- *          |       :         |      84| Port 0 EG CPLH  |        |       :          |
- *        88| Port 2 EG CPLDW |      88| Port 0 EG CPLDW |        |       :          |
- *          |-----------------|        |-----------------|        |       :          |
- *        8C| Port 3 EG PH    |      8C| Port 1 EG PH    |        |       :          |
- *          |       :         |        |       :         |        |/\/\/\/\/\/\/\/\/\|
- *          |       :         |        |       :         |     26C| Port 15 EG PH    |
- *        9C| Port 3 EG CPLDW |      9C| Port 1 EG CPLDW |        |       :          |
- *          |-----------------|        |-----------------|        |       :          |
- *        A0| Port 0 IN DLLP  |      A0| Port 2 EG PH    |     27C| Port 15 EG CPLDW |
- *        A4| Port 1 IN DLLP  |        |       :         |        |------------------|
- *        A8| Port 2 IN DLLP  |        |       :         |     280| Port  0 IN DLLP  |
- *        AC| Port 3 IN DLLP  |      B0| Port 2 EG CPLDW |     284| Port  2 IN DLLP  |
- *          |-----------------|        |-----------------|     288| Port  4 IN DLLP  |
- *        B0| Port 0 EG DLLP  |      B4| Port 3 EG PH    |     28C| Port  6 IN DLLP  |
- *        B4| Port 1 EG DLLP  |        |       :         |     290| Port  8 IN DLLP  |
- *        B8| Port 2 EG DLLP  |        |       :         |     294| Port 10 IN DLLP  |
- *        BC| Port 3 EG DLLP  |      C4| Port 3 EG CPLDW |     298| Port 12 IN DLLP  |
- *          |-----------------|        |-----------------|     29C| Port 14 IN DLLP  |
- *        C0| Port 0 IN PHY   |      C8| Port 4 EG PH    |        |------------------|
- *        C4| Port 1 IN PHY   |        |       :         |     2A0| Port  0 EG DLLP  |
- *        C8| Port 2 IN PHY   |        |       :         |     2A4| Port  2 EG DLLP  |
- *        CC| Port 3 IN PHY   |      D8| Port 4 EG CPLDW |     2A8| Port  4 EG DLLP  |
- *          |-----------------|        |-----------------|     2AC| Port  6 EG DLLP  |
- *        D0| Port 0 EG PHY   |      DC| Port 5 EG PH    |     2B0| Port  8 EG DLLP  |
- *        D4| Port 1 EG PHY   |        |       :         |     2B4| Port 10 EG DLLP  |
- *        D8| Port 2 EG PHY   |        |       :         |     2B8| Port 12 EG DLLP  |
- *        DC| Port 3 EG PHY   |      EC| Port 5 EG CPLDW |     2BC| Port 14 EG DLLP  |
- *           -----------------         |-----------------|        |------------------|
- *                                   F0| Port 0 IN DLLP  |     2C0| Port  1 IN DLLP  |
- *                                   F4| Port 1 IN DLLP  |     2C4| Port  3 IN DLLP  |
- *             Mira                  F8| Port 2 IN DLLP  |     2C8| Port  5 IN DLLP  |
- *     --------------------------    FC| Port 3 IN DLLP  |     2CC| Port  7 IN DLLP  |
- *        14 PCIe counters/port     100| Port 4 IN DLLP  |     2D0| Port  9 IN DLLP  |
- *         4 ports/station          104| Port 5 IN DLLP  |     2D4| Port 11 IN DLLP  |
- *         1 stations (4 ports)        |-----------------|     2D8| Port 13 IN DLLP  |
- *                                  108| Port 0 EG DLLP  |     2DC| Port 15 IN DLLP  |
- *        86 counters/station       10C| Port 1 EG DLLP  |        |------------------|
- *        86 counters (86 * 1)      110| Port 2 EG DLLP  |     2E0| Port  1 EG DLLP  |
- *                                  114| Port 3 EG DLLP  |     2E4| Port  3 EG DLLP  |
- *       off     Counter            118| Port 4 EG DLLP  |     2E8| Port  5 EG DLLP  |
- *           -----------------      11C| Port 5 EG DLLP  |     2EC| Port  7 EG DLLP  |
- *         0| Port 0 IN PH    |        |-----------------|     2F0| Port  9 EG DLLP  |
- *         4| Port 0 IN PDW   |     120| Port 0 IN PHY   |     2F4| Port 11 EG DLLP  |
- *         8| Port 0 IN NPDW  |     124| Port 1 IN PHY   |     2F8| Port 13 EG DLLP  |
- *         C| Port 0 IN CPLH  |     128| Port 2 IN PHY   |     2FC| Port 15 EG DLLP  |
- *        10| Port 0 IN CPLDW |     12C| Port 3 IN PHY   |        |------------------|
- *          |-----------------|     130| Port 4 IN PHY   |     300| Port 0 PHY       |
- *        14| Port 1 IN PH    |     134| Port 5 IN PHY   |        |       :          |
- *          |       :         |        |-----------------|        |       :          |
- *          |       :         |     138| Port 0 EG PHY   |     33C| Port 15 PHY      |
- *        24| Port 1 IN CPLDW |     13C| Port 1 EG PHY   |         ------------------
- *          |-----------------|     140| Port 2 EG PHY   |
- *        28| Port 2 IN PH    |     144| Port 3 EG PHY   |
- *          |       :         |     148| Port 4 EG PHY   |
- *          |       :         |     14C| Port 5 EG PHY   |
- *        38| Port 2 IN CPLDW |         ----------------- 
- *          |-----------------|
- *        3C| Port 3 IN PH    |
- *          |       :         |
- *          |       :         |
- *        4C| Port 3 IN CPLDW |
- *          |-----------------|
- *        50| Port 0 EG PH    |
- *        54| Port 0 EG PDW   |
- *        58| Port 0 EG NPDW  |
- *        5C| Port 0 EG CPLH  |
- *        60| Port 0 EG CPLDW |
- *          |-----------------|
- *        64| Port 1 EG PH    |
- *          |       :         |
- *          |       :         |
- *        74| Port 1 EG CPLDW |
- *          |-----------------|
- *        78| Port 2 EG PH    |
- *          |       :         |
- *          |       :         |
- *        88| Port 2 EG CPLDW |
- *          |-----------------|
- *        8C| Port 3 EG PH    |
- *          |       :         |
- *          |       :         |
- *        9C| Port 3 EG CPLDW |
- *          |-----------------|
- *        A0| Port 0 IN DLLP  |
- *        A4| Port 1 IN DLLP  |
- *        A8| Port 2 IN DLLP  |
- *        AC| Port 3 IN DLLP  |
- *          |-----------------|
- *        B0| Port 0 EG DLLP  |
- *        B4| Port 1 EG DLLP  |
- *        B8| Port 2 EG DLLP  |
- *        BC| Port 3 EG DLLP  |
- *          |-----------------|
- *        C0| GPEP_0 IN PLD   |
- *        C4| GPEP_0 IN RAW   |
- *        C8| GPEP_0 IN PKT   |
- *          |-----------------|
- *        CC| GPEP_1 IN PLD   |
- *        D0| GPEP_1 IN RAW   |
- *        D4| GPEP_1 IN PKT   |
- *          |-----------------|
- *        D8| GPEP_2 IN PLD   |
- *        DC| GPEP_2 IN RAW   |
- *        E0| GPEP_2 IN PKT   |
- *          |-----------------|
- *        E4| GPEP_3 IN PLD   |
- *        E8| GPEP_3 IN RAW   |
- *        EC| GPEP_3 IN PKT   |
- *          |-----------------|
- *        F0| GPEP_0 OUT PLD  |
+ *        4C| Port 3 IN CPLDW |        |       :         |        |       :          |
+ *          |-----------------|      74| Port 5 IN CPLDW |     13C| Port 15 IN CPLDW |
+ *        50| Port 0 EG PH    |        |-----------------|        |------------------|
+ *        54| Port 0 EG PDW   |      78| Port 0 EG PH    |     140| Port 0 EG PH     |
+ *        58| Port 0 EG NPDW  |      7C| Port 0 EG PDW   |     144| Port 0 EG PDW    |
+ *        5C| Port 0 EG CPLH  |      80| Port 0 EG NPDW  |     148| Port 0 EG NPDW   |
+ *        60| Port 0 EG CPLDW |      84| Port 0 EG CPLH  |     14C| Port 0 EG CPLH   |
+ *          |-----------------|      88| Port 0 EG CPLDW |     150| Port 0 EG CPLDW  |
+ *        64| Port 1 EG PH    |        |-----------------|        |------------------|
+ *          |       :         |      8C| Port 1 EG PH    |     154| Port 1 EG PH     |
+ *          |       :         |        |       :         |        |       :          |
+ *        74| Port 1 EG CPLDW |        |       :         |        |       :          |
+ *          |-----------------|      9C| Port 1 EG CPLDW |     164| Port 1 EG CPLDW  |
+ *        78| Port 2 EG PH    |        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
+ *          |       :         |        |       :         |        |       :          |
+ *          |       :         |        |       :         |        |       :          |
+ *        88| Port 2 EG CPLDW |        |       :         |        |       :          |
+ *          |-----------------|        |       :         |        |       :          |
+ *        8C| Port 3 EG PH    |        |       :         |        |       :          |
+ *          |       :         |        |/\/\/\/\/\/\/\/\/|        |/\/\/\/\/\/\/\/\/\|
+ *          |       :         |      DC| Port 5 EG PH    |     26C| Port 15 EG PH    |
+ *        9C| Port 3 EG CPLDW |        |       :         |        |       :          |
+ *          |-----------------|        |       :         |        |       :          |
+ *        A0| Port 0 IN DLLP  |      EC| Port 5 EG CPLDW |     27C| Port 15 EG CPLDW |
+ *        A4| Port 1 IN DLLP  |        |-----------------|        |------------------|
+ *        A8| Port 2 IN DLLP  |      F0| Port 0 IN DLLP  |     280| Port  0 IN DLLP  |
+ *        AC| Port 3 IN DLLP  |      F4| Port 1 IN DLLP  |     284| Port  2 IN DLLP  |
+ *          |-----------------|      F8| Port 2 IN DLLP  |     288| Port  4 IN DLLP  |
+ *        B0| Port 0 EG DLLP  |      FC| Port 3 IN DLLP  |     28C| Port  6 IN DLLP  |
+ *        B4| Port 1 EG DLLP  |     100| Port 4 IN DLLP  |     290| Port  8 IN DLLP  |
+ *        B8| Port 2 EG DLLP  |     104| Port 5 IN DLLP  |     294| Port 10 IN DLLP  |
+ *        BC| Port 3 EG DLLP  |        |-----------------|     298| Port 12 IN DLLP  |
+ *          |-----------------|     108| Port 0 EG DLLP  |     29C| Port 14 IN DLLP  |
+ *        C0| Port 0 IN PHY   |     10C| Port 1 EG DLLP  |        |------------------|
+ *        C4| Port 1 IN PHY   |     110| Port 2 EG DLLP  |     2A0| Port  0 EG DLLP  |
+ *        C8| Port 2 IN PHY   |     114| Port 3 EG DLLP  |     2A4| Port  2 EG DLLP  |
+ *        CC| Port 3 IN PHY   |     118| Port 4 EG DLLP  |     2A8| Port  4 EG DLLP  |
+ *          |-----------------|     11C| Port 5 EG DLLP  |     2AC| Port  6 EG DLLP  |
+ *        D0| Port 0 EG PHY   |        |-----------------|     2B0| Port  8 EG DLLP  |
+ *        D4| Port 1 EG PHY   |     120| Port 0 IN PHY   |     2B4| Port 10 EG DLLP  |
+ *        D8| Port 2 EG PHY   |     124| Port 1 IN PHY   |     2B8| Port 12 EG DLLP  |
+ *        DC| Port 3 EG PHY   |     128| Port 2 IN PHY   |     2BC| Port 14 EG DLLP  |
+ *           -----------------      12C| Port 3 IN PHY   |        |------------------|
+ *                                  130| Port 4 IN PHY   |     2C0| Port  1 IN DLLP  |
+ *                                  134| Port 5 IN PHY   |     2C4| Port  3 IN DLLP  |
+ *                                     |-----------------|     2C8| Port  5 IN DLLP  |
+ *                                  138| Port 0 EG PHY   |     2CC| Port  7 IN DLLP  |
+ *                                  13C| Port 1 EG PHY   |     2D0| Port  9 IN DLLP  |
+ *                                  140| Port 2 EG PHY   |     2D4| Port 11 IN DLLP  |
+ *                                  144| Port 3 EG PHY   |     2D8| Port 13 IN DLLP  |
+ *                                  148| Port 4 EG PHY   |     2DC| Port 15 IN DLLP  |
+ *                                  14C| Port 5 EG PHY   |        |------------------|
+ *                                      -----------------      2E0| Port  1 EG DLLP  |
+ *                                                             2E4| Port  3 EG DLLP  |
+ *                                                             2E8| Port  5 EG DLLP  |
+ *                                                             2EC| Port  7 EG DLLP  |
+ *                                                             2F0| Port  9 EG DLLP  |
+ *                                                             2F4| Port 11 EG DLLP  |
+ *                                                             2F8| Port 13 EG DLLP  |
+ *                                                             2FC| Port 15 EG DLLP  |
+ *                                                                |------------------|
+ *                                                             300| Port 0 PHY       |
+ *                                                                |       :          |
+ *                                                                |       :          |
+ *                                                             33C| Port 15 PHY      |
+ *                                                                 ------------------
+ *
+ *             Mira                        Capella-1/2
+ *     --------------------------    -----------------------
+ *        14 PCIe counters/port      14 counters/port
+ *         4 ports/station            4 pts/stn but 5 in RAM
+ *         1 stations (4 ports)       6 stn (24 ports)
+ *                                  *SW uses 30 pts to read all
+ *        86 counters/station
+ *        86 counters (86 * 1)        70 counters/station
+ *                                   420 counters (70 * 6)
+ *
+ *       off     Counter             off     Counter
+ *           -----------------           -----------------
+ *         0| Port 0 IN PH    |        0| Port 0 IN PH    |
+ *         4| Port 0 IN PDW   |        4| Port 0 IN PDW   |
+ *         8| Port 0 IN NPDW  |        8| Port 0 IN NPDW  |
+ *         C| Port 0 IN CPLH  |        C| Port 0 IN CPLH  |
+ *        10| Port 0 IN CPLDW |       10| Port 0 IN CPLDW |
+ *          |-----------------|         |-----------------|
+ *        14| Port 1 IN PH    |       14| Port 1 IN PH    |
+ *          |       :         |         |       :         |
+ *          |       :         |         |       :         |
+ *        24| Port 1 IN CPLDW |       24| Port 1 IN CPLDW |
+ *          |-----------------|         |/\/\/\/\/\/\/\/\/|
+ *        28| Port 2 IN PH    |         |       :         |
+ *          |       :         |         |       :         |
+ *          |       :         |         |       :         |
+ *        38| Port 2 IN CPLDW |         |       :         |
+ *          |-----------------|         |       :         |
+ *        3C| Port 3 IN PH    |         |/\/\/\/\/\/\/\/\/|
+ *          |       :         |       50| Port 4 IN PH    |
+ *          |       :         |         |       :         |
+ *        4C| Port 3 IN CPLDW |         |       :         |
+ *          |-----------------|       60| Port 4 IN CPLDW |
+ *        50| Port 0 EG PH    |         |-----------------|
+ *        54| Port 0 EG PDW   |       64| Port 0 EG PH    |
+ *        58| Port 0 EG NPDW  |       68| Port 0 EG PDW   |
+ *        5C| Port 0 EG CPLH  |       6c| Port 0 EG NPDW  |
+ *        60| Port 0 EG CPLDW |       70| Port 0 EG CPLH  |
+ *          |-----------------|       74| Port 0 EG CPLDW |
+ *        64| Port 1 EG PH    |         |-----------------|
+ *          |       :         |       78| Port 1 EG PH    |
+ *          |       :         |         |       :         |
+ *        74| Port 1 EG CPLDW |         |       :         |
+ *          |-----------------|       88| Port 1 EG CPLDW |
+ *        78| Port 2 EG PH    |         |/\/\/\/\/\/\/\/\/|
+ *          |       :         |         |       :         |
+ *          |       :         |         |       :         |
+ *        88| Port 2 EG CPLDW |         |       :         |
+ *          |-----------------|         |       :         |
+ *        8C| Port 3 EG PH    |         |       :         |
+ *          |       :         |         |/\/\/\/\/\/\/\/\/|
+ *          |       :         |         |-----------------|
+ *        9C| Port 3 EG CPLDW |       B4| Port 4 EG PH    |
+ *          |-----------------|         |       :         |
+ *        A0| Port 0 IN DLLP  |         |       :         |
+ *        A4| Port 1 IN DLLP  |       C4| Port 4 EG CPLDW |
+ *        A8| Port 2 IN DLLP  |         |-----------------|
+ *        AC| Port 3 IN DLLP  |       C8| Port 0 IN DLLP  |
+ *          |-----------------|       CC| Port 1 IN DLLP  |
+ *        B0| Port 0 EG DLLP  |       D0| Port 2 IN DLLP  |
+ *        B4| Port 1 EG DLLP  |       D4| Port 3 IN DLLP  |
+ *        B8| Port 2 EG DLLP  |       D8| Port 4 IN DLLP  |
+ *        BC| Port 3 EG DLLP  |         |-----------------|
+ *          |-----------------|       DC| -- Invalid --   |
+ *        C0| GPEP_0 IN PLD   |       E0| Port 0 EG DLLP  |
+ *        C4| GPEP_0 IN RAW   |       E4| Port 1 EG DLLP  |
+ *        C8| GPEP_0 IN PKT   |       E8| Port 2 EG DLLP  |
+ *          |-----------------|       EC| Port 3 EG DLLP  |*P4 EG DLLP missing
+ *        CC| GPEP_1 IN PLD   |         |-----------------|
+ *        D0| GPEP_1 IN RAW   |       F0| Port 0 IN PHY   |
+ *        D4| GPEP_1 IN PKT   |       F4| Port 1 IN PHY   |
+ *          |-----------------|       F8| Port 2 IN PHY   |
+ *        D8| GPEP_2 IN PLD   |       FC| Port 3 IN PHY   |
+ *        DC| GPEP_2 IN RAW   |      100| Port 4 IN PHY   |
+ *        E0| GPEP_2 IN PKT   |         |-----------------|
+ *          |-----------------|      104| Port 0 EG PHY   |
+ *        E4| GPEP_3 IN PLD   |      108| Port 1 EG PHY   |
+ *        E8| GPEP_3 IN RAW   |      10C| Port 2 EG PHY   |
+ *        EC| GPEP_3 IN PKT   |      110| Port 3 EG PHY   |
+ *          |-----------------|      114| Port 4 EG PHY   |
+ *        F0| GPEP_0 OUT PLD  |          -----------------
  *        F4| GPEP_0 OUT RAW  |
  *        F8| GPEP_0 OUT PKT  |
  *          |-----------------|
@@ -2442,6 +2561,7 @@ PlxPciPerformanceResetCounters(
  *       138| PHY (always 0)  |
  *       13C| PHY (always 0)  |
  *           -----------------
+ *
  ******************************************************************************/
 PLX_STATUS
 PlxPciPerformanceGetCounters(
@@ -2450,21 +2570,32 @@ PlxPciPerformanceGetCounters(
     U8               NumOfObjects
     )
 {
-    U8          NumPorts;
-    U8          NumCounters;
-    U8          PortsPerStation;
-    U16         i;
-    U16         index;
-    U16         IndexBase;
-    U16         Offset_Fifo;
-    U16         Offset_RamCtrl;
-    U32         RegValue;
-    U32        *pCounter;
-    U32        *pCounter_Prev;
-    U32         Counter_PrevTmp[14];
-    S64         TmpValue;
-    static U32  Counters[336];     // Cygnus currently max (24 ports * 14 counters/port)
+    U8             NumCounters;
+    U8             CurrStation;
+    U8             StnCount;
+    U8             StnPortCount;
+    U8             bStationBased;
+    U8             RamStnPortCount;
+    U16            i;
+    U16            index;
+    U16            IndexBase;
+    U32            Offset_Fifo;
+    U32            Offset_RamCtrl;
+    U32            RegValue;
+    U32           *pCounter;
+    U32           *pCounters;
+    U32           *pCounter_Prev;
+    U32            Counter_PrevTmp[PERF_COUNTERS_PER_PORT];
+    S64            TmpValue;
+    PLX_STATUS     status;
+    PLX_PERF_PROP *pTmpPerfProps;
 
+
+    // Default to single station access
+    bStationBased = FALSE;
+
+    // Assume station port count in RAM is identical to station port count
+    RamStnPortCount = 0;
 
     // Setup parameters for reading counters
     switch (pdx->Key.PlxFamily)
@@ -2472,33 +2603,33 @@ PlxPciPerformanceGetCounters(
         case PLX_FAMILY_DENEB:
             Offset_RamCtrl  = 0x618;
             Offset_Fifo     = 0x628;
-            NumPorts        = 12;
             NumCounters     = 14;
-            PortsPerStation = 4;
+            StnCount        = 3;
+            StnPortCount    = 4;
             break;
 
         case PLX_FAMILY_SIRIUS:
             Offset_RamCtrl  = 0x618;
             Offset_Fifo     = 0x628;
-            NumPorts        = 16;
             NumCounters     = 13;
-            PortsPerStation = 16;
+            StnCount        = 1;
+            StnPortCount    = 16;
             break;
 
         case PLX_FAMILY_CYGNUS:
             Offset_RamCtrl  = 0x3F0;
             Offset_Fifo     = 0x3E4;
-            NumPorts        = 24;
             NumCounters     = 14;
-            PortsPerStation = 4;
+            StnCount        = 6;
+            StnPortCount    = 4;
             break;
 
         case PLX_FAMILY_MIRA:
             Offset_RamCtrl  = 0x618;
             Offset_Fifo     = 0x628;
-            NumPorts        = 4;
             NumCounters     = 12;
-            PortsPerStation = 4;
+            StnCount        = 1;
+            StnPortCount    = 4;
 
             // In MIRA legacy EP mode, PCIe registers start at 1000h
             if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
@@ -2512,51 +2643,122 @@ PlxPciPerformanceGetCounters(
         case PLX_FAMILY_DRACO_2:
             Offset_RamCtrl  = 0x3F0;
             Offset_Fifo     = 0x3E4;
-            NumPorts        = 18;
             NumCounters     = 14;
-            PortsPerStation = 6;
+            StnCount        = 3;
+            StnPortCount    = 6;
             break;
 
         case PLX_FAMILY_CAPELLA_1:
+        case PLX_FAMILY_CAPELLA_2:
             Offset_RamCtrl  = 0x3F0;
             Offset_Fifo     = 0x3E4;
-            NumPorts        = 24;
             NumCounters     = 14;
-            if ((pdx->Key.PlxChip == 0x8714) || (pdx->Key.PlxChip == 0x8718))
-                PortsPerStation = 5;
-            else
-                PortsPerStation = 4;
+            StnCount        = 6;
+            StnPortCount    = 4;
+            RamStnPortCount = 5;
+            bStationBased   = TRUE;
             break;
 
         default:
             DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
-            return ApiUnsupportedFunction;
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    // RAM control default - Set capture type [5:4] to 2 & enable RAM (bit 0)
-    RegValue = (2 << 4) | (1 << 0);
+    // Allocate buffer to contain counter data for all ports (Max = 14 counters/port)
+    pCounters = kmalloc( PERF_MAX_PORTS * PERF_COUNTERS_PER_PORT * sizeof(U32), GFP_KERNEL );
+    if (pCounters == NULL)
+    {
+        return PLX_STATUS_INSUFFICIENT_RES;
+    }
 
-    // Reset RAM read pointer (bit 2)
-    PLX_8000_REG_WRITE(
-        pdx,
-        Offset_RamCtrl,
-        RegValue | (1 << 2)
-        );
+    // Allocate temporary kernel buffer to hold performance properties
+    pTmpPerfProps = kmalloc( sizeof(PLX_PERF_PROP) * NumOfObjects, GFP_KERNEL );
+    if (pTmpPerfProps == NULL)
+    {
+        kfree( pCounters );
+        return PLX_STATUS_INSUFFICIENT_RES;
+    }
+
+    // Copy performance properties from user buffer
+    if (copy_from_user(
+            pTmpPerfProps,
+            pPerfProps,
+            sizeof(PLX_PERF_PROP) * NumOfObjects
+            ) != 0)
+    {
+        ErrorPrintf(("ERROR - Unable to copy counter data from user buffer\n"));
+        kfree( pCounters );
+        kfree( pTmpPerfProps );
+        return PLX_STATUS_INVALID_ACCESS;
+    }
+
+    // Set RAM station port count if matches station port count
+    if (RamStnPortCount == 0)
+    {
+        RamStnPortCount = StnPortCount;
+    }
+
+    // RAM control
+    RegValue = (2 << 4) |   // Capture type ([5:4])
+               (1 << 2) |   // Reset read pointer
+               (1 << 0);    // Enable RAM
+
+    // Reset RAM read pointer
+    for (i = 0; i < StnCount; i++)
+    {
+        if ((i == 0) || bStationBased)
+        {
+            PLX_8000_REG_WRITE(
+                pdx,
+                Offset_RamCtrl + (i * StnPortCount * 0x1000),
+                RegValue
+                );
+        }
+    }
 
     // Read in all counters
-    i = 0;
-    while (i < (NumPorts * NumCounters))
+    i           = 0;
+    CurrStation = 0;
+    while (i < (StnCount * RamStnPortCount * NumCounters))
     {
+        // Check if reached station boundary
+        if ((i % (NumCounters * RamStnPortCount)) == 0)
+        {
+            DebugPrintf_Cont(("\n"));
+            if (i == 0)
+            {
+                DebugPrintf(("           Counters\n"));
+                DebugPrintf(("----------------------------------\n"));
+            }
+            else
+            {
+                // Increment to next station
+                CurrStation++;
+
+                // For station based counters use register in station port 0
+                if (bStationBased)
+                {
+                    Offset_Fifo += (StnPortCount * 0x1000);
+                }
+            }
+
+            DebugPrintf(("Station %d:\n", CurrStation));
+            DebugPrintf(("%03X:", (U16)(i * sizeof(U32))));
+        }
+        else if ((i % 4) == 0)
+        {
+            DebugPrintf_Cont(("\n"));
+            DebugPrintf(("%03X:", (U16)(i * sizeof(U32))));
+        }
+
         // Get next counter
-        Counters[i] =
-            PLX_8000_REG_READ(
-                pdx,
-                Offset_Fifo
-                );
+        pCounters[i] = PLX_8000_REG_READ( pdx, Offset_Fifo );
+        DebugPrintf_Cont((" %08X", pCounters[i]));
 
         // Jump to next counter
         i++;
     }
+    DebugPrintf_Cont(("\n"));
 
     // Assign counter values to enabled ports
     i = 0;
@@ -2565,78 +2767,87 @@ PlxPciPerformanceGetCounters(
         // Make a copy of the previous values before overwriting them
         RtlCopyMemory(
             Counter_PrevTmp,
-            &(pPerfProps[i].Prev_IngressPostedHeader),
-            14 * sizeof(U32)    // All 14 counters in structure
+            &(pTmpPerfProps[i].Prev_IngressPostedHeader),
+            PERF_COUNTERS_PER_PORT * sizeof(U32)    // All 14 counters in structure
             );
 
         // Save current values to previous
         RtlCopyMemory(
-            &(pPerfProps[i].Prev_IngressPostedHeader),
-            &(pPerfProps[i].IngressPostedHeader),
-            14 * sizeof(U32)    // All 14 counters in structure
+            &(pTmpPerfProps[i].Prev_IngressPostedHeader),
+            &(pTmpPerfProps[i].IngressPostedHeader),
+            PERF_COUNTERS_PER_PORT * sizeof(U32)    // All 14 counters in structure
             );
 
         // Calculate starting index for counters based on port in station
-        IndexBase = pPerfProps[i].Station * (NumCounters * PortsPerStation);
+        IndexBase = pTmpPerfProps[i].Station * (NumCounters * RamStnPortCount);
 
         // Ingress counters start at index 0 from base
-        index = IndexBase + 0 + (pPerfProps[i].StationPort * 5);
+        index = IndexBase + 0 + (pTmpPerfProps[i].StationPort * 5);
 
         // Get Ingress counters (5 DW/port)
-        pPerfProps[i].IngressPostedHeader = Counters[index + 0];
-        pPerfProps[i].IngressPostedDW     = Counters[index + 1];
-        pPerfProps[i].IngressNonpostedDW  = Counters[index + 2];
-        pPerfProps[i].IngressCplHeader    = Counters[index + 3];
-        pPerfProps[i].IngressCplDW        = Counters[index + 4];
+        pTmpPerfProps[i].IngressPostedHeader = pCounters[index + 0];
+        pTmpPerfProps[i].IngressPostedDW     = pCounters[index + 1];
+        pTmpPerfProps[i].IngressNonpostedDW  = pCounters[index + 2];
+        pTmpPerfProps[i].IngressCplHeader    = pCounters[index + 3];
+        pTmpPerfProps[i].IngressCplDW        = pCounters[index + 4];
 
         // Egress counters start after ingress
-        index = IndexBase + (5 * PortsPerStation) + (pPerfProps[i].StationPort * 5);
+        index = IndexBase + (5 * RamStnPortCount) + (pTmpPerfProps[i].StationPort * 5);
 
         // Get Egress counters (5 DW/port)
-        pPerfProps[i].EgressPostedHeader = Counters[index + 0];
-        pPerfProps[i].EgressPostedDW     = Counters[index + 1];
-        pPerfProps[i].EgressNonpostedDW  = Counters[index + 2];
-        pPerfProps[i].EgressCplHeader    = Counters[index + 3];
-        pPerfProps[i].EgressCplDW        = Counters[index + 4];
+        pTmpPerfProps[i].EgressPostedHeader = pCounters[index + 0];
+        pTmpPerfProps[i].EgressPostedDW     = pCounters[index + 1];
+        pTmpPerfProps[i].EgressNonpostedDW  = pCounters[index + 2];
+        pTmpPerfProps[i].EgressCplHeader    = pCounters[index + 3];
+        pTmpPerfProps[i].EgressCplDW        = pCounters[index + 4];
 
         // DLLP Ingress counters start after egress
-        index = IndexBase + (10 * PortsPerStation);
+        index = IndexBase + (10 * RamStnPortCount);
 
         // DLLP counter location depends upon chip
         if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
         {
             // Even port number DLLP counters are first
-            index += (pPerfProps[i].StationPort / 2);
+            index += (pTmpPerfProps[i].StationPort / 2);
 
             // Odd port number DLLP counters follow even ports
-            if (pPerfProps[i].StationPort & (1 << 0))
-                index += PortsPerStation;
+            if (pTmpPerfProps[i].StationPort & (1 << 0))
+            {
+                index += RamStnPortCount;
+            }
         }
         else
         {
-            index += pPerfProps[i].StationPort;
+            index += pTmpPerfProps[i].StationPort;
         }
 
         // Get DLLP Ingress counters (1 DW/port)
-        pPerfProps[i].IngressDllp = Counters[index];
+        pTmpPerfProps[i].IngressDllp = pCounters[index];
 
         // Egress DLLP counters follow Ingress
         if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
         {
             // Even ports are grouped together
-            index += (PortsPerStation / 2);
+            index += (RamStnPortCount / 2);
         }
         else
         {
-            index += PortsPerStation;
+            index += RamStnPortCount;
+        }
+
+        // For Capella, Egress DLLP skips one offset & port 4 is lost
+        if ((pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
+            (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2))
+        {
+            index++;
         }
 
         // Get DLLP Egress counters (1 DW/port)
-        pPerfProps[i].EgressDllp = Counters[index];
+        pTmpPerfProps[i].EgressDllp = pCounters[index];
 
         // Any PHY counters are always 0, so ignore any values
-        pPerfProps[i].IngressPhy = 0;
-        pPerfProps[i].EgressPhy  = 0;
+        pTmpPerfProps[i].IngressPhy = 0;
+        pTmpPerfProps[i].EgressPhy  = 0;
 
         /**********************************************************
          * In some cases on Draco 1 chips, device may incorrectly
@@ -2646,21 +2857,23 @@ PlxPciPerformanceGetCounters(
          * minimize data reporting errors.
          *********************************************************/
         if ((pdx->Key.PlxFamily == PLX_FAMILY_DRACO_1) &&
-            (pPerfProps[i].LinkWidth != 0))
+            (pTmpPerfProps[i].LinkWidth != 0))
         {
             // Setup initial pointers to stored counters
-            pCounter      = &pPerfProps[i].IngressPostedHeader;
-            pCounter_Prev = &pPerfProps[i].Prev_IngressPostedHeader;
+            pCounter      = &pTmpPerfProps[i].IngressPostedHeader;
+            pCounter_Prev = &pTmpPerfProps[i].Prev_IngressPostedHeader;
 
             // Verify each counter & use previous on error
-            for (index = 0; index < 14; index++)
+            for (index = 0; index < PERF_COUNTERS_PER_PORT; index++)
             {
                 if (((*pCounter == 0) && (*pCounter_Prev != 0)) || (*pCounter == 0x4C041301))
                 {
                     // Store 64-bit counter in case of wrapping
                     TmpValue = *pCounter_Prev;
                     if (*pCounter_Prev < Counter_PrevTmp[index])
+                    {
                         TmpValue += ((S64)1 << 32);
+                    }
 
                     // Re-use difference between previous 2 counter values
                     *pCounter = *pCounter_Prev + (U32)(TmpValue - Counter_PrevTmp[index]);
@@ -2676,7 +2889,26 @@ PlxPciPerformanceGetCounters(
         i++;
     }
 
-    return ApiSuccess;
+    // Copy performance properties to user buffer
+    if (copy_to_user(
+            pPerfProps,
+            pTmpPerfProps,
+            sizeof(PLX_PERF_PROP) * NumOfObjects
+            ) != 0)
+    {
+        ErrorPrintf(("ERROR - Unable to copy counter data to user buffer\n"));
+        status = PLX_STATUS_INVALID_ACCESS;
+    }
+    else
+    {
+        status = PLX_STATUS_OK;
+    }
+
+    // Release temporary buffers
+    kfree( pCounters );
+    kfree( pTmpPerfProps );
+
+    return status;
 }
 
 
@@ -2705,7 +2937,7 @@ PlxMH_GetProperties(
     RtlZeroMemory( pMHProp, sizeof(PLX_MULTI_HOST_PROP) );
 
     // Default to standard mode
-    pMHProp->SwitchMode = PLX_SWITCH_MODE_STANDARD;
+    pMHProp->SwitchMode = PLX_CHIP_MODE_STANDARD;
 
     // Verify supported device
     switch (pdx->Key.PlxFamily)
@@ -2714,27 +2946,27 @@ PlxMH_GetProperties(
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
         case PLX_FAMILY_CAPELLA_1:
+        case PLX_FAMILY_CAPELLA_2:
             break;
 
         default:
-            DebugPrintf(("ERROR - Device (%04X) doesn't support multi-host\n", pdx->Key.PlxChip));
-            return ApiUnsupportedFunction;
+            DebugPrintf(("ERROR - Device (%04X) doesn't support VS mode\n", pdx->Key.PlxChip));
+            return PLX_STATUS_UNSUPPORTED;
     }
 
     // Attempt to read management port configuration
-    RegValue =
-        PLX_8000_REG_READ(
-            pdx,
-            0x354
-            );
+    RegValue = PLX_8000_REG_READ( pdx, 0x354 );
+
+    // Get active VS mask
+    RegVSEnable = PLX_8000_REG_READ( pdx, 0x358 );
 
     // Device properties are only available from the management port
-    if (RegValue == 0)
+    if ((RegValue == 0) && ((RegVSEnable & ~(1 << 0)) == 0))
     {
-        // In Multi-Host mode, but not management port
-        pMHProp->SwitchMode = PLX_SWITCH_MODE_MULTI_HOST;
-        DebugPrintf(("Device is in multi-host mode, but not management port\n"));
-        return ApiSuccess;
+        // In VS mode, but not management port
+        pMHProp->SwitchMode = PLX_CHIP_MODE_VIRT_SW;
+        DebugPrintf(("Device is in VS mode, but not management port\n"));
+        return PLX_STATUS_OK;
     }
 
     // Report this is management port regardless of mode
@@ -2744,18 +2976,16 @@ PlxMH_GetProperties(
     pMHProp->MgmtPortNumActive    = (U8)((RegValue >> 0) & 0x1F);
     pMHProp->MgmtPortNumRedundant = (U8)((RegValue >> 8) & 0x1F);
 
+    // Determine which management ports are active
     if (RegValue & (1 << 5))
+    {
         pMHProp->bMgmtPortActiveEn = TRUE;
+    }
 
     if (RegValue & (1 << 13))
+    {
         pMHProp->bMgmtPortRedundantEn = TRUE;
-
-    // Get active VS mask
-    RegVSEnable =
-        PLX_8000_REG_READ(
-            pdx,
-            0x358
-            );
+    }
 
     // Provide active VS's
     pMHProp->VS_EnabledMask = (U16)RegVSEnable;
@@ -2763,7 +2993,7 @@ PlxMH_GetProperties(
     TotalVS = 0;
 
     // Count number of active virtual switches
-    for (i=0; i<8; i++)
+    for (i = 0; i < 8; i++)
     {
         // Check if VS is active
         if (RegVSEnable & (1 << i))
@@ -2794,17 +3024,18 @@ PlxMH_GetProperties(
         }
     }
 
-    // If more than one VS is active, then multi-host mode
+    // If more than one VS is active, then VS mode
     if (TotalVS == 1)
     {
         DebugPrintf(("Device is in standard mode\n"));
     }
     else
     {
-        pMHProp->SwitchMode = PLX_SWITCH_MODE_MULTI_HOST;
+        pMHProp->SwitchMode = PLX_CHIP_MODE_VIRT_SW;
 
         DebugPrintf((
-            "Mode        : Mult-Host\n"
+            "\n"
+            "Mode        : Virtual Switch\n"
             "Enabled VS  : %04X\n"
             "Active Mgmt : %d (%s)\n"
             "Backup Mgmt : %d (%s)\n"
@@ -2826,7 +3057,7 @@ PlxMH_GetProperties(
             ));
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2855,18 +3086,17 @@ PlxMH_MigrateDsPorts(
 
 
     // Get current MH properties
-    status =
-        PlxMH_GetProperties(
-            pdx,
-            &MHProp
-            );
-
-    if (status != ApiSuccess)
+    status = PlxMH_GetProperties( pdx, &MHProp );
+    if (status != PLX_STATUS_OK)
+    {
         return status;
+    }
 
-    // Operation only available from Multi-Host management port
-    if ((MHProp.SwitchMode != PLX_SWITCH_MODE_MULTI_HOST) || (MHProp.bIsMgmtPort == FALSE))
-        return ApiUnsupportedFunction;
+    // Operation only available from VS management port
+    if ((MHProp.SwitchMode != PLX_CHIP_MODE_VIRT_SW) || (MHProp.bIsMgmtPort == FALSE))
+    {
+        return PLX_STATUS_UNSUPPORTED;
+    }
 
     DebugPrintf((
         "Migrate DS ports (%08X) from VS%d ==> VS%d %s\n",
@@ -2877,25 +3107,25 @@ PlxMH_MigrateDsPorts(
     if ((VS_Source >= 8) || (VS_Dest >= 8))
     {
         DebugPrintf(("ERROR - Source or Dest VS are not valid\n"));
-        return ApiInvalidIndex;
+        return PLX_STATUS_INVALID_DATA;
     }
 
     // Verify source VS is enabled
     if ((MHProp.VS_EnabledMask & (1 << VS_Source)) == 0)
     {
         DebugPrintf(("ERROR - Source VS (%d) not enabled\n", VS_Source));
-        return ApiDeviceDisabled;
+        return PLX_STATUS_DISABLED;
     }
 
     // Verify DS ports to move currently owned by source port
     if ((MHProp.VS_DownstreamPorts[VS_Source] & DsPortMask) != DsPortMask)
     {
         DebugPrintf(("ERROR - One or more DS ports not owned by source VS\n"));
-        return ApiInvalidData;
+        return PLX_STATUS_INVALID_DATA;
     }
 
     // Migrate DS ports
-    for (i=0; i<24; i++)
+    for (i = 0; i < PERF_MAX_PORTS; i++)
     {
         // Migrate port from source to destination if requested
         if (DsPortMask & (1 << i))
@@ -2925,7 +3155,6 @@ PlxMH_MigrateDsPorts(
     if ((MHProp.VS_EnabledMask & (1 << VS_Dest)) == 0)
     {
         DebugPrintf(("Enable destination VS%d\n", VS_Dest));
-
         PLX_8000_REG_WRITE(
             pdx,
             0x358,
@@ -2960,5 +3189,5 @@ PlxMH_MigrateDsPorts(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }

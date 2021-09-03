@@ -36,7 +36,7 @@ if [ "${PLX_SDK_DIR}1" = "1" ]; then
 
     if [ "${PLX_SDK_DIR}1" = "1" ]; then
         # Add environment variable
-        export PLX_SDK_DIR=$HOME/PLX_DIR
+        export PLX_SDK_DIR=$HOME/$PLX_DIR
 
         echo
         echo "  Note:"
@@ -73,13 +73,8 @@ fi
 # Set directory
 PLX_DIR=${PLX_SDK_DIR}
 
-# Set default driver name
-plx_drv_name=$1
-
-# Default to non-service driver
-bServiceDriver=0
-
 # Store parameters
+Param1=`echo $1 |awk '{print tolower($0)}'`
 Param2=$2
 
 # Check for debug version
@@ -90,18 +85,18 @@ fi
 
 
 # Verify command-line
-case "$1" in
+case "$Param1" in
     8000n) plx_drv_name=8000_NT  ;;
     8000d) plx_drv_name=8000_DMA ;;
     6000n) plx_drv_name=6000_NT  ;;
-    9050)  ;;
-    9030)  ;;
-    9080)  ;;
-    9054)  ;;
-    9056)  ;;
-    9656)  ;;
-    8311)  ;;
-    Svc)   bServiceDriver=1 ;;
+    9050)  plx_drv_name=9050     ;;
+    9030)  plx_drv_name=9030     ;;
+    9080)  plx_drv_name=9080     ;;
+    9054)  plx_drv_name=9054     ;;
+    9056)  plx_drv_name=9056     ;;
+    9656)  plx_drv_name=9656     ;;
+    8311)  plx_drv_name=8311     ;;
+    svc)   plx_drv_name=Svc      ;;
 
     *)
     echo
@@ -147,8 +142,11 @@ if [ `id -u` != 0 ]; then
 fi
 
 
-# Path to the driver nodes
-path=/dev/plx
+# Set path to driver
+case "$Param1" in
+    9* | 8311 )  plx_drv_path=$PLX_DIR/Driver/Source.Plx9000/Output          ;;
+    *         )  plx_drv_path=$PLX_DIR/Driver/Source.Plx$plx_drv_name/Output ;;
+esac
 
 # Registered name of driver
 name=Plx$plx_drv_name
@@ -183,20 +181,23 @@ if [ "$drv_Name" != "" ]; then
 fi
 
 # Verify driver file exists
-if [ ! -f $PLX_DIR/Driver/$name/$module.ko ]; then
+if [ ! -f $plx_drv_path/$module.ko ]; then
     echo "ERROR: Driver not built or invalid path"
-    echo "         \-- File: $PLX_DIR/Driver/$name/$module.ko"
+    echo "    \-- $plx_drv_path/$module.ko"
     echo
     exit
 fi
 
 # Load module
-if $InsMod $PLX_DIR/Driver/$name/$module.ko $Param2 $3 $4 $5 $6 $7 2>/dev/null; then
-    echo "Ok ($module.ko)"
+if $InsMod $plx_drv_path/$module.ko $Param2 $3 $4 $5 $6 $7 2>/dev/null; then
+    echo "Ok ($plx_drv_path)"
 else
     echo ERROR: Load error or no supported devices found
-    if [ "$1" = "8000n" ]; then
+    if [ "$Param1" = "8000n" ]; then
         echo "   -- NOTE: 8000_NT driver is only for PLX switch Non-Transparent(NT) ports --"
+    fi
+    if [ "$Param1" = "8000d" ]; then
+        echo "   -- NOTE: 8000_DMA driver is only for PLX switches with DMA functions --"
     fi
     echo
     exit
@@ -227,6 +228,7 @@ fi
 echo "Ok (MajorID = $major)"
 
 # Create the device node path
+path=/dev/plx
 echo -n "  Create node path.... "
 if [ -d $path ]; then
     echo "Ok ($path already exists)"
@@ -242,7 +244,7 @@ rm -f $path/$name*
 mknod $path/$name c $major 255
 
 # Create additional nodes for non-service driver
-if [ "$bServiceDriver" = "0" ]; then
+if [ "$plx_drv_name" != "Svc" ]; then
     mknod ${path}/$name-0  c $major 0
     mknod ${path}/$name-1  c $major 1
     mknod ${path}/$name-2  c $major 2

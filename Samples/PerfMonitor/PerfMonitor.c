@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2015 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -11,7 +44,7 @@
  *
  * Revision History:
  *
- *      07-01-11 : PLX SDK v6.50
+ *      10-01-14 : PLX SDK v7.20
  *
  ******************************************************************************/
 
@@ -21,10 +54,12 @@
 
 #if defined(PLX_MSWINDOWS)
     #include "..\\Shared\\ConsFunc.h"
+    #include "..\\Shared\\PlxInit.h"
 #endif
 
 #if defined(PLX_LINUX)
     #include "ConsFunc.h"
+    #include "PlxInit.h"
 #endif
 
 
@@ -33,8 +68,6 @@
 /**********************************************
  *               Definitions
  *********************************************/
-#define MAX_DEVICES_TO_LIST                 50      // Max number of devices for user selection
-
 #define SLEEP_INTERVAL_MS                   1000    // Num of milliseconds for sleep interval
 
 
@@ -87,12 +120,9 @@ main(
 
     Cons_printf(
         "\n\n"
-        "\t\t       PLX Performance Test\n"
-        "\t\t           March 2009\n\n"
-        );
-
-    Cons_printf(
-        "\t\t     ************************\n"
+        "\t\t     PLX Performance Monitor Sample\n"
+        "\n"
+        "\t\t        ***********************\n"
         "\tThis application is provided to demonstrate how to measure\n"
         "\tPCIe performance using the PLX 8000 performance counters\n"
         "\tfeature. The PLX Performance API functions are used to retrieve\n"
@@ -124,7 +154,7 @@ main(
             &Device
             );
 
-    if (rc != ApiSuccess)
+    if (rc != PLX_STATUS_OK)
     {
         Cons_printf("\n   ERROR: Unable to find or select a PLX device (rc=%X)\n", rc);
         ConsoleEnd();
@@ -132,7 +162,7 @@ main(
     }
 
     Cons_printf(
-        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%x]\n\n",
+        "\nSelected: %04x %04x [%02X:%02X.%X]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
@@ -183,6 +213,7 @@ PerformTest(
     char           Str_PayloadRate[20];
     U32            ElapsedTime_ms;
     struct timeb   PrevTime, EndTime;
+    PLX_STATUS     status;
     PLX_PERF_PROP  PerfProp;
     PLX_PERF_STATS PerfStats;
 
@@ -197,10 +228,16 @@ PerformTest(
         );
 
     // Initialize performance objects
-    PlxPci_PerformanceInitializeProperties(
-        pDevice,
-        &PerfProp
-        );
+    status =
+        PlxPci_PerformanceInitializeProperties(
+            pDevice,
+            &PerfProp
+            );
+    if (status != PLX_STATUS_OK)
+    {
+        PlxSdkErrorDisplay( status );
+        return;
+    }
 
     // Start performance monitor
     PlxPci_PerformanceMonitorControl(
@@ -429,7 +466,7 @@ SelectDevice_8000(
                 (U16)i
                 );
 
-        if (rc == ApiSuccess)
+        if (rc == PLX_STATUS_OK)
         {
             // Default to add device
             bAddDevice = TRUE;
@@ -438,7 +475,8 @@ SelectDevice_8000(
             if (((DevKey.PlxChip & 0xFF00) != 0x2300) &&
                 ((DevKey.PlxChip & 0xFF00) != 0x3300) &&
                 ((DevKey.PlxChip & 0xFF00) != 0x8600) &&
-                ((DevKey.PlxChip & 0xFF00) != 0x8700))
+                ((DevKey.PlxChip & 0xFF00) != 0x8700) &&
+                ((DevKey.PlxChip & 0xFF00) != 0x9700))
             {
                 bAddDevice = FALSE;
             }
@@ -474,9 +512,9 @@ SelectDevice_8000(
                         bAddDevice = FALSE;
                 }
 
-                // For endpoints, only NT virtual port is supported
+                // For endpoints, only NT virtual is supported
                 if ((PortProp.PortType == PLX_PORT_ENDPOINT) &&
-                    (DevKey.NTPortType != PLX_NT_PORT_VIRTUAL))
+                    (DevKey.PlxPortType != PLX_SPEC_PORT_NT_VIRTUAL))
                 {
                     bAddDevice = FALSE;
                 }
@@ -505,19 +543,29 @@ SelectDevice_8000(
                 DevKey_US[NumDevices] = DevKey;
 
                 Cons_printf(
-                    "\t\t  %2d. %04x Port %d [b:%02x s:%02x] ",
+                    "\t\t  %2d. %04x Port %2d [%02x:%02x.%x] ",
                     (NumDevices + 1), DevKey.PlxChip, PortProp.PortNumber,
-                    DevKey.bus, DevKey.slot
+                    DevKey.bus, DevKey.slot, DevKey.function
                     );
 
-                if (PortProp.PortType == PLX_PORT_UPSTREAM)
+                if (DevKey.PlxPortType == PLX_SPEC_PORT_UPSTREAM)
                     Cons_printf("PLX Upstream port\n");
-                else if (PortProp.PortType == PLX_PORT_DOWNSTREAM)
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_DOWNSTREAM)
                     Cons_printf("PLX Downstream port\n");
-                else if (DevKey.NTPortType == PLX_NT_PORT_VIRTUAL)
-                    Cons_printf("PLX NT port\n");
-                else if (PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT)
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
+                    Cons_printf("PLX NT Virtual port\n");
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
+                    Cons_printf("PLX NT Link port\n");
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_LEGACY_EP)
                     Cons_printf("PLX USB Controller\n");
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_DMA)
+                    Cons_printf("PLX DMA controller\n");
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_HOST)
+                    Cons_printf("PLX Host port\n");
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_FABRIC)
+                    Cons_printf("PLX Fabric port\n");
+                else if (DevKey.PlxPortType == PLX_SPEC_PORT_GEP)
+                    Cons_printf("PLX GEP\n");
                 else
                     Cons_printf("**Unknown device**\n");
 
@@ -528,7 +576,7 @@ SelectDevice_8000(
             i++;
         }
     }
-    while ((rc == ApiSuccess) && (NumDevices < MAX_DEVICES_TO_LIST));
+    while ((rc == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
         return 0;

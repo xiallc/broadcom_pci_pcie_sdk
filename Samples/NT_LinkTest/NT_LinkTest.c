@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2015 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -11,7 +44,7 @@
  *
  * Revision History:
  *
- *      08-01-12 : PLX SDK v7.00
+ *      07-01-14 : PLX SDK v7.20
  *
  ******************************************************************************/
 
@@ -183,7 +216,7 @@ main(
             &Device
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf(
             "\n"
@@ -215,7 +248,7 @@ main(
      ***********************************/
     Cons_printf(
         "Communicating from: %s side\n\n",
-        (DeviceKey.NTPortType == PLX_NT_PORT_LINK) ? "LINK" : "VIRTUAL"
+        (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "LINK" : "VIRTUAL"
         );
 
 
@@ -233,7 +266,7 @@ main(
             &BarProp
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to get PCI BAR properties\n");
         goto _ExitApp;
@@ -249,7 +282,7 @@ main(
             &BarVa
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to map PCI BAR\n");
         goto _ExitApp;
@@ -269,7 +302,7 @@ main(
             &ReqId_Write
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to probe ReqID, auto-add 0,0,0\n");
         ReqId_Write = 0;
@@ -295,7 +328,7 @@ main(
             &LutIndex,
             ReqId_Write,
             FALSE       // Snoop must be disabled
-            ) != ApiSuccess)
+            ) != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to add LUT entry\n");
     }
@@ -310,7 +343,7 @@ main(
             &Device,
             TRUE,           // Probe for reads
             &ReqId_Read
-            ) != ApiSuccess)
+            ) != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to probe ReqID\n");
     }
@@ -340,7 +373,7 @@ main(
                     &LutIndex,
                     ReqId_Read,
                     FALSE       // Snoop must be disabled
-                    ) != ApiSuccess)
+                    ) != PLX_STATUS_OK)
             {
                 Cons_printf("ERROR: Unable to add LUT entry\n");
             }
@@ -366,7 +399,7 @@ main(
             TRUE
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to allocate buffer for data transfers\n");
         goto _ExitApp;
@@ -384,7 +417,7 @@ main(
             &PhysBuffer
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to map to user space\n");
         goto _ExitApp;
@@ -404,7 +437,7 @@ main(
     Cons_printf("Broadcast buffer properties: ");
 
     // Set mailbox to write
-    if (DeviceKey.NTPortType == PLX_NT_PORT_LINK)
+    if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
         value = 6;
     else
         value = 3;
@@ -449,7 +482,7 @@ main(
     Cons_printf("Get buffer properties: ");
 
     // Set mailbox to read
-    if (DeviceKey.NTPortType == PLX_NT_PORT_LINK)
+    if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
         value = 3;
     else
         value = 6;
@@ -517,7 +550,7 @@ main(
             DirAddr
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to setup NT translation\n");
         goto _ExitApp;
@@ -551,7 +584,7 @@ main(
     Count_Loop = 0;
 
     // Use slightly different priorities to skew Tx/Rx (larger = higher priority)
-    if (DeviceKey.NTPortType == PLX_NT_PORT_VIRTUAL)
+    if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
         TxPriority = 50;
     else
         TxPriority = 1000;
@@ -640,7 +673,7 @@ main(
             do
             {
                 // Get link status
-                if (DeviceKey.NTPortType == PLX_NT_PORT_VIRTUAL)
+                if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
                 {
                     // Read NT-Link side PCIe Link status (1000h past NT-Virtual registers)
                     RegBar = PlxPci_PlxRegisterRead( &Device, 0x1000 + 0x78, NULL );
@@ -800,12 +833,12 @@ SelectDevice_NT(
                 (U16)i
                 );
 
-        if (status == ApiSuccess)
+        if (status == PLX_STATUS_OK)
         {
             // Default to add device
             bAddDevice = TRUE;
 
-            if (DevKey.NTPortType == PLX_NT_PORT_NONE)
+            if (DevKey.PlxPortType == PLX_SPEC_PORT_UNKNOWN)
                 bAddDevice = FALSE;
 
             if (bAddDevice)
@@ -813,7 +846,8 @@ SelectDevice_NT(
                 // Verify supported chip type
                 if (((DevKey.PlxChip & 0xFF00) != 0x8500) &&
                     ((DevKey.PlxChip & 0xFF00) != 0x8600) &&
-                    ((DevKey.PlxChip & 0xFF00) != 0x8700))
+                    ((DevKey.PlxChip & 0xFF00) != 0x8700) &&
+                    ((DevKey.PlxChip & 0xFF00) != 0x9700))
                 {
                     bAddDevice = FALSE;
                 }
@@ -866,7 +900,7 @@ SelectDevice_NT(
                     "\t\t  %2d. %04x Port %d [b:%02x s:%02x] (%s-side)\n",
                     (NumDevices + 1), DevKey.PlxChip, PortProp.PortNumber,
                     DevKey.bus, DevKey.slot,
-                    (DevKey.NTPortType == PLX_NT_PORT_LINK) ? "Link" : "Virtual"
+                    (DevKey.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "Link" : "Virtual"
                     );
 
                 // Increment device count
@@ -877,7 +911,7 @@ SelectDevice_NT(
         // Go to next devices
         i++;
     }
-    while ((status == ApiSuccess) && (NumDevices < MAX_DEVICES_TO_LIST));
+    while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
         return 0;
@@ -928,11 +962,11 @@ WaitForConnection(
     Cons_printf(
         "\n"
         "Wait for %s side (ESC to cancel): ",
-        (pDevice->Key.NTPortType == PLX_NT_PORT_LINK) ? "Virtual" : "Link"
+        (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "Virtual" : "Link"
         );
 
     // Set mailboxes to use
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
         MB_Read  = 2;
         MB_Write = 5;
@@ -1046,16 +1080,16 @@ PlxPci_SetupNtTranslation(
 
     // Only BAR 2 currently supported
     if (BarIndex != 2)
-        return ApiUnsupportedFunction;
+        return PLX_STATUS_UNSUPPORTED;
 
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
         if (BarIndex == 2)
         {
             if (((DirAddr.DestinationAddr >> 32) != 0) ||
                  ((DirAddr.Size >> 32) != 0))
             {
-                return ApiInvalidAddress;
+                return PLX_STATUS_INVALID_ADDR;
             }
         }
     }
@@ -1103,7 +1137,7 @@ PlxPci_SetupNtTranslation(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1127,7 +1161,7 @@ PlxPciRegisterSaveRestore(
 
 
     // Save NT-Link side PCI registers
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
         for (offset=0; offset < 0x40; offset += sizeof(U32))
         {
@@ -1157,7 +1191,7 @@ PlxPciRegisterSaveRestore(
         PlxPci_PlxRegisterWrite( pDevice, 0xC3C, pPciRegs[0x10] );
 
         // ReqID LUT 0 & 1
-        if (pDevice->Key.NTPortType == PLX_NT_PORT_VIRTUAL)
+        if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
         {
             PlxPci_PlxRegisterWrite( pDevice, 0xD94, pPciRegs[0x11] );
             PlxPci_PlxRegisterWrite( pDevice, 0xD98, pPciRegs[0x12] );
@@ -1174,7 +1208,7 @@ PlxPciRegisterSaveRestore(
         pPciRegs[0x10] = PlxPci_PlxRegisterRead( pDevice, 0xC3C, NULL );
 
         // ReqID LUT 0 & 1
-        if (pDevice->Key.NTPortType == PLX_NT_PORT_VIRTUAL)
+        if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
         {
             pPciRegs[0x11] = PlxPci_PlxRegisterRead( pDevice, 0xD94, NULL );
             pPciRegs[0x12] = PlxPci_PlxRegisterRead( pDevice, 0xD98, NULL );
@@ -1186,5 +1220,5 @@ PlxPciRegisterSaveRestore(
         }
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }

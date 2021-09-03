@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision History:
  *
- *      07-01-12 : PLX SDK v7.00
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -42,6 +54,8 @@
 #include <linux/sched.h>
 #include "ApiFunc.h"
 #include "PciFunc.h"
+#include "PciRegs.h"
+#include "PlxChipFn.h"
 #include "PlxInterrupt.h"
 #include "SuppFunc.h"
 
@@ -60,48 +74,7 @@ Plx_sleep(
     U32 delay
     )
 {
-    mdelay(
-        delay
-        );
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  Plx_pow_int
- *
- * Description:  A PLX support routine to compute x^y (integers)
- *
- ******************************************************************************/
-U32
-Plx_pow_int(
-    U32 x,
-    U32 y
-    )
-{
-    U32 value;
-
-
-    // Check for '0' exponent
-    if (y == 0)
-        return 1;
-
-    // Check for base of '0'
-    if (x == 0)
-        return 0;
-
-    // Set start value
-    value = 1;
-
-    // Perform calculation
-    while (y--)
-    {
-        value = value * x;
-    }
-
-    return value;
+    mdelay( delay );
 }
 
 
@@ -233,7 +206,7 @@ PlxSignalNotifications(
     struct list_head *pEntry;
     PLX_WAIT_OBJECT  *pWaitObject;
 
-    
+
     spin_lock(
         &(pdx->Lock_WaitObjectsList)
         );
@@ -260,7 +233,7 @@ PlxSignalNotifications(
         if (SourceInt || SourceDB)
         {
             DebugPrintf((
-                "DPC signaling wait object (%p)\n",
+                "DPC signal wait object (%p)\n",
                 pWaitObject
                 ));
 
@@ -291,53 +264,144 @@ PlxSignalNotifications(
 
 /*******************************************************************************
  *
- * Function   :  PlxGetExtendedCapabilityOffset
+ * Function   :  PlxPciFindCapability
  *
- * Description:  Scans the capability list to search for a specific capability
+ * Description:  Scans a device's capability list to find the base offset of the
+ *               specified PCI or PCIe extended capability. If the capability ID
+ *               is PCI or PCIe vendor-specific (VSEC), an optional instance
+ *               number can be provided since a device could have multiple VSEC
+ *               capabilities. A value of 0 returns the 1st matching instance but
+ *               the parameter is ignored for non-VSEC capability search.
  *
  ******************************************************************************/
 U16
-PlxGetExtendedCapabilityOffset(
+PlxPciFindCapability(
     DEVICE_EXTENSION *pdx,
-    U16               CapabilityId
+    U16               CapID,
+    U8                bPCIeCap,
+    U8                InstanceNum
     )
 {
-    U16 Offset_Cap;
-    U32 RegValue;
+    U8  matchCount;
+    U16 offset;
+    U16 currID;
+    U16 probeLimit;
+    U32 regVal;
 
 
-    // Get offset of first capability
-    PLX_PCI_REG_READ(
-        pdx,
-        0x34,           // PCI capabilities pointer
-        &RegValue
-        );
+    // Get PCI command register (04h)
+    PLX_PCI_REG_READ( pdx, PCI_REG_CMD_STAT, &regVal );
 
-    // If link is down, PCI reg accesses will fail
-    if (RegValue == (U32)-1)
+    // Verify device responds to PCI accesses (in case link down)
+    if (regVal == (U32)-1)
+    {
         return 0;
+    }
 
-    // Set first capability
-    Offset_Cap = (U16)RegValue;
+    // Verify device supports extended capabilities (04h[20])
+    if ((regVal & ((U32)1 << 20)) == 0)
+    {
+        return 0;
+    }
+
+    // Set capability pointer offset
+    if (bPCIeCap)
+    {
+        // PCIe capabilities must start at 100h
+        offset = PCIE_REG_CAP_PTR;
+
+        // Ignore instance number for non-VSEC capabilities
+        if (CapID != PCIE_CAP_ID_VENDOR_SPECIFIC)
+        {
+            InstanceNum = 0;
+        }
+    }
+    else
+    {
+        // Get offset of first capability from capability pointer (34h[7:0])
+        PLX_PCI_REG_READ( pdx, PCI_REG_CAP_PTR, &regVal );
+
+        // Set first capability offset
+        offset = (U8)regVal;
+
+        // Ignore instance number for non-VSEC capabilities
+        if (CapID != PCI_CAP_ID_VENDOR_SPECIFIC)
+        {
+            InstanceNum = 0;
+        }
+    }
+
+    // Start with 1st match
+    matchCount = 0;
+
+    // Set max probe limit
+    probeLimit = 100;
 
     // Traverse capability list searching for desired ID
-    while ((Offset_Cap != 0) && (RegValue != (U32)-1))
+    while ((offset != 0) && (regVal != (U32)-1))
     {
         // Get next capability
-        PLX_PCI_REG_READ(
-            pdx,
-            Offset_Cap,
-            &RegValue
-            );
+        PLX_PCI_REG_READ( pdx, offset, &regVal );
 
-        if ((U8)RegValue == (U8)CapabilityId)
+        // Verify capability is valid
+        if ((regVal == 0) || (regVal == (U32)-1))
         {
-            // Capability found, return base offset
-            return Offset_Cap;
+            return 0;
+        }
+
+        // Some chipset pass 100h+ to PCI devices which decode
+        // back to 0-FFh, so check if 100h matches Dev/Ven ID(0)
+        if ((offset == PCIE_REG_CAP_PTR) &&
+            (regVal == (((U32)pdx->Key.DeviceId << 16) |
+                              pdx->Key.VendorId)))
+        {
+            return 0;
+        }
+
+        // Extract the capability ID
+        if (bPCIeCap)
+        {
+            // PCIe ID in [15:0]
+            currID = (U16)((regVal >> 0) & 0xFFFF);
+        }
+        else
+        {
+            // PCI ID in [7:0]
+            currID = (U16)((regVal >> 0) & 0xFF);
+        }
+
+        // Compare with desired capability
+        if (currID == CapID)
+        {
+            // Verify correct instance
+            if (InstanceNum == matchCount)
+            {
+                // Capability found, return base offset
+                return offset;
+            }
+
+            // Increment count of matches
+            matchCount++;
+        }
+
+        // Enforce an upper bound on probe in case device has issues
+        probeLimit--;
+        if (probeLimit == 0)
+        {
+            return 0;
         }
 
         // Jump to next capability
-        Offset_Cap = (U16)((RegValue >> 8) & 0xFF);
+        if (bPCIeCap)
+        {
+            // PCIe next cap offset in [31:20]
+            offset = (U16)((regVal >> 20) & 0xFFF);
+        }
+        else
+        {
+            // PCI next cap offset in [15:8]
+            offset = (U8)((regVal >> 8) & 0xFF);
+        }
     }
 
     // Capability not found
@@ -450,18 +514,14 @@ PlxPciBarResourcesUnmap(
             }
             else
             {
-                DebugPrintf((
-                    "Unmap BAR %d from kernel space (VA=%p)\n",
-                    i, pdx->PciBar[i].pVa
-                    ));
-
                 // Unmap from kernel space
                 if (pdx->PciBar[i].pVa != NULL)
                 {
-                    iounmap(
-                        pdx->PciBar[i].pVa
-                        );
-
+                    DebugPrintf((
+                        "Unmap BAR %d (VA=%p)\n",
+                        i, pdx->PciBar[i].pVa
+                        ));
+                    iounmap( pdx->PciBar[i].pVa );
                     pdx->PciBar[i].pVa = NULL;
                 }
 
@@ -532,7 +592,7 @@ PlxPciPhysicalMemoryFreeAll_ByOwner(
             PlxPciPhysicalMemoryFree(
                 pdx,
                 &PciMem
-                ); 
+                );
 
             spin_lock(
                 &(pdx->Lock_PhysicalMemList)
@@ -576,6 +636,14 @@ Plx_dma_buffer_alloc(
     dma_addr_t   BusAddress;
     PLX_UINT_PTR virt_addr;
 
+
+    // Verify size
+    if (pMemObject->Size == 0)
+    {
+        ErrorPrintf(("ERROR: Unable to allocate buffer, requested size = 0\n"));
+        RtlZeroMemory( pMemObject, sizeof(PLX_PHYS_MEM_OBJECT) );
+        return NULL;
+    }
 
     /*********************************************************
      * Attempt to allocate contiguous memory
@@ -631,13 +699,13 @@ Plx_dma_buffer_alloc(
     DebugPrintf(("Allocated physical memory...\n"));
 
     DebugPrintf((
-        "    CPU Phys Addr: %08lx\n",
-        (PLX_UINT_PTR)pMemObject->CpuPhysical
+        "    CPU Phys Addr: %08llx\n",
+        pMemObject->CpuPhysical
         ));
 
     DebugPrintf((
-        "    Bus Phys Addr: %08lx\n",
-        (PLX_UINT_PTR)pMemObject->BusPhysical
+        "    Bus Phys Addr: %08llx\n",
+        pMemObject->BusPhysical
         ));
 
     DebugPrintf((
@@ -646,10 +714,15 @@ Plx_dma_buffer_alloc(
         ));
 
     DebugPrintf((
-        "    Size         : %8X (%d %s)\n",
+        "    Size         : %Xh (%d%s)\n",
         pMemObject->Size,
-        (pMemObject->Size < (10 << 10)) ? pMemObject->Size : (pMemObject->Size >> 10),
-        (pMemObject->Size < (10 << 10)) ? "bytes" : "KB"
+        (pMemObject->Size > (1 << 30)) ? (pMemObject->Size >> 30) :
+          (pMemObject->Size > (1 << 20)) ? (pMemObject->Size >> 20) :
+          (pMemObject->Size > (1 << 10)) ? (pMemObject->Size >> 10) :
+          pMemObject->Size,
+        (pMemObject->Size > (1 << 30)) ? "GB" :
+          (pMemObject->Size > (1 << 20)) ? "MB" :
+          (pMemObject->Size > (1 << 10)) ? "KB" : "B"
         ));
 
     // Return the kernel virtual address of the allocated block
@@ -694,17 +767,19 @@ Plx_dma_buffer_free(
         );
 
     DebugPrintf((
-        "Released physical memory at %08llx (%d %s)\n",
+        "Released physical memory at %08llxh (%d%s)\n",
         pMemObject->CpuPhysical,
-        (pMemObject->Size < (10 << 10)) ? pMemObject->Size : (pMemObject->Size >> 10),
-        (pMemObject->Size < (10 << 10)) ? "bytes" : "KB"
+        (pMemObject->Size > (1 << 30)) ? (pMemObject->Size >> 30) :
+          (pMemObject->Size > (1 << 20)) ? (pMemObject->Size >> 20) :
+          (pMemObject->Size > (1 << 10)) ? (pMemObject->Size >> 10) :
+          pMemObject->Size,
+        (pMemObject->Size > (1 << 30)) ? "GB" :
+          (pMemObject->Size > (1 << 20)) ? "MB" :
+          (pMemObject->Size > (1 << 10)) ? "KB" : "B"
         ));
 
     // Clear memory object properties
-    RtlZeroMemory(
-        pMemObject,
-        sizeof(PLX_PHYS_MEM_OBJECT)
-        );
+    RtlZeroMemory( pMemObject, sizeof(PLX_PHYS_MEM_OBJECT) );
 }
 
 
@@ -730,16 +805,10 @@ Plx_dev_mem_to_user_8(
     while (count)
     {
         // Get next value from device
-        value =
-            PHYS_MEM_READ_8(
-                VaDev
-                );
+        value = PHYS_MEM_READ_8( VaDev );
 
         // Copy value to user-buffer
-        __put_user(
-            value,
-            VaUser
-            );
+        __put_user( value, VaUser );
 
         // Increment pointers
         VaDev++;
@@ -773,16 +842,10 @@ Plx_dev_mem_to_user_16(
     while (count)
     {
         // Get next value from device
-        value =
-            PHYS_MEM_READ_16(
-                VaDev
-                );
+        value = PHYS_MEM_READ_16( VaDev );
 
         // Copy value to user-buffer
-        __put_user(
-            value,
-            VaUser
-            );
+        __put_user( value, VaUser );
 
         // Increment pointers
         VaDev++;
@@ -816,16 +879,10 @@ Plx_dev_mem_to_user_32(
     while (count)
     {
         // Get next value from device
-        value =
-            PHYS_MEM_READ_32(
-                VaDev
-                );
+        value = PHYS_MEM_READ_32( VaDev );
 
         // Copy value to user-buffer
-        __put_user(
-            value,
-            VaUser
-            );
+        __put_user( value, VaUser );
 
         // Increment pointers
         VaDev++;
@@ -859,16 +916,10 @@ Plx_user_to_dev_mem_8(
     while (count)
     {
         // Get next data from user-buffer
-        __get_user(
-            value,
-            VaUser
-            );
+        __get_user( value, VaUser );
 
         // Write value to device
-        PHYS_MEM_WRITE_8(
-            VaDev,
-            value
-            );
+        PHYS_MEM_WRITE_8( VaDev, value );
 
         // Increment pointers
         VaDev++;
@@ -902,16 +953,10 @@ Plx_user_to_dev_mem_16(
     while (count)
     {
         // Get next data from user-buffer
-        __get_user(
-            value,
-            VaUser
-            );
+        __get_user( value, VaUser );
 
         // Write value to device
-        PHYS_MEM_WRITE_16(
-            VaDev,
-            value
-            );
+        PHYS_MEM_WRITE_16( VaDev, value );
 
         // Increment pointers
         VaDev++;
@@ -945,16 +990,10 @@ Plx_user_to_dev_mem_32(
     while (count)
     {
         // Get next data from user-buffer
-        __get_user(
-            value,
-            VaUser
-            );
+        __get_user( value, VaUser );
 
         // Write value to device
-        PHYS_MEM_WRITE_32(
-            VaDev,
-            value
-            );
+        PHYS_MEM_WRITE_32( VaDev, value );
 
         // Increment pointers
         VaDev++;

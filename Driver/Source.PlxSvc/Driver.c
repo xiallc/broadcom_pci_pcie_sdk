@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2017 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision History:
  *
- *      07-01-12 : PLX SDK v7.00
+ *      01-01-17 : PLX SDK v7.25
  *
  *****************************************************************************/
 
@@ -39,6 +51,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/slab.h>      // For kmalloc()
 #include <linux/version.h>
 #include <linux/vermagic.h>
 #include "Dispatch.h"
@@ -73,19 +86,14 @@ Plx_init_module(
     int status;
 
 
-    DebugPrintf_Cont(("\n"));
-    DebugPrintf(("<========================================================>\n"));
-    DebugPrintf((
-        "PLX Service driver v%d.%02d (%d-bit) - built %s %s\n",
+    InfoPrintf_Cont(("\n"));
+    InfoPrintf(("<========================================================>\n"));
+    InfoPrintf((
+        "PLX PCI Service driver v%d.%02d (%d-bit)\n",
         PLX_SDK_VERSION_MAJOR, PLX_SDK_VERSION_MINOR,
-        (U32)(sizeof(PLX_UINT_PTR) * 8),
-        __DATE__, __TIME__
+        (U32)(sizeof(PLX_UINT_PTR) * 8)
         ));
-
-    DebugPrintf((
-        "Supports Linux kernel version %s\n",
-        UTS_RELEASE
-        ));
+    InfoPrintf(("Supports Linux kernel v%s\n", UTS_RELEASE));
 
     // Allocate memory for the Driver Object
     pGbl_DriverObject =
@@ -93,23 +101,15 @@ Plx_init_module(
             sizeof(DRIVER_OBJECT),
             GFP_KERNEL
             );
-
     if (pGbl_DriverObject == NULL)
     {
         ErrorPrintf(("ERROR - memory allocation for Driver Object failed\n"));
         return (-ENOMEM);
     }
-
-    DebugPrintf((
-        "Allocated global driver object (%p)\n",
-        pGbl_DriverObject
-        ));
+    DebugPrintf(("Allocated global driver object (%p)\n", pGbl_DriverObject));
 
     // Clear the driver object
-    RtlZeroMemory(
-        pGbl_DriverObject,
-        sizeof(DRIVER_OBJECT)
-        );
+    RtlZeroMemory( pGbl_DriverObject, sizeof(DRIVER_OBJECT) );
 
     // Initialize driver object
     pGbl_DriverObject->DeviceObject = NULL;
@@ -121,16 +121,12 @@ Plx_init_module(
     pGbl_DriverObject->DispatchTable.open    = Dispatch_open;
     pGbl_DriverObject->DispatchTable.release = Dispatch_release;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
-    pGbl_DriverObject->DispatchTable.ioctl = Dispatch_IoControl;
-#else
+    // Use newer IOCTL functions
     pGbl_DriverObject->DispatchTable.unlocked_ioctl = Dispatch_IoControl;
-#endif
+    pGbl_DriverObject->DispatchTable.compat_ioctl   = Dispatch_IoControl;
 
     // Initialize spin locks
-    spin_lock_init(
-        &(pGbl_DriverObject->Lock_DeviceList)
-        );
+    spin_lock_init( &(pGbl_DriverObject->Lock_DeviceList) );
 
     // Register the driver with the OS
     pGbl_DriverObject->MajorID =
@@ -146,12 +142,7 @@ Plx_init_module(
         ));
 
     // Add a single device object
-    status =
-        AddDevice(
-            pGbl_DriverObject,
-            NULL
-            );
-
+    status = AddDevice( pGbl_DriverObject, NULL );
     if (status != 0)
     {
         // Unload the driver
@@ -172,15 +163,11 @@ Plx_init_module(
     if (pGbl_DriverObject->DeviceCount == 0)
     {
         ErrorPrintf(("ERROR - No PCI devices found\n"));
-
-        // Unload the driver
         Plx_cleanup_module();
-
         return (-ENODEV);
     }
 
-    DebugPrintf(("...driver loaded\n"));
-
+    InfoPrintf(("...driver loaded\n\n"));
     return 0;
 }
 
@@ -203,8 +190,11 @@ Plx_cleanup_module(
     DEVICE_OBJECT *pNext;
 
 
-    DebugPrintf_Cont(("\n"));
-    DebugPrintf(("Unload driver...\n"));
+    InfoPrintf_Cont(("\n"));
+    InfoPrintf((
+        "Unload driver v%d.%02d\n",
+        PLX_SDK_VERSION_MAJOR, PLX_SDK_VERSION_MINOR
+        ));
 
     // Get the device list
     fdo = pGbl_DriverObject->DeviceObject;
@@ -216,9 +206,7 @@ Plx_cleanup_module(
         pNext = fdo->NextDevice;
 
         // Delete the device & remove from device list
-        RemoveDevice(
-            fdo
-            );
+        RemoveDevice( fdo );
 
         // Jump to next device object
         fdo = pNext;
@@ -240,13 +228,11 @@ Plx_cleanup_module(
         ));
 
     // Release driver object
-    kfree(
-        pGbl_DriverObject
-        );
+    kfree( pGbl_DriverObject );
 
     pGbl_DriverObject = NULL;
 
-    DebugPrintf(("...driver unloaded\n"));
+    InfoPrintf(("...driver unloaded\n"));
 }
 
 
@@ -296,10 +282,7 @@ AddDevice(
     }
 
     // Initialize device object
-    RtlZeroMemory(
-        fdo,
-        sizeof(DEVICE_OBJECT)
-        );
+    RtlZeroMemory( fdo, sizeof(DEVICE_OBJECT) );
 
     fdo->DriverObject    = pDriverObject;        // Save parent driver object
     fdo->DeviceExtension = &(fdo->DeviceInfo);
@@ -334,15 +317,12 @@ AddDevice(
         &(pdx->Lock_MapParamsList)
         );
 
-
     //
     // Add to driver device list
     //
 
     // Acquire Device List lock
-    spin_lock(
-        &(pDriverObject->Lock_DeviceList)
-        );
+    spin_lock( &(pDriverObject->Lock_DeviceList) );
 
     // Get device list head
     pDevice = pDriverObject->DeviceObject;
@@ -356,7 +336,9 @@ AddDevice(
     {
         // Go to end of list
         while (pDevice->NextDevice != NULL)
+        {
             pDevice = pDevice->NextDevice;
+        }
 
         // Add device to end of list
         pDevice->NextDevice = fdo;
@@ -366,14 +348,9 @@ AddDevice(
     pDriverObject->DeviceCount++;
 
     // Release Device List lock
-    spin_unlock(
-        &(pDriverObject->Lock_DeviceList)
-        );
+    spin_unlock( &(pDriverObject->Lock_DeviceList) );
 
-    DebugPrintf((
-        "Created Device (%s)\n",
-        PLX_DRIVER_NAME
-        ));
+    DebugPrintf(("Created Device (%s)\n", PLX_DRIVER_NAME));
 
     return 0;
 }
@@ -385,7 +362,7 @@ AddDevice(
  *
  * Function   :  RemoveDevice
  *
- * Description:  Remove a device object from device list and delete it
+ * Description:  Remove a functional device object
  *
  ******************************************************************************/
 int
@@ -401,12 +378,11 @@ RemoveDevice(
 
     pdx = fdo->DeviceExtension;
 
+    DebugPrintf(("---------- %s ----------\n", PLX_DRIVER_NAME));
     DebugPrintf(("Delete supported devices list\n"));
 
     // Free device list
-    while (!list_empty(
-                &(pdx->List_Devices)
-                ))
+    while (!list_empty( &(pdx->List_Devices) ))
     {
         // Get next list item
         pEntry = pdx->List_Devices.next;
@@ -419,38 +395,31 @@ RemoveDevice(
                 ListEntry
                 );
 
+        DebugPrintf((
+            "Remove: %04X %04X [D%d %02X:%02X.%X]\n",
+            pNode->Key.DeviceId, pNode->Key.VendorId, pNode->Key.domain,
+            pNode->Key.bus, pNode->Key.slot, pNode->Key.function
+            ));
+
         // Remove node from list
-        list_del(
-            pEntry
-            );
+        list_del( pEntry );
 
         // Release the object
-        kfree(
-            pNode
-            );
+        kfree( pNode );
     }
 
-    DebugPrintf((
-        "Remove device (%s)\n",
-        PLX_DRIVER_NAME
-        ));
+    DebugPrintf(("Remove device (%s)\n", PLX_DRIVER_NAME));
 
     // Acquire Device List lock
-    spin_lock(
-        &(pGbl_DriverObject->Lock_DeviceList)
-        );
+    spin_lock( &(pGbl_DriverObject->Lock_DeviceList) );
 
     // Get device list head
     pDevice = pGbl_DriverObject->DeviceObject;
 
     if (pDevice == NULL)
     {
-        // Release Device List lock
-        spin_unlock(
-            &(pGbl_DriverObject->Lock_DeviceList)
-            );
-
-        ErrorPrintf(("ERROR - Unable to remove device, device list is empty\n"));
+        spin_unlock( &(pGbl_DriverObject->Lock_DeviceList) );
+        ErrorPrintf(("ERROR - Unable to remove device, device list empty\n"));
         return (-ENODEV);
     }
 
@@ -468,16 +437,8 @@ RemoveDevice(
 
             if (pDevice == NULL)
             {
-                // Release Device List lock
-                spin_unlock(
-                    &(pGbl_DriverObject->Lock_DeviceList)
-                    );
-
-                ErrorPrintf((
-                    "ERROR - Device object (%p) not found in device list\n",
-                    fdo
-                    ));
-
+                spin_unlock( &(pGbl_DriverObject->Lock_DeviceList) );
+                ErrorPrintf(("ERROR - Device (%p) not found in list\n", fdo));
                 return (-ENODEV);
             }
         }
@@ -490,19 +451,12 @@ RemoveDevice(
     pGbl_DriverObject->DeviceCount--;
 
     // Release Device List lock
-    spin_unlock(
-        &(pGbl_DriverObject->Lock_DeviceList)
-        );
-
-    DebugPrintf((
-        "Delete device object (%p)\n",
-        fdo
-        ));
+    spin_unlock( &(pGbl_DriverObject->Lock_DeviceList) );
 
     // Delete the device object
-    kfree(
-        fdo
-        );
+    DebugPrintf(("Delete device object (%p)\n", fdo));
+    kfree( fdo );
 
+    DebugPrintf(("   --------------------\n"));
     return 0;
 }

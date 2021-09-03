@@ -22,32 +22,25 @@ endif
 # Target builds
 #=============================================================================
 BuildApp: CreateOutputDir $(PLX_OBJECTS)
-	@echo Link: $(ImageName)
-	$(Q)$(CC) -o $(OUT_DIR)/$(ImageName) $(LFLAGS) $(PLX_OBJECTS) $(LIBS)
+	$(OPTIONAL_LF)
+	@echo 'LNK $(ImageName)'
+	$(CC) -o $(OUT_DIR)/$(ImageName) $(LFLAGS) $(PLX_OBJECTS) $(LIBS)
 	@echo
 	@echo Application \"$(OUT_DIR)/$(ImageName)\" built successfully
 	@echo
 
 
 BuildLibrary: CreateOutputDir $(PLX_OBJECTS)
-	@echo Create: $(ImageName).a
-	$(Q)$(AR) -rcv $(OUT_DIR)/$(ImageName).a $(PLX_OBJECTS)
+	$(OPTIONAL_LF)
+	@echo 'LIB $(ImageName).a'
+	$(AR) -rc $(VERBOSE) $(OUT_DIR)/$(ImageName).a $(PLX_OBJECTS)
 	@echo
 	@echo Library \"$(OUT_DIR)/$(ImageName).a\" built successfully
 	@echo
 
 
-BuildDriver_2.4: CreateOutputDir $(PLX_OBJECTS)
-	@echo Link: $(ImageName).o
-	@echo
-	$(Q)$(LD) -r $(PLX_OBJECTS) -o $(OUT_DIR)/$(ImageName).ko
-	@echo
-	@echo Driver \"$(OUT_DIR)/$(ImageName).ko\" built sucessfully
-	@echo
-
-
 BuildDriver:
-	$(Q)$(MAKE) -C $(KDIR) M=$(PWD) modules
+	$(Q)$(MAKE) -C $(KDIR) M=`pwd` ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 	@echo
 	@echo Driver \"$(OUT_DIR)/$(ImageName).ko\" built sucessfully
 	@echo
@@ -70,7 +63,7 @@ SaveDriverObjects: CreateOutputDir
 	     mv $(VERBOSE) $(PLX_CHIP_DIR)/*.o    $(OBJ_DIR)/PlxChip; \
 	     mv $(VERBOSE) $(PLX_CHIP_DIR)/.*.cmd $(OBJ_DIR)/PlxChip; \
 	 fi
-	@if [ "$Q" != "@" ]; then echo; fi
+	$(OPTIONAL_LF)
 
 
 # Restores driver objects (*.o files) back to original location
@@ -88,8 +81,7 @@ RestoreDriverObjects:
 	     mv $(VERBOSE) -u $(OBJ_DIR)/Common/.*.cmd  $(COMMON_DIR); \
 	     rm $(VERBOSE) -r -f $(OBJ_DIR)/Common; \
 	 fi
-	@if [ -f $(OUT_DIR)/$(ImageName).ko ]; then \
-	     mv $(VERBOSE) -u $(OUT_DIR)/$(ImageName).ko    .; \
+	@if [ -f $(OBJ_DIR)/$(ImageName).o ]; then \
 	     mv $(VERBOSE) -u $(OBJ_DIR)/$(ImageName).o     .; \
 	     mv $(VERBOSE) -u $(OBJ_DIR)/$(ImageName).mod.* .; \
 	     mv $(VERBOSE) -u $(OBJ_DIR)/.$(ImageName).*    .; \
@@ -97,7 +89,7 @@ RestoreDriverObjects:
 	@if [ -f $(OUT_DIR)/$(ImageName).ko.* ]; then \
 	     mv $(VERBOSE) -u $(OUT_DIR)/$(ImageName).ko.*  .; \
 	 fi
-	@if [ "$Q" != "@" ]; then echo; fi
+	$(OPTIONAL_LF)
 
 
 
@@ -106,26 +98,21 @@ RestoreDriverObjects:
 #=============================================================================
 
 DisplayParameters:
-	@clear
+	@if [ "$(PLX_NO_CLEAR_SCREEN)" = "" ]; then clear; fi
 	@echo
 	@echo Build: $(ImageName)
 	@echo
-	@if [ -r /etc/redhat-release ]; then \
-	    echo "- PLA: `cat /etc/redhat-release`"; \
-	 elif [ -r /etc/SuSE-release ]; then \
-	    echo "- PLA: `cat /etc/SuSE-release | awk "FNR==1 {print $0}"`"; \
-	 else \
-	    echo "- PLA: Linux, version ???"; \
-	 fi
-	@echo "- KER: `uname -r`"
+	@echo - PLA: $(PLATFORM_NAME)
 	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
+	    echo - KER: $(KERNEL_VER); \
 	    echo - INC: $(KDIR)/include; \
 	 fi
 	@echo - CPU: $(ARCH) \($(PLX_CPU_BITS)-bit $(PLX_CPU_ENDIAN) Endian\)
-	@echo - CMP: $(TOOLS_NAME)
-	@echo - TYP: $(TGT_TYPE)
-	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
-	    echo - PLX: $(PLX_CHIP); \
+	@echo - CMP: $(CROSS_COMPILE)gcc
+	@echo - TYP: $(PLX_CHIP) $(TGT_TYPE)
+	@echo - PLX: SDK v$(SDK_VER);
+	@if [ "$(PLX_ENV)" != "" ]; then \
+	    echo - ENV: $(PLX_ENV); \
 	 fi
 	@echo - CFG: $(BUILD_TYPE)
 	@echo
@@ -141,10 +128,9 @@ CreateOutputDir:
 	        mkdir $(VERBOSE) -p $(OBJ_DIR)/PlxChip; \
 	    fi \
 	 fi
-	@if [ "$Q" != "@" ]; then echo; fi
 
 
-clean:
+cleanobj:
 	@echo
 	@echo Clean: $(ImageName)
 	@echo
@@ -171,7 +157,7 @@ clean:
 	@echo
 
 
-cleanall: clean
+clean: cleanobj
 	@echo Delete: All build files...
 	@rm -v -f $(OUT_DIR)/$(ImageName)*
 	@rm -v -f $(OUT_DIR)/.$(ImageName)*

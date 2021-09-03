@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -11,7 +44,7 @@
  *
  * Revision History:
  *
- *      10-01-12 : PLX SDK v7.00
+ *      05-01-16 : PLX SDK v7.30
  *
  ******************************************************************************/
 
@@ -188,7 +221,7 @@ main(
             &Device
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf(
             "\n"
@@ -215,17 +248,17 @@ main(
      * Display the NT side
      ***********************************/
     Cons_printf(
-        "Communicating from          : %s side\n",
-        (DeviceKey.NTPortType == PLX_NT_PORT_LINK) ? "LINK" : "VIRTUAL"
+        "Communicating from         : %s side\n",
+        (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "LINK" : "VIRTUAL"
         );
 
 
     /************************************
      * Identify connection type
      ***********************************/
-    Cons_printf("Determine NT connect type   : ");
+    Cons_printf("Determine NT connect type  : ");
     status = PlxNT_DetermineConnectType( &Device, &RemoteHost );
-    if ((status != ApiSuccess) || (RemoteHost.NtConnectType == NT_CONNECT_UNKNOWN))
+    if ((status != PLX_STATUS_OK) || (RemoteHost.NtConnectType == NT_CONNECT_UNKNOWN))
     {
         Cons_printf("ERROR: Unable to determine NT connect type\n");
         goto _ExitApp;
@@ -246,7 +279,7 @@ main(
     {
         Cons_printf("Setup NT Back-to-Back       : ");
         status = PlxNT_B2B_Initialize( &Device, &RemoteHost );
-        if (status != ApiSuccess)
+        if (status != PLX_STATUS_OK)
             goto _ExitApp;
         Cons_printf("Ok\n");
     }
@@ -266,7 +299,7 @@ main(
             &BarProp
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to get PCI BAR properties\n");
         goto _ExitApp;
@@ -282,7 +315,7 @@ main(
             &BarVa
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to map PCI BAR\n");
         goto _ExitApp;
@@ -302,7 +335,7 @@ main(
             &ReqId_Write
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to probe ReqID, auto-add 0,0,0\n");
         ReqId_Write = 0;
@@ -328,7 +361,7 @@ main(
             &LutIndex,
             ReqId_Write,
             FALSE       // Snoop must be disabled
-            ) != ApiSuccess)
+            ) != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to add LUT entry\n");
     }
@@ -357,7 +390,7 @@ main(
             TRUE
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to allocate buffer for data transfers\n");
         goto _ExitApp;
@@ -375,7 +408,7 @@ main(
             &PhysBuffer
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to map to user space\n");
         goto _ExitApp;
@@ -395,7 +428,7 @@ main(
     Cons_printf("Broadcast buffer properties: ");
 
     // Set mailbox to write
-    if (DeviceKey.NTPortType == PLX_NT_PORT_LINK)
+    if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
         value = 6;
     else
         value = 3;
@@ -437,7 +470,7 @@ main(
     Cons_printf("Get buffer address  : ");
 
     // Set mailbox to read
-    if (DeviceKey.NTPortType == PLX_NT_PORT_LINK)
+    if (DeviceKey.PlxPortType == PLX_SPEC_PORT_NT_LINK)
         value = 3;
     else
         value = 6;
@@ -495,7 +528,7 @@ main(
             DirAddr
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("ERROR: Unable to setup NT translation\n");
         goto _ExitApp;
@@ -584,7 +617,7 @@ _ExitApp:
     {
         Cons_printf("Cleanup NT Back-to-Back     : ");
         status = PlxNT_B2B_Cleanup( &Device, &RemoteHost );
-        if (status != ApiSuccess)
+        if (status != PLX_STATUS_OK)
         {
             Cons_printf("ERROR: Unable to cleanup Back-to-Back\n");
             goto _ExitApp;
@@ -659,12 +692,12 @@ SelectDevice_NT(
                 (U8)i
                 );
 
-        if (status == ApiSuccess)
+        if (status == PLX_STATUS_OK)
         {
             // Default to add device
             bAddDevice = TRUE;
 
-            if (DevKey.NTPortType == PLX_NT_PORT_NONE)
+            if (DevKey.PlxPortType == PLX_SPEC_PORT_UNKNOWN)
                 bAddDevice = FALSE;
 
             if (bAddDevice)
@@ -672,7 +705,8 @@ SelectDevice_NT(
                 // Verify supported chip type
                 if (((DevKey.PlxChip & 0xFF00) != 0x8500) &&
                     ((DevKey.PlxChip & 0xFF00) != 0x8600) &&
-                    ((DevKey.PlxChip & 0xFF00) != 0x8700))
+                    ((DevKey.PlxChip & 0xFF00) != 0x8700) &&
+                    ((DevKey.PlxChip & 0xFF00) != 0x9700))
                 {
                     bAddDevice = FALSE;
                 }
@@ -725,7 +759,7 @@ SelectDevice_NT(
                     "\t\t  %2d. %04x Port %d [b:%02x s:%02x] (%s-side)\n",
                     (NumDevices + 1), DevKey.PlxChip, PortProp.PortNumber,
                     DevKey.bus, DevKey.slot,
-                    (DevKey.NTPortType == PLX_NT_PORT_LINK) ? "Link" : "Virtual"
+                    (DevKey.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "Link" : "Virtual"
                     );
 
                 // Increment device count
@@ -736,7 +770,7 @@ SelectDevice_NT(
         // Go to next devices
         i++;
     }
-    while ((status == ApiSuccess) && (NumDevices < MAX_DEVICES_TO_LIST));
+    while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
         return 0;
@@ -787,11 +821,11 @@ WaitForConnection(
     Cons_printf(
         "\n"
         "Wait for %s side (ESC to cancel): ",
-        (pDevice->Key.NTPortType == PLX_NT_PORT_LINK) ? "Virtual" : "Link"
+        (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK) ? "Virtual" : "Link"
         );
 
     // Set mailboxes to use
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
         MB_Read  = 2;
         MB_Write = 5;
@@ -900,7 +934,7 @@ PlxNT_DetermineConnectType(
     pRemHost->NtConnectType = NT_CONNECT_STANDARD;
 
     // NT-Virtual could be either type of connection
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_VIRTUAL)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_VIRTUAL)
     {
         // Probe some NT-Link registers to try & determine type
 
@@ -929,7 +963,7 @@ PlxNT_DetermineConnectType(
 
 _Exit_PlxNT_DetermineConnectType:
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -952,7 +986,7 @@ PlxNT_B2B_Initialize(
 
 
     if (pRemHost->NtConnectType != NT_CONNECT_BACK_TO_BACK)
-        return ApiInvalidState;
+        return PLX_STATUS_INVALID_STATE;
 
     // Verify BAR 2 is enabled
     BarMask  = PlxPci_PlxRegisterRead( pDevice, 0x1000 + 0xE8, NULL );
@@ -960,7 +994,7 @@ PlxNT_B2B_Initialize(
     if (BarMask == 0)
     {
         Cons_printf("ERROR - NT-Link BAR 2 not enabled\n");
-        return ApiInsufficientResources;
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Set NT-Link side BAR 0
@@ -978,7 +1012,7 @@ PlxNT_B2B_Initialize(
     // Mark connection initialized
     pRemHost->bInitialized = TRUE;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -998,17 +1032,17 @@ PlxNT_B2B_Cleanup(
     )
 {
     if (pRemHost->NtConnectType != NT_CONNECT_BACK_TO_BACK)
-        return ApiInvalidState;
+        return PLX_STATUS_INVALID_STATE;
 
     // Do nothing if not initialized
     if (pRemHost->bInitialized == FALSE)
-        return ApiSuccess;
+        return PLX_STATUS_OK;
 
     //
 
     pRemHost->bInitialized = FALSE;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1036,16 +1070,16 @@ PlxPci_SetupNtTranslation(
 
     // Only BAR 2 currently supported
     if (BarIndex != 2)
-        return ApiUnsupportedFunction;
+        return PLX_STATUS_UNSUPPORTED;
 
-    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+    if (pDevice->Key.PlxPortType == PLX_SPEC_PORT_NT_LINK)
     {
         if (BarIndex == 2)
         {
             if (((DirAddr.DestinationAddr >> 32) != 0) ||
                  ((DirAddr.Size >> 32) != 0))
             {
-                return ApiInvalidAddress;
+                return PLX_STATUS_INVALID_ADDR;
             }
         }
     }
@@ -1093,5 +1127,5 @@ PlxPci_SetupNtTranslation(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }

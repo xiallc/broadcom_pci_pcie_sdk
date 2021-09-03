@@ -1,14 +1,23 @@
 
                 PLX Command-line Monitor (PlxCm)
 
-                         August 2013
+                          July 2014
     _________________________________________________________
 
 
      ******************************************************
-        NOTE: This document is incomplete at this time &
-              is a work-in-progress.
+        NOTE: This document is a work-in-progress.
      ******************************************************
+
+
+
+CONTENTS
+
+   I. ABSTRACT
+  II. PLXCM HISTORY
+ III. SUPPORTED PLATFORMS
+  IV. USING PLXCM
+   V. PLXCM COMMANDS
 
 
 
@@ -20,7 +29,7 @@ incorporated into this document.
 
 
 
-II. PlxCm History
+II. PLXCM HISTORY
 
 PlxCm was initially developed in the late 1990's to execute on embedded
 CPUs incorporated into PLX local bus RDKs, such as the PLX 9656-MPC860 RDK.
@@ -33,7 +42,7 @@ application layer is provided in the PLX SDK.
 
 
 
-III. Supported Platforms
+III. SUPPORTED PLATFORMS
 
 PlxCm is available for the following platforms:
 
@@ -45,19 +54,19 @@ PlxCm is available for the following platforms:
    directly from the PLX SDK & efforts are made to keep the DOS version
    synchronized with PLX SDK updates. A PLX custom DOS layer, implementing a
    subset of the PLX API, allows PlxCm to build as-is. The DOS layer is
-   proprietary to PLX & is not publiclly provided.
+   proprietary to PLX & is not publicly provided.
 
  Windows & Linux
    PlxCm is provided in the respective PLX SDK package for either OS. In order
    for PlxCm, or any application utilizing the PLX API, to access devices
-   through PCI/PCIe, at least one PLX driver must be loaded into the system.
+   through PCI/PCIe, at least one PLX driver must be loaded in the system.
    The driver(s) loaded determine which devices show up in PlxCm. The PLX PCI
    Service driver allows PlxCm to access any PCI/PCIe device in the system,
    including non-PLX devices.
 
 
 
-IV. Using PlxCm
+IV. USING PLXCM
 
  COMMAND-LINE
    The PlxCm command-line behaves similar to any DOS or standard
@@ -66,7 +75,7 @@ IV. Using PlxCm
  INTEGRATED HELP
    There is currently a 'help' command that lists the commands PlxCm supports.
    At this time, the help system is still under development so it does not list
-   additional details. A future version may allow something like "help dl" to
+   additional details. A future version may allow commands like "help dl" to
    display addtional usage information.
 
  VIRTUAL ADDRESSES
@@ -97,7 +106,7 @@ IV. Using PlxCm
 
 
 
-V. PlxCm Commands
+V. PLXCM COMMANDS
 
 The available PlxCm commands are documented here, grouped by feature.
 

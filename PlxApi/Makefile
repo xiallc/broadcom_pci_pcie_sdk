@@ -27,16 +27,28 @@ TGT_TYPE    = Library
 
 
 #=============================================================================
-# Put all object files here
+# Set default SDK path if not set
+# Note: Since shared between projects, account for SDK & System SW variables
 #=============================================================================
-PLX_OBJECTS = \
-	$(OBJ_DIR)/Aardvark.o    \
-	$(OBJ_DIR)/Eep_8000.o    \
-	$(OBJ_DIR)/PlxApi.o      \
-	$(OBJ_DIR)/PlxApiI2cAa.o
+ifndef PLX_SDK_DIR
+    PLX_SDK_DIR := $(shell cd ..;pwd)
+endif
+
+ifndef PLX_SYS_DIR
+    PLX_SYS_DIR := $(shell cd ..;pwd)
+endif
+
+# Decide which directory to use
+PLX_DIR = $(shell cd ..;pwd)
+ifeq ( $PLX_DIR, $PLX_SDK_DIR )
+    PLX_DIR = $PLX_SDK_DIR
+endif
+ifeq ( $PLX_DIR, $PLX_SYS_DIR )
+    PLX_DIR = $PLX_SYS_DIR
+endif
 
 
 #=============================================================================
 # Include shared PLX makefile
 #=============================================================================
-include $(PLX_SDK_DIR)/Makefiles/PlxMake.def
+include $(PLX_DIR)/Makefiles/PlxMake.def

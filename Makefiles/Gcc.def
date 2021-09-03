@@ -9,10 +9,10 @@
 #=============================================================================
 # Compiler/Assembler names
 #=============================================================================
-AS = as
-AR = ar
-LD = ld
-CC = gcc
+AS = $(Q)$(CROSS_COMPILE)as
+AR = $(Q)$(CROSS_COMPILE)ar
+LD = $(Q)$(CROSS_COMPILE)ld
+CC = $(Q)$(CROSS_COMPILE)gcc
 
 
 
@@ -21,16 +21,9 @@ CC = gcc
 #=============================================================================
 EXTRA_CFLAGS += -DGCC
 
-ifneq ($(TGT_TYPE), Driver)
-    ifdef PLX_DEBUG
-        EXTRA_CFLAGS += -g3
-    else
-        EXTRA_CFLAGS += -O2
-    endif
-endif
-
-# Optimizations required for drivers to expand in-line functions
-ifeq ($(TGT_TYPE), Driver)
+ifdef PLX_DEBUG
+    EXTRA_CFLAGS += -g3
+else
     EXTRA_CFLAGS += -O2
 endif
 
@@ -54,21 +47,16 @@ EXTRA_CFLAGS += -c -Wall -pipe
 .SUFFIXES: .c
 
 %.o : %.c
-	@echo Compile: $<
-	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
-	@echo
+	$(OPTIONAL_LF)
+	@echo 'CC  $<'
+	$(CC) $< -o $@ $(CFLAGS) $(EXTRA_CFLAGS)
 
 $(OBJ_DIR)/%.o : %.c
-	@echo Compile: $<
-	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
-	@echo
+	$(OPTIONAL_LF)
+	@echo 'CC  $<'
+	$(CC) $< -o $@ $(CFLAGS) $(EXTRA_CFLAGS)
 
 $(OBJ_DIR)/%.o : $(COMMON_DIR)/%.c
-	@echo Compile: $*.c
-	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
-	@echo
-
-$(OBJ_DIR)/%.o : $(PLX_CHIP_DIR)/%.c
-	@echo Compile: Pci$(PLX_CHIP)/$*.c
-	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
-	@echo
+	$(OPTIONAL_LF)
+	@echo 'CC  $<'
+	$(CC) $< -o $@ $(CFLAGS) $(EXTRA_CFLAGS)

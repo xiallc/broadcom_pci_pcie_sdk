@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -10,11 +43,13 @@
  *
  ******************************************************************************/
 
+#if defined(_WIN32)
+    #define _CRT_NONSTDC_NO_WARNINGS        // Prevents POSIX function warnings
+#endif
 
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
-
 #include "CmdLine.h"
 #include "Monitor.h"
 #include "MonCmds.h"
@@ -43,6 +78,7 @@ static FN_TABLE Gbl_FnTable[] =
     { CMD_VERSION   , FALSE, "ver"                     , Cmd_Version    },
     { CMD_SLEEP     ,  TRUE, "sleep"                   , Cmd_Sleep      },
     { CMD_SCREEN    ,  TRUE, "screen"                  , Cmd_Screen     },
+    { CMD_THROTTLE  ,  TRUE, "throttle"                , Cmd_Throttle   },
     { CMD_HISTORY   , FALSE, "history/h/!"             , Cmd_History    },
     { CMD_BOOT      , FALSE, "boot"                    , Cmd_Boot       },
     { CMD_RESET     , FALSE, "reset"                   , Cmd_Reset      },
@@ -208,7 +244,7 @@ ProcessMonitorParams(
     {
         if (bGetFileName)
         {
-            if ((argv[i][0] == '-') || (argv[i][0] == '/'))
+            if (argv[i][0] == '-')
             {
                 Cons_printf("ERROR: File name not specified\n");
                 return -1;
@@ -225,8 +261,7 @@ ProcessMonitorParams(
             // Flag parameter retrieved
             bGetFileName = FALSE;
         }
-        else if ((Plx_strcasecmp(argv[i], "/s") == 0) ||
-                 (Plx_strcasecmp(argv[i], "-s") == 0))
+        else if (Plx_strcasecmp(argv[i], "-s") == 0)
         {
             // Set flag to get file name
             bGetFileName = TRUE;
@@ -267,7 +302,7 @@ Monitor(
     )
 {
     U16                i;
-    U16                count;
+    size_t             count;
     int                PrevInp;
     int                NextInp;
     char               buffer[MAX_CMDLN_LEN];
@@ -350,7 +385,7 @@ Monitor(
     pCmd           = NULL;
     NextInp        = 0;
     PrevInp        = 0;
-    bInsertMode    = 0;
+    bInsertMode    = 1;
     Gbl_pPostedCmd = NULL;
 
     memset( buffer, '\0', MAX_CMDLN_LEN );
@@ -450,6 +485,7 @@ Monitor(
                 break;
 
             case CONS_KEY_BACKSPACE:
+            case CONS_KEY_EXT_BACKSPACE:
                 if (i > 0)
                 {
                     // Delete left character & shift text from right
@@ -798,7 +834,7 @@ ProcessCommand(
  *********************************************************/
 DEVICE_NODE*
 DeviceSelectByIndex(
-    U8 index
+    U16 index
     )
 {
     DEVICE_NODE *pNode;

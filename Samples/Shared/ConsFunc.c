@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2015 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -10,7 +43,7 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      08-01-14 : PLX SDK v7.20
  *
  ******************************************************************************/
 
@@ -27,6 +60,7 @@
  *            Globals
  ************************************/
 static unsigned char  _Gbl_bThrottleOutput = FALSE;
+static unsigned char  _Gbl_bThrottleLock   = FALSE;
 static unsigned char  _Gbl_bPausePending   = FALSE;
 static unsigned char  _Gbl_bOutputDisable  = FALSE;
 static unsigned short _Gbl_LineCount       = 0;
@@ -228,32 +262,6 @@ ConsoleScreenHeightSet(
 
 /******************************************************************
  *
- * Function   :  ConsoleIoThrottle
- *
- * Description:  Toggle throttling of the console output
- *
- *****************************************************************/
-void
-ConsoleIoThrottle(
-    unsigned char bEnable
-    )
-{
-    _Gbl_bThrottleOutput = bEnable;
-
-    // Reset if disabled
-    if (!bEnable)
-    {
-        _Gbl_LineCount      = 0;
-        _Gbl_bPausePending  = FALSE;
-        _Gbl_bOutputDisable = FALSE;
-    }
-}
-
-
-
-
-/******************************************************************
- *
  * Function   :  ConsoleCursorPropertiesSet
  *
  * Description:  Sets cursor properties
@@ -294,6 +302,58 @@ void ConsoleCursorPropertiesSet( int size )
 
 /******************************************************************
  *
+ * Function   :  ConsoleIoThrottleGet
+ *
+ * Description:  Returns current throttle setting
+ *
+ *****************************************************************/
+unsigned char
+ConsoleIoThrottleGet(
+    void
+    )
+{
+    // Throttle disabled only if locked to disabled
+    if (_Gbl_bThrottleLock && (_Gbl_bThrottleOutput == FALSE))
+        return FALSE;
+
+    return TRUE;
+}
+
+
+
+
+/******************************************************************
+ *
+ * Function   :  ConsoleIoThrottleSet
+ *
+ * Description:  Toggle throttling of the console output
+ *
+ *****************************************************************/
+void
+ConsoleIoThrottleSet(
+    unsigned char bEnable
+    )
+{
+    // Do nothing if current setting locked
+    if (_Gbl_bThrottleLock)
+        return;
+
+    _Gbl_bThrottleOutput = bEnable;
+
+    // Reset if disabled
+    if (!bEnable)
+    {
+        _Gbl_LineCount      = 0;
+        _Gbl_bPausePending  = FALSE;
+        _Gbl_bOutputDisable = FALSE;
+    }
+}
+
+
+
+
+/******************************************************************
+ *
  * Function   :  ConsoleIoThrottleReset
  *
  * Description:  Resets console line count
@@ -305,6 +365,27 @@ ConsoleIoThrottleReset(
     )
 {
     _Gbl_LineCount = 0;
+}
+
+
+
+
+/******************************************************************
+ *
+ * Function   :  ConsoleIoThrottleLock
+ *
+ * Description:  Lock or unlock the current throttle setting
+ *
+ *****************************************************************/
+void
+ConsoleIoThrottleLock(
+    unsigned char bEnable
+    )
+{
+    if (bEnable)
+        _Gbl_bThrottleLock = TRUE;
+    else
+        _Gbl_bThrottleLock = FALSE;
 }
 
 
@@ -396,7 +477,7 @@ Plx_fputs(
         toggle = tolower( toggle );
 
         if (toggle == 'c')
-            ConsoleIoThrottle( FALSE );         // Disable throttle output
+            ConsoleIoThrottleSet( FALSE );         // Disable throttle output
         else if (toggle == 'q')
         {
             ConsoleIoOutputDisable( TRUE );     // Disable any further output
@@ -523,12 +604,11 @@ _Exit_Plx_printf:
  *         Windows-specific functions
  *
  ************************************************/
-
 #if defined(PLX_MSWINDOWS)
 
 /******************************************************************
  *
- * Function   :  Plx_clrscr
+ * Function   :  Plx_clrscr (Windows version)
  *
  * Description:  Clears the console window
  *
@@ -589,8 +669,32 @@ Plx_clrscr(
  *         Linux-specific functions
  *
  ************************************************/
-
 #if defined(PLX_LINUX)
+
+/******************************************************************
+ *
+ * Function   :  Plx_clrscr (Linux version)
+ *
+ * Description:  Clears the console window
+ *
+ *****************************************************************/
+void
+Plx_clrscr(
+    void
+    )
+{
+    int ret;
+
+
+    // Get return code to avoid compiler warning
+    ret = system( "clear" );
+    if (ret == 0)
+    {
+    }
+}
+
+
+
 
 /******************************************************************
  *

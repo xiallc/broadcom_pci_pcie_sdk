@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -58,6 +70,7 @@ PlxChip_BoardReset(
 {
     U8  EepromPresent;
     U32 RegValue;
+    U32 DelayLoop;
     U32 RegInterrupt;
     U32 RegIntCtrlStatus;
 
@@ -119,8 +132,11 @@ PlxChip_BoardReset(
         RegValue | (1 << 30)
         );
 
-    // Delay for a bit
-    Plx_sleep(100);
+    // Delay for a bit using dummy register reads (1 read = ~1us)
+    for (DelayLoop = 0; DelayLoop < (100 * 1000); DelayLoop++)
+    {
+        PLX_9000_REG_READ( pdx, 0 );
+    }
 
     // Bring chip out of reset
     PLX_9000_REG_WRITE(
@@ -136,8 +152,11 @@ PlxChip_BoardReset(
         RegValue | (1 << 29)
         );
 
-    // Delay for a bit
-    Plx_sleep(10);
+    // Delay for a bit using dummy register reads (1 read = ~1us)
+    for (DelayLoop = 0; DelayLoop < (10 * 1000); DelayLoop++)
+    {
+        PLX_9000_REG_READ( pdx, 0 );
+    }
 
     // Clear EEPROM reload
     PLX_9000_REG_WRITE(
@@ -166,7 +185,7 @@ PlxChip_BoardReset(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -188,7 +207,7 @@ PlxChip_MailboxRead(
 {
     // Chip does not contain mailbox registers
     if (pStatus != NULL)
-        *pStatus = ApiUnsupportedFunction;
+        *pStatus = PLX_STATUS_UNSUPPORTED;
 
     return 0;
 }
@@ -211,7 +230,7 @@ PlxChip_MailboxWrite(
     )
 {
     // Chip does not contain mailbox registers
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -257,7 +276,7 @@ PlxChip_InterruptEnable(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -303,7 +322,7 @@ PlxChip_InterruptDisable(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -319,7 +338,7 @@ PlxChip_InterruptDisable(
 PLX_STATUS
 PlxChip_EepromReadByOffset(
     DEVICE_EXTENSION *pdx,
-    U16               offset,
+    U32               offset,
     U32              *pValue
     )
 {
@@ -327,7 +346,7 @@ PlxChip_EepromReadByOffset(
     if ((offset & 0x3) || (offset > 0x200))
     {
         DebugPrintf(("ERROR - Invalid EEPROM offset\n"));
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
     // Read EEPROM
@@ -337,7 +356,7 @@ PlxChip_EepromReadByOffset(
         pValue
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -353,7 +372,7 @@ PlxChip_EepromReadByOffset(
 PLX_STATUS
 PlxChip_EepromWriteByOffset(
     DEVICE_EXTENSION *pdx,
-    U16               offset,
+    U32               offset,
     U32               value
     )
 {
@@ -361,7 +380,7 @@ PlxChip_EepromWriteByOffset(
     if ((offset & 0x3) || (offset > 0x200))
     {
         DebugPrintf(("ERROR - Invalid EEPROM offset\n"));
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
     // 9050 does not protect the EEPROM from write access, do nothing
@@ -373,7 +392,7 @@ PlxChip_EepromWriteByOffset(
         value
         );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -393,7 +412,7 @@ PlxChip_DmaChannelOpen(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -413,7 +432,7 @@ PlxChip_DmaGetProperties(
     PLX_DMA_PROP     *pProp
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -434,7 +453,7 @@ PlxChip_DmaSetProperties(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -455,7 +474,7 @@ PlxChip_DmaControl(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -475,7 +494,7 @@ PlxChip_DmaStatus(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -496,7 +515,7 @@ PlxChip_DmaTransferBlock(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -517,7 +536,7 @@ PlxChip_DmaTransferUserBuffer(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -538,5 +557,5 @@ PlxChip_DmaChannelClose(
     VOID             *pOwner
     )
 {
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }

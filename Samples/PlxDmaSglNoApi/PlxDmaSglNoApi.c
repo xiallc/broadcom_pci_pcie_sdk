@@ -1,3 +1,36 @@
+/*******************************************************************************
+ * Copyright 2013-2015 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -173,7 +206,7 @@ main(
             &Device
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("\n   ERROR: Unable to find or select a PLX device\n");
         PlxSdkErrorDisplay(status);
@@ -220,7 +253,7 @@ main(
      ******************************************************/
     Cons_printf("  Map DMA buffer to user space... ");
     status = PlxPci_CommonBufferMap( &Device, (VOID**)&pDmaBuffer );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -238,7 +271,7 @@ main(
     else
         status = SetupDmaDescriptors_8000( &Device, pDmaBuffer, &SglPciAddr_64 );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("\n   ERROR: Unable to setup DMA descriptors\n");
         PlxSdkErrorDisplay(status);
@@ -255,7 +288,7 @@ main(
     else
         status = PerformSglDmaTransfer_8000( &Device, pDmaBuffer, SglPciAddr_64 );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("\n   ERROR: Unable to perform SGL DMA\n");
         PlxSdkErrorDisplay(status);
@@ -269,7 +302,7 @@ main(
      ******************************************************/
     Cons_printf("  Unmap DMA buffer............... ");
     status = PlxPci_CommonBufferUnmap( &Device, (VOID**)&pDmaBuffer );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -342,7 +375,7 @@ SelectDevice_DMA(
                 (U16)i
                 );
 
-        if (status == ApiSuccess)
+        if (status == PLX_STATUS_OK)
         {
             // Default to add device
             bAddDevice = TRUE;
@@ -421,7 +454,7 @@ SelectDevice_DMA(
         // Go to next devices
         i++;
     }
-    while ((status == ApiSuccess) && (NumDevices < MAX_DEVICES_TO_LIST));
+    while ((status == PLX_STATUS_OK) && (NumDevices < MAX_DEVICES_TO_LIST));
 
     if (NumDevices == 0)
         return 0;
@@ -494,7 +527,7 @@ SetupDmaDescriptors_9000(
     Cons_printf("  Get DMA buffer properties...... ");
 
     status = PlxPci_CommonBufferProperties( pDevice, &PciBuffer );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         *pSglPciAddress = 0;
         Cons_printf("*ERROR* - API failed\n");
@@ -578,7 +611,7 @@ SetupDmaDescriptors_9000(
     // Provide PCI address of first descriptor
     *pSglPciAddress = (U32)PciBuffer.PhysicalAddr;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -632,7 +665,7 @@ PerformSglDmaTransfer_9000(
 
     PlxInterrupt.DmaDone = (1 << 0);
     status = PlxPci_NotificationRegisterFor( pDevice, &PlxInterrupt, &NotifyObject );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -651,7 +684,7 @@ PerformSglDmaTransfer_9000(
 
     PlxInterrupt.PciMain = 1;
     status = PlxPci_InterruptEnable( pDevice, &PlxInterrupt );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -708,15 +741,15 @@ PerformSglDmaTransfer_9000(
 
     switch (status)
     {
-        case ApiSuccess:
+        case PLX_STATUS_OK:
             Cons_printf("Ok (DMA 0 Int received)\n");
             break;
 
-        case ApiWaitTimeout:
+        case PLX_STATUS_TIMEOUT:
             Cons_printf("*ERROR* - Timeout waiting for interrupt\n");
             break;
 
-        case ApiWaitCanceled:
+        case PLX_STATUS_CANCELED:
             Cons_printf("*ERROR* - Interrupt event cancelled\n");
             break;
 
@@ -729,14 +762,14 @@ PerformSglDmaTransfer_9000(
     Cons_printf("  Cancel Int Notification........ ");
     status = PlxPci_NotificationCancel( pDevice, &NotifyObject );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - status=%s\n", PlxSdkErrorText(status));
         return status;
     }
     Cons_printf("Ok\n");
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -773,7 +806,7 @@ SetupDmaDescriptors_8000(
     Cons_printf("  Get DMA buffer properties...... ");
 
     status = PlxPci_CommonBufferProperties( pDevice, &PciBuffer );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         *pSglPciAddress = 0;
         Cons_printf("*ERROR* - API failed\n");
@@ -793,7 +826,7 @@ SetupDmaDescriptors_8000(
         Cons_printf(
             " -- ERROR: Address requires > 48-bit (Extended Descriptors not supported)\n"
             );
-        return ApiUnsupportedFunction;
+        return PLX_STATUS_UNSUPPORTED;
     }
 
     // Set starting address of buffer
@@ -885,7 +918,7 @@ SetupDmaDescriptors_8000(
     // Provide PCI address of first descriptor
     *pSglPciAddress = (U32)PciBuffer.PhysicalAddr;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -926,7 +959,7 @@ PerformSglDmaTransfer_8000(
 
     PlxInterrupt.DmaDone = (1 << 0);
     status = PlxPci_NotificationRegisterFor( pDevice, &PlxInterrupt, &NotifyObject );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - API failed\n");
         PlxSdkErrorDisplay(status);
@@ -1031,15 +1064,15 @@ PerformSglDmaTransfer_8000(
 
     switch (status)
     {
-        case ApiSuccess:
+        case PLX_STATUS_OK:
             Cons_printf("Ok (DMA 0 Int received)\n");
             break;
 
-        case ApiWaitTimeout:
+        case PLX_STATUS_TIMEOUT:
             Cons_printf("*ERROR* - Timeout waiting for interrupt\n");
             break;
 
-        case ApiWaitCanceled:
+        case PLX_STATUS_CANCELED:
             Cons_printf("*ERROR* - Interrupt event cancelled\n");
             break;
 
@@ -1051,7 +1084,7 @@ PerformSglDmaTransfer_8000(
     // Release the interrupt wait object
     Cons_printf("  Cancel Int Notification........ ");
     status = PlxPci_NotificationCancel( pDevice, &NotifyObject );
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         Cons_printf("*ERROR* - status=%s\n", PlxSdkErrorText(status));
         return status;
@@ -1074,7 +1107,7 @@ PerformSglDmaTransfer_8000(
     NumErrors = CompareBuffers( pDmaBuffer + 0x200, pDmaBuffer + 0x400, 0x100 );
     Cons_printf("%s\n", (NumErrors == 0) ? "Ok" : "");
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 

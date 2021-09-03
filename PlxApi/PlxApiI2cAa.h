@@ -2,24 +2,36 @@
 #define __PLX_API_I2C_AA_H
 
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -34,7 +46,7 @@
  *
  * Revision:
  *
- *     04-01-12 : PLX SDK v7.00
+ *     09-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
@@ -60,15 +72,10 @@ extern "C" {
 #define PLX_I2C_DEFAULT_CLOCK_RATE  100         // I2C default clock rate in Khz
 #define PLX_I2C_CMD_REG_READ        0x04        // I2C read command code
 #define PLX_I2C_CMD_REG_WRITE       0x03        // I2C write command code
-
-// NT Legacy or P2P mode
-#define PLX_I2C_NT_MODE_LEGACY      0
-#define PLX_I2C_NT_MODE_P2P         1
-
+#define PLX_I2C_RETRY_MAX_COUNT     3           // On error, max retry count
+#define PLX_I2C_RETRY_DELAY_MS      300         // Delay in ms to wait before command retry
 #define PLX_I2C_CMD_ERROR           ((U32)-1)
 #define PLX_I2C_CMD_SKIP            ((U32)-2)
-
-#define Plx_pow_int                 pow         // Used to X^Y calculations
 
 #if defined(PLX_MSWINDOWS)
     #define Plx_sleep               Sleep
@@ -85,10 +92,10 @@ extern "C" {
         #define PLX_8000_REG_READ(pDevice, offset)          PlxPci_PlxRegisterRead( (pDevice), (offset), NULL )
         #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxPci_PlxRegisterWrite( (pDevice), (offset), (value) )
     #else
-        #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, TRUE )
+        #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, TRUE, TRUE )
         #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), TRUE )
 
-        #define PLX_8000_REG_READ(pDevice, offset)          PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, FALSE )
+        #define PLX_8000_REG_READ(pDevice, offset)          PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, FALSE, TRUE )
         #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), FALSE )
     #endif
 #endif
@@ -170,7 +177,8 @@ PlxI2c_PlxRegisterRead(
     PLX_DEVICE_OBJECT *pDevice,
     U32                offset,
     PLX_STATUS        *pStatus,
-    BOOLEAN            bAdjustForPort
+    BOOLEAN            bAdjustForPort,
+    U16                bRetryOnError
     );
 
 PLX_STATUS
@@ -313,6 +321,11 @@ PlxI2c_MH_MigrateDsPorts(
 /******************************************
  *      I2C Private Support Functions
  *****************************************/
+VOID
+Plx_delay_us(
+    U32 Time_us
+    );
+
 U32
 PlxI2c_GenerateCommand(
     PLX_DEVICE_OBJECT *pDevice,
@@ -344,9 +357,11 @@ PlxI2c_ProbeSwitch(
     );
 
 U16
-PlxGetExtendedCapabilityOffset(
+PlxPciFindCapability(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                CapabilityId
+    U16                CapID,
+    U8                 bPCIeCap,
+    U8                 InstanceNum
     );
 
 BOOLEAN
@@ -357,6 +372,12 @@ PlxChipTypeDetect(
 VOID
 PlxChipRevisionDetect(
     PLX_DEVICE_OBJECT *pDevice
+    );
+
+PLX_STATUS
+PlxChipFilterDisabledPorts(
+    PLX_DEVICE_OBJECT *pDevice,
+    U64               *pPortMask
     );
 
 

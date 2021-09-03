@@ -8,13 +8,18 @@
 
 
 #=============================================================================
-# Set kernel & CPU Properties
+# Set architecture, CPU properties, cross-compiler, kernel source dir
+#    ARCH           : Set to Linux standard architecture name
+#    PLX_CPU_BITS   : Set to 32 or 64 depending upon CPU type
+#    PLX_CPU_ENDIAN : Set to Little or Big
+#    CROSS_COMPILE  : Set to GCC prefix of cross-compiler
+#    KDIR           : Set to root folder of kernel source to target
 #=============================================================================
-# Get kernel version
-KERNEL_VER := $(shell uname -r | awk -F. '{print $$1"."$$2}')
+# Set default architecture if not set
+ifndef ARCH
+    ARCH := $(shell uname -m | sed 's/i.86/i386/')
+endif
 
-# Determine CPU architecture & properties
-ARCH := $(shell uname -m | sed 's/i.86/i386/')
 ifeq ($(ARCH),i386)
     PLX_CPU_BITS   = 32
     PLX_CPU_ENDIAN = Little
@@ -43,6 +48,54 @@ ifeq ($(ARCH),mips64)
     PLX_CPU_BITS   = 64
     PLX_CPU_ENDIAN = Big
 endif
+ifeq ($(ARCH),arm)
+    PLX_CPU_BITS   = 32
+    PLX_CPU_ENDIAN = Little
+    ifeq ($(CROSS_COMPILE),)
+        CROSS_COMPILE = arm-linux-gnu-
+    endif
+endif
+
+
+
+#=============================================================================
+# Setup for Cross-compiling if necessary
+#=============================================================================
+# Set kernel source folder if not set
+ifndef KDIR
+    ifeq ($(TGT_TYPE), Driver)
+        KDIR := /lib/modules/$(shell uname -r)/build
+    endif
+endif
+
+# Get kernel version
+KERNEL_VER := $(shell uname -r)
+ifdef KDIR
+    # Attempt to get version from header
+    ifneq ($(wildcard $(KDIR)/include/generated/utsrelease.h),)
+        KERNEL_VER := ver $(shell awk '{ print $$3 }' ${KDIR}/include/generated/utsrelease.h)
+    endif
+endif
+
+# Auto-detect platform name if not set
+ifndef PLATFORM_NAME
+    ifneq ($(CROSS_COMPILE),)
+        PLATFORM_NAME := "$(shell echo $(ARCH) | tr "[:lower:]" "[:upper:]") Target Platform"
+    else ifneq ($(wildcard /etc/redhat-release),)
+        PLATFORM_NAME := "$(shell cat /etc/redhat-release)"
+    else ifneq ($(wildcard /etc/SuSE-release),)
+        PLATFORM_NAME := "$(shell cat /etc/SuSE-release | grep SUSE)"
+    else ifneq ($(wildcard /etc/lsb-release),)
+        PLATFORM_NAME := "$(shell lsb_release -s -d)"
+    else
+        PLATFORM_NAME := "Linux ver ??"
+    endif
+endif
+
+# Set current folder for driver build
+ifeq ($(TGT_TYPE), Driver)
+    PWD := $(shell pwd)
+endif
 
 
 
@@ -57,11 +110,6 @@ ifndef PLX_DIR
     PLX_DIR=$(PLX_SDK_DIR)
 endif
 
-ifndef TOOLS_NAME
-    # Only Gcc is supported
-    TOOLS_NAME := Gcc
-endif
-
 ifndef ImageName
     $(error ERROR: Variable 'ImageName' not set ***)
 endif
@@ -73,13 +121,13 @@ endif
 ifndef PLX_CHIP
     ifeq ($(TGT_TYPE), Driver)
         $(error ERROR: Variable 'PLX_CHIP' not set ***)
+    else ifeq ($(TGT_TYPE), Library)
+        PLX_CHIP := API
+    else ifeq ($(TGT_TYPE), App)
+        PLX_CHIP := Sample
     else
         PLX_CHIP := n/a
     endif
-endif
-
-ifndef KERNEL_VER
-    $(error ERROR: Variable 'KERNEL_VER' not set ***)
 endif
 
 ifndef PLX_CPU_BITS
@@ -88,13 +136,6 @@ endif
 
 ifndef PLX_CPU_ENDIAN
     $(error ERROR: Variable 'PLX_CPU_ENDIAN' not set ***)
-endif
-
-ifndef KDIR
-    ifeq ($(TGT_TYPE), Driver)
-        KDIR := /lib/modules/$(shell uname -r)/build
-        PWD  := $(shell pwd)
-    endif
 endif
 
 
@@ -109,6 +150,7 @@ ifndef V
     Q=@
 else
     VERBOSE=-v
+    OPTIONAL_LF=@echo ""
 endif
 
 
@@ -122,12 +164,12 @@ endif
 #  PLX_CHIP_DIR = Directory where chip-specific driver files are located
 #=============================================================================
 ifeq ($(TGT_TYPE), Driver)
-    OUT_DIR = Plx$(PLX_CHIP)
+    OUT_DIR = $(COMMON_DIR)/Output
 else
     OUT_DIR = $(TGT_TYPE)
 endif
 
-OBJ_DIR = $(OUT_DIR)/Obj$(DBG)
+OBJ_DIR = $(OUT_DIR)/Obj$(DBG)_$(ARCH)_$(PLX_CPU_BITS)b
 
 ifeq ($(TGT_TYPE), App)
     COMMON_DIR := $(PLX_DIR)/Samples/Shared
@@ -189,16 +231,12 @@ else
     PLX_OPT += -DPLX_LITTLE_ENDIAN
 endif
 
-ifeq (1,$(shell [ -r /etc/redhat-release ] && echo 1 || echo 0))
-    PLX_OPT += -DRED_HAT_LINUX_KERNEL
-endif
-
 ifdef PLX_DEBUG
     PLX_OPT += -DPLX_DEBUG
 endif
 
 ifeq ($(TGT_TYPE), App)
-    PLX_OPT += -DPLX_LINUX 
+    PLX_OPT += -DPLX_LINUX
 endif
 
 # Add Position Independent Code (-fPIC) to support Shared Object libaries
@@ -207,6 +245,12 @@ ifeq ($(TGT_TYPE), Library)
 endif
 
 ifeq ($(TGT_TYPE), Driver)
+    # Flag RedHat/Fedora/CentOS due to variations from standard kernels
+    ifeq (1,$(shell [ -r /etc/redhat-release ] && echo 1 || echo 0))
+        PLX_OPT += -DRED_HAT_LINUX_KERNEL
+    endif
+
+    # Flag to display SGL details for drivers that support SGL DMA
     ifdef PLX_DISPLAY_SGL
         PLX_OPT += -DPLX_DISPLAY_SGL
     endif
@@ -223,6 +267,11 @@ else
     endif
 endif
 
+# If PLX Co-Sim environment
+ifdef PLX_COSIM
+    PLX_OPT += -DPLX_COSIM=$(PLX_COSIM)
+endif
+
 EXTRA_CFLAGS += $(PLX_OPT) $(PLX_INC_DIR)
 
 
@@ -235,4 +284,13 @@ ifdef PLX_DEBUG
     BUILD_TYPE = Debug
 else
     BUILD_TYPE = Release
+endif
+
+# Build SDK version string
+SDK_VER = X.YY
+VER_FILE = $(PLX_SDK_DIR)/Include/Plx.h
+ifneq ($(wildcard $(VER_FILE)),)
+    VER_MAJOR = $(shell cat ${VER_FILE} | grep VERSION_MAJOR | awk '{print $$3}')
+    VER_MINOR = $(shell cat ${VER_FILE} | grep VERSION_MINOR | awk '{print $$3}')
+    SDK_VER=$(VER_MAJOR).$(VER_MINOR)
 endif

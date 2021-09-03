@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /*******************************************************************************
@@ -31,14 +43,16 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      12-01-16 : PLX SDK v7.25
  *
  ******************************************************************************/
 
 
+#include <asm/uaccess.h>    // For copy_to/from_user()
 #include <linux/sched.h>    // For MAX_SCHED_TIMEOUT & TASK_UNINTERRUPTIBLE
 #include "ApiFunc.h"
 #include "PciFunc.h"
+#include "PciRegs.h"
 #include "PlxChipFn.h"
 #include "PlxInterrupt.h"
 #include "SuppFunc.h"
@@ -171,12 +185,11 @@ PlxDeviceFind(
                 *pKey = pdx->Key;
 
                 DebugPrintf((
-                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%x]\n",
+                    "Criteria matched device %04X_%04X [%02x:%02x.%x]\n",
                     pdx->Key.DeviceId, pdx->Key.VendorId,
                     pdx->Key.bus, pdx->Key.slot, pdx->Key.function
                     ));
-
-                return ApiSuccess;
+                return PLX_STATUS_OK;
             }
 
             // Increment device count
@@ -192,7 +205,7 @@ PlxDeviceFind(
 
     DebugPrintf(("Criteria did not match any devices\n"));
 
-    return ApiInvalidDeviceInfo;
+    return PLX_STATUS_INVALID_OBJECT;
 }
 
 
@@ -220,7 +233,7 @@ PlxChipTypeGet(
         *pChipType, *pRevision
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -241,7 +254,7 @@ PlxChipTypeSet(
     )
 {
     // Setting the PLX chip type is not supported in this PnP driver
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -268,23 +281,27 @@ PlxGetPortProperties(
     // Set default properties
     RtlZeroMemory(pPortProp, sizeof(PLX_PORT_PROP));
 
-    // Get the offset of the PCI Express capability 
+    // Get the offset of the PCI Express capability
     Offset_PcieCap =
-        PlxGetExtendedCapabilityOffset(
+        PlxPciFindCapability(
             pdx,
-            0x10       // CAP_ID_PCI_EXPRESS
+            PCI_CAP_ID_PCI_EXPRESS,
+            FALSE,
+            0
             );
-
     if (Offset_PcieCap == 0)
     {
-        DebugPrintf(("Device does not support PCI Express Capability\n"));
+        DebugPrintf((
+            "[D%d %02X:%02X.%X] Does not contain PCIe capability\n",
+            pdx->Key.domain, pdx->Key.bus, pdx->Key.slot, pdx->Key.function
+            ));
 
         // Mark device as non-PCIe
         pPortProp->bNonPcieDevice = TRUE;
 
         // Default to a legacy endpoint
         pPortProp->PortType = PLX_PORT_LEGACY_ENDPOINT;
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Get PCIe Capability
@@ -308,8 +325,7 @@ PlxGetPortProperties(
     MaxSize = (U8)(RegValue >> 0) & 0x7;
 
     // Set max payload size (=128 * (2 ^ MaxPaySizeField))
-    if (MaxSize <= 5)
-        pPortProp->MaxPayloadSupported = 128 * ((U16)Plx_pow_int(2, MaxSize));
+    pPortProp->MaxPayloadSupported = PCIE_MPS_MRR_TO_BYTES( MaxSize );
 
     // Get PCIe Device Control
     PLX_PCI_REG_READ(
@@ -322,15 +338,13 @@ PlxGetPortProperties(
     MaxSize = (U8)(RegValue >> 5) & 0x7;
 
     // Set max payload size (=128 * (2 ^ MaxPaySizeField))
-    if (MaxSize <= 5)
-        pPortProp->MaxPayloadSize = 128 * ((U16)Plx_pow_int(2, MaxSize));
+    pPortProp->MaxPayloadSize = PCIE_MPS_MRR_TO_BYTES( MaxSize );
 
     // Get max read request size field
     MaxSize = (U8)(RegValue >> 12) & 0x7;
 
     // Set max read request size (=128 * (2 ^ MaxReadReqSizeField))
-    if (MaxSize <= 5)
-        pPortProp->MaxReadReqSize = 128 * ((U16)Plx_pow_int(2, MaxSize));
+    pPortProp->MaxReadReqSize = PCIE_MPS_MRR_TO_BYTES( MaxSize );
 
     // Get PCIe Link Capabilities
     PLX_PCI_REG_READ(
@@ -362,15 +376,16 @@ PlxGetPortProperties(
     pPortProp->LinkSpeed = (U8)((RegValue >> 16) & 0xF);
 
     DebugPrintf((
-        "Type=%d Num=%d MaxPd=%d/%d MaxRdReq=%d LW=x%d/x%d LS=%d/%d\n",
-        pPortProp->PortType, pPortProp->PortNumber,
+        "[D%d %02X:%02X.%X] P=%d T=%d MPS=%d/%d MRR=%d L=G%dx%d/G%dx%d\n",
+        pdx->Key.domain, pdx->Key.bus, pdx->Key.slot, pdx->Key.function,
+        pPortProp->PortNumber, pPortProp->PortType,
         pPortProp->MaxPayloadSize, pPortProp->MaxPayloadSupported,
         pPortProp->MaxReadReqSize,
-        pPortProp->LinkWidth, pPortProp->MaxLinkWidth,
-        pPortProp->LinkSpeed, pPortProp->MaxLinkSpeed
+        pPortProp->LinkSpeed, pPortProp->LinkWidth,
+        pPortProp->MaxLinkSpeed, pPortProp->MaxLinkWidth
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -389,7 +404,7 @@ PlxPciDeviceReset(
     )
 {
     // Device reset not implemented
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -410,24 +425,23 @@ PlxRegisterRead(
     BOOLEAN           bAdjustForPort
     )
 {
-    // Verify register offset
-    if ((offset & 0x3) || (offset >= MAX_PLX_REG_OFFSET))
+    // Verify offset
+    if ((offset & 0x3) || (offset >= pdx->PciBar[0].Properties.Size))
     {
         DebugPrintf(("ERROR - Invalid register offset (%X)\n", offset));
-
-        if (pStatus != NULL)
-            *pStatus = ApiInvalidOffset;
-
+        if (pStatus)
+        {
+            *pStatus = PLX_STATUS_INVALID_OFFSET;
+        }
         return 0;
     }
 
-    if (pStatus != NULL)
-        *pStatus = ApiSuccess;
+    if (pStatus)
+    {
+        *pStatus = PLX_STATUS_OK;
+    }
 
-    return PLX_DMA_REG_READ(
-               pdx,
-               offset
-               );
+    return PLX_DMA_REG_READ( pdx, offset );
 }
 
 
@@ -448,20 +462,16 @@ PlxRegisterWrite(
     BOOLEAN           bAdjustForPort
     )
 {
-    // Verify register offset
-    if ((offset & 0x3) || (offset >= MAX_PLX_REG_OFFSET))
+    // Verify offset
+    if ((offset & 0x3) || (offset >= pdx->PciBar[0].Properties.Size))
     {
         DebugPrintf(("ERROR - Invalid register offset (%X)\n", offset));
-        return ApiInvalidOffset;
+        return PLX_STATUS_INVALID_OFFSET;
     }
 
-    PLX_DMA_REG_WRITE(
-        pdx,
-        offset,
-        value
-        );
+    PLX_DMA_REG_WRITE( pdx, offset, value );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -493,7 +503,7 @@ PlxPciBarProperties(
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Return BAR properties
@@ -503,7 +513,7 @@ PlxPciBarProperties(
     if (pdx->PciBar[BarIndex].Properties.Size == 0)
     {
         DebugPrintf(("BAR %d is disabled\n", BarIndex));
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     DebugPrintf((
@@ -517,12 +527,18 @@ PlxPciBarProperties(
         ));
 
     DebugPrintf((
-        "    Size     : %08llX (%lld %s)\n",
+        "    Size     : %llXh (%lld%s)\n",
         pdx->PciBar[BarIndex].Properties.Size,
-        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ?
-            pdx->PciBar[BarIndex].Properties.Size :
-            pdx->PciBar[BarIndex].Properties.Size >> 10,
-        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ? "Bytes" : "KB"
+        pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 30) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 30) :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 20) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 20) :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 10) ?
+           (pdx->PciBar[BarIndex].Properties.Size >> 10) :
+           pdx->PciBar[BarIndex].Properties.Size,
+        pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 30) ? "GB" :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 20) ? "MB" :
+           pdx->PciBar[BarIndex].Properties.Size > ((U64)1 << 10) ? "KB" : "B"
         ));
 
     DebugPrintf((
@@ -531,7 +547,7 @@ PlxPciBarProperties(
         (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_64_BIT) ? 64 : 32
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -553,7 +569,7 @@ PlxPciBarMap(
     )
 {
     // Handled in Dispatch_mmap() in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -574,7 +590,7 @@ PlxPciBarUnmap(
     )
 {
     // Handled at user API level in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -594,7 +610,7 @@ PlxEepromPresent(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -614,7 +630,7 @@ PlxEepromProbe(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -634,7 +650,7 @@ PlxEepromGetAddressWidth(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -654,7 +670,7 @@ PlxEepromSetAddressWidth(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -679,7 +695,7 @@ PlxEepromCrcGet(
     *pCrcStatus = PLX_CRC_UNSUPPORTED;
 
     // CRC not supported
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -703,7 +719,7 @@ PlxEepromCrcUpdate(
     *pCrc = 0;
 
     // CRC not supported
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -724,7 +740,7 @@ PlxEepromReadByOffset(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -745,7 +761,7 @@ PlxEepromWriteByOffset(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -766,7 +782,7 @@ PlxEepromReadByOffset_16(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -787,7 +803,7 @@ PlxEepromWriteByOffset_16(
     )
 {
     // Device does not support access to EEPROM
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -809,53 +825,52 @@ PlxPciIoPortTransfer(
     BOOLEAN          bReadOperation
     )
 {
-    U8 AccessSize;
+    U8  AlignMask;
+    U8  AccessSize;
+    U32 Value;
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+    {
+        return PLX_STATUS_NULL_PARAM;
+    }
 
     // Verify size & type
     switch (AccessType)
     {
         case BitSize8:
+            AlignMask  = 0;
             AccessSize = sizeof(U8);
             break;
 
         case BitSize16:
-            if (IoPort & (1 << 0))
-            {
-                DebugPrintf(("ERROR - I/O port not aligned on 16-bit boundary\n"));
-                return ApiInvalidAddress;
-            }
-
-            if (SizeInBytes & (1 << 0))
-            {
-                DebugPrintf(("ERROR - Byte count not aligned on 16-bit boundary\n"));
-                return ApiInvalidSize;
-            }
+            AlignMask  = (1 << 0);
             AccessSize = sizeof(U16);
             break;
 
         case BitSize32:
-            if (IoPort & 0x3)
-            {
-                DebugPrintf(("ERROR - I/O port not aligned on 32-bit boundary\n"));
-                return ApiInvalidAddress;
-            }
-
-            if (SizeInBytes & 0x3)
-            {
-                DebugPrintf(("ERROR - Byte count not aligned on 32-bit boundary\n"));
-                return ApiInvalidSize;
-            }
+            AlignMask  = (3 << 0);
             AccessSize = sizeof(U32);
             break;
 
         default:
-            return ApiInvalidAccessType;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
+    // Verify alignments
+    if (IoPort & AlignMask)
+    {
+        DebugPrintf(("ERROR - I/O port not %d-bit aligned\n", (AccessSize * 8)));
+        return PLX_STATUS_INVALID_ADDR;
+    }
+
+    if (SizeInBytes & AlignMask)
+    {
+        DebugPrintf(("ERROR - Byte count not %d-bit aligned\n", (AccessSize * 8)));
+        return PLX_STATUS_INVALID_SIZE;
+    }
+
+    // Perform operation
     while (SizeInBytes)
     {
         if (bReadOperation)
@@ -863,45 +878,48 @@ PlxPciIoPortTransfer(
             switch (AccessType)
             {
                 case BitSize8:
-                    *(U8*)pBuffer = IO_PORT_READ_8( IoPort );
+                    Value = IO_PORT_READ_8( IoPort );
                     break;
 
                 case BitSize16:
-                    *(U16*)pBuffer = IO_PORT_READ_16( IoPort );
+                    Value = IO_PORT_READ_16( IoPort );
                     break;
 
                 case BitSize32:
-                    *(U32*)pBuffer = IO_PORT_READ_32( IoPort );
+                    Value = IO_PORT_READ_32( IoPort );
                     break;
 
                 default:
                     // Added to avoid compiler warnings
                     break;
             }
+
+            // Copy value to user buffer
+            if (copy_to_user( pBuffer, &Value, AccessSize ) != 0)
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
         }
         else
         {
+            // Copy next value from user buffer
+            if (copy_from_user( &Value, pBuffer, AccessSize ) != 0)
+            {
+                return PLX_STATUS_INVALID_ACCESS;
+            }
+
             switch (AccessType)
             {
                 case BitSize8:
-                    IO_PORT_WRITE_8(
-                        IoPort,
-                        *(U8*)pBuffer
-                        );
+                    IO_PORT_WRITE_8( IoPort, (U8)Value );
                     break;
 
                 case BitSize16:
-                    IO_PORT_WRITE_16(
-                        IoPort,
-                        *(U16*)pBuffer
-                        );
+                    IO_PORT_WRITE_16( IoPort, (U16)Value );
                     break;
 
                 case BitSize32:
-                    IO_PORT_WRITE_32(
-                        IoPort,
-                        *(U32*)pBuffer
-                        );
+                    IO_PORT_WRITE_32( IoPort, (U32)Value );
                     break;
 
                 default:
@@ -911,11 +929,11 @@ PlxPciIoPortTransfer(
         }
 
         // Adjust pointer & byte count
-        pBuffer      = (VOID*)((PLX_UINT_PTR)pBuffer + AccessSize);
+        pBuffer      = (U8*)pBuffer + AccessSize;
         SizeInBytes -= AccessSize;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -954,7 +972,7 @@ PlxPciPhysicalMemoryAllocate(
      ******************************************************/
     if (pPciMem->Size == 0)
     {
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Allocate memory for new list object
@@ -963,11 +981,10 @@ PlxPciPhysicalMemoryAllocate(
             sizeof(PLX_PHYS_MEM_OBJECT),
             GFP_KERNEL
             );
-
     if (pMemObject == NULL)
     {
         DebugPrintf(("ERROR - Memory allocation for list object failed\n"));
-        return ApiInsufficientResources;
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Clear object
@@ -980,7 +997,7 @@ PlxPciPhysicalMemoryAllocate(
     DecrementAmount = (pPciMem->Size / 10);
 
     DebugPrintf((
-        "Attempt to allocate physical memory (%d Kb)...\n",
+        "Attempt to allocate physical memory (%dKB)\n",
         (pPciMem->Size >> 10)
         ));
 
@@ -1002,16 +1019,10 @@ PlxPciPhysicalMemoryAllocate(
             }
             else
             {
-                // Release the list object
-                kfree(
-                    pMemObject
-                    );
-
-                DebugPrintf(("ERROR - Physical memory allocation failed\n"));
-
+                ErrorPrintf(("ERROR - Physical memory allocation failed\n"));
+                kfree( pMemObject );
                 pPciMem->Size = 0;
-
-                return ApiInsufficientResources;
+                return PLX_STATUS_INSUFFICIENT_RES;
             }
         }
     }
@@ -1048,12 +1059,10 @@ PlxPciPhysicalMemoryAllocate(
         pGbl_DriverObject->CommonBuffer = *pMemObject;
 
         // Release the list object
-        kfree(
-            pMemObject
-            );
+        kfree( pMemObject );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1076,9 +1085,7 @@ PlxPciPhysicalMemoryFree(
     PLX_PHYS_MEM_OBJECT *pMemObject;
 
 
-    spin_lock(
-        &(pdx->Lock_PhysicalMemList)
-        );
+    spin_lock( &(pdx->Lock_PhysicalMemList) );
 
     pEntry = pdx->List_PhysicalMem.next;
 
@@ -1097,39 +1104,28 @@ PlxPciPhysicalMemoryFree(
         if (pMemObject->BusPhysical == pPciMem->PhysicalAddr)
         {
             // Remove the object from the list
-            list_del(
-                pEntry
-                );
+            list_del( pEntry );
 
-            spin_unlock(
-                &(pdx->Lock_PhysicalMemList)
-                );
+            spin_unlock( &(pdx->Lock_PhysicalMemList) );
 
             // Release the buffer
-            Plx_dma_buffer_free(
-                pdx,
-                pMemObject
-                );
+            Plx_dma_buffer_free( pdx, pMemObject );
 
             // Release the list object
-            kfree(
-                pMemObject
-                );
+            kfree( pMemObject );
 
-            return ApiSuccess;
+            return PLX_STATUS_OK;
         }
 
         // Jump to next item in the list
         pEntry = pEntry->next;
     }
 
-    spin_unlock(
-        &(pdx->Lock_PhysicalMemList)
-        );
+    spin_unlock( &(pdx->Lock_PhysicalMemList) );
 
     DebugPrintf(("ERROR - buffer object not found in list\n"));
 
-    return ApiInvalidData;
+    return PLX_STATUS_INVALID_DATA;
 }
 
 
@@ -1150,7 +1146,7 @@ PlxPciPhysicalMemoryMap(
     )
 {
     // Handled in Dispatch_mmap() in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1171,7 +1167,7 @@ PlxPciPhysicalMemoryUnmap(
     )
 {
     // Handled by user-level API in Linux
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 }
 
 
@@ -1209,19 +1205,29 @@ PlxInterruptEnable(
 
         // Enable desired interrupts
         if (pPlxIntr->DmaPauseDone & (1 << channel))
+        {
             RegData.BitsToSet |= (1 << 4);
+        }
 
         if (pPlxIntr->DmaAbortDone & (1 << channel))
+        {
             RegData.BitsToSet |= (1 << 3);
+        }
 
         if (pPlxIntr->DmaImmedStopDone & (1 << channel))
+        {
             RegData.BitsToSet |= (1 << 5);
+        }
 
         if (pPlxIntr->DmaInvalidDescr & (1 << channel))
+        {
             RegData.BitsToSet |= (1 << 1);
+        }
 
         if (pPlxIntr->DmaError & (1 << channel))
+        {
             RegData.BitsToSet |= (1 << 0);
+        }
 
         // Write register values if they have changed
         if (RegData.BitsToSet != 0)
@@ -1233,7 +1239,7 @@ PlxInterruptEnable(
         }
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1271,19 +1277,29 @@ PlxInterruptDisable(
 
         // Enable desired interrupts
         if (pPlxIntr->DmaPauseDone & (1 << channel))
+        {
             RegData.BitsToClear |= (1 << 4);
+        }
 
         if (pPlxIntr->DmaAbortDone & (1 << channel))
+        {
             RegData.BitsToClear |= (1 << 3);
+        }
 
         if (pPlxIntr->DmaImmedStopDone & (1 << channel))
+        {
             RegData.BitsToClear |= (1 << 5);
+        }
 
         if (pPlxIntr->DmaInvalidDescr & (1 << channel))
+        {
             RegData.BitsToClear |= (1 << 1);
+        }
 
         if (pPlxIntr->DmaError & (1 << channel))
+        {
             RegData.BitsToClear |= (1 << 0);
+        }
 
         // Write register values if they have changed
         if (RegData.BitsToClear != 0)
@@ -1295,7 +1311,7 @@ PlxInterruptDisable(
         }
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1329,11 +1345,8 @@ PlxNotificationRegisterFor(
 
     if (pWaitObject == NULL)
     {
-        DebugPrintf((
-            "ERROR - memory allocation for interrupt wait object failed\n"
-            ));
-
-        return ApiInsufficientResources;
+        DebugPrintf(("ERROR - Allocation for interrupt wait object failed\n"));
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Provide the wait object to the user app
@@ -1349,9 +1362,7 @@ PlxNotificationRegisterFor(
     atomic_set( &pWaitObject->SleepCount, 0 );
 
     // Initialize wait queue
-    init_waitqueue_head(
-        &(pWaitObject->WaitQueue)
-        );
+    init_waitqueue_head( &(pWaitObject->WaitQueue) );
 
     // Clear interrupt source
     pWaitObject->Source_Ints = INTR_TYPE_NONE;
@@ -1384,7 +1395,7 @@ PlxNotificationRegisterFor(
         pWaitObject
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1508,24 +1519,26 @@ PlxNotificationWait(
             {
                 // Condition met or interrupt occurred
                 DebugPrintf(("Interrupt wait object awakened\n"));
-                rc = ApiSuccess;
+                rc = PLX_STATUS_OK;
             }
             else if (Wait_rc == 0)
             {
                 // Timeout reached
                 DebugPrintf(("Timeout waiting for interrupt\n"));
-                rc = ApiWaitTimeout;
+                rc = PLX_STATUS_TIMEOUT;
             }
             else
             {
                 // Interrupted by a signal
                 DebugPrintf(("Interrupt wait object interrupted by signal or error\n"));
-                rc = ApiWaitCanceled;
+                rc = PLX_STATUS_CANCELED;
             }
 
             // If object is in triggered state, rest to waiting state
             if (pWaitObject->state == PLX_STATE_TRIGGERED)
+            {
                 pWaitObject->state = PLX_STATE_WAITING;
+            }
 
             // Decrement number of sleeping threads
             atomic_dec( &pWaitObject->SleepCount );
@@ -1548,7 +1561,7 @@ PlxNotificationWait(
         ));
 
     // Object not found at this point
-    return ApiFailed;
+    return PLX_STATUS_FAILED;
 }
 
 
@@ -1618,7 +1631,7 @@ PlxNotificationStatus(
                 pPlxIntr
                 );
 
-            return ApiSuccess;
+            return PLX_STATUS_OK;
         }
 
         // Jump to next item in the list
@@ -1630,7 +1643,7 @@ PlxNotificationStatus(
         flags
         );
 
-    return ApiFailed;
+    return PLX_STATUS_FAILED;
 }
 
 
@@ -1754,7 +1767,9 @@ PlxNotificationCancel(
 
             // Return if removing only a specific object
             if (pUserWaitObject != NULL)
-                return ApiSuccess;
+            {
+                return PLX_STATUS_OK;
+            }
 
             // Reset to beginning of list
             spin_lock_irqsave(
@@ -1776,7 +1791,7 @@ PlxNotificationCancel(
         flags
         );
 
-    return ApiFailed;
+    return PLX_STATUS_FAILED;
 }
 
 
@@ -1812,13 +1827,13 @@ PlxDmaChannelOpen(
                     "Error - Channel %d exceeds max supported (%d)\n",
                     channel, (pdx->NumDmaChannels - 1)
                     ));
-                return ApiDmaChannelInvalid;
+                return PLX_STATUS_INVALID_ACCESS;
             }
             break;
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
@@ -1836,19 +1851,25 @@ PlxDmaChannelOpen(
             case 1:
                 // Only channel 0 active
                 if (channel != 0)
-                    return ApiDmaChannelUnavailable;
+                {
+                    return PLX_STATUS_INVALID_ACCESS;
+                }
                 break;
 
             case 2:
                 // Channels 0 & 2 active
                 if ((channel != 0) && (channel != 2))
-                    return ApiDmaChannelUnavailable;
+                {
+                    return PLX_STATUS_INVALID_ACCESS;
+                }
                 break;
 
             case 3:
                 // Channels 0, 1, & 2 active
                 if (channel == 3)
-                    return ApiDmaChannelUnavailable;
+                {
+                    return PLX_STATUS_INVALID_ACCESS;
+                }
                 break;
         }
     }
@@ -1861,12 +1882,10 @@ PlxDmaChannelOpen(
     if (pdx->DmaInfo[channel].bOpen)
     {
         DebugPrintf(("ERROR - DMA channel already opened\n"));
-
         spin_unlock(
             &(pdx->Lock_Dma[channel])
             );
-
-        return ApiDmaChannelUnavailable;
+        return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Open the channel
@@ -1887,7 +1906,7 @@ PlxDmaChannelOpen(
         channel
         ));
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1924,13 +1943,13 @@ PlxDmaGetProperties(
                     "Error - Channel %d exceeds max supported (%d)\n",
                     channel, (pdx->NumDmaChannels - 1)
                     ));
-                return ApiDmaChannelInvalid;
+                return PLX_STATUS_INVALID_ACCESS;
             }
             break;
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Set the channel's base register offset (200h, 300h, etc)
@@ -1976,16 +1995,20 @@ PlxDmaGetProperties(
 
         // DMA Descr mode (0=block, 1=SGL on-chip, 2=SGL off-chip, 3=reserved)
         if (pProp->DescriptorMode == 1)
+        {
             pProp->DescriptorMode = PLX_DMA_MODE_SGL_INTERNAL;
+        }
         else if (pProp->DescriptorMode == 2)
+        {
             pProp->DescriptorMode = PLX_DMA_MODE_SGL;
+        }
     }
 
     // Max pending requests
     RegValue = PLX_DMA_REG_READ( pdx, OffsetDmaBase + 0x54 );
     pProp->MaxPendingReadReq = (U8)(RegValue >> 0) & 0x3F;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2019,7 +2042,7 @@ PlxDmaSetProperties(
             pOwner
             );
 
-    if (status != ApiDmaDone)
+    if (status != PLX_STATUS_COMPLETE)
     {
         DebugPrintf(("ERROR - DMA unavailable or in-progress\n"));
         return status;
@@ -2033,7 +2056,9 @@ PlxDmaSetProperties(
     RegValue &= ~(0x0700FFFF);
     RegValue |= (pProp->ReadReqDelayClocks & 0xFFFF) << 0;
     if (pdx->Key.PlxFamily != PLX_FAMILY_SIRIUS)
+    {
         RegValue |= (U32)(pProp->MaxDestWriteSize & 0x7) << 24;
+    }
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x2C, RegValue );
 
     // Max prefetch
@@ -2069,9 +2094,13 @@ PlxDmaSetProperties(
 
         // DMA Descr mode (0=block, 1=SGL on-chip, 2=SGL off-chip, 3=reserved)
         if (pProp->DescriptorMode == PLX_DMA_MODE_SGL)
+        {
             pProp->DescriptorMode = 2;
+        }
         else if (pProp->DescriptorMode == PLX_DMA_MODE_SGL_INTERNAL)
+        {
             pProp->DescriptorMode = 1;
+        }
         RegValue |= (pProp->DescriptorMode & 0x3) << 5;
     }
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x38, RegValue );
@@ -2082,7 +2111,7 @@ PlxDmaSetProperties(
     RegValue |= (pProp->MaxPendingReadReq & 0x3F) >> 0;
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x54, RegValue );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2121,20 +2150,20 @@ PlxDmaControl(
                     "Error - Channel %d exceeds max supported (%d)\n",
                     channel, (pdx->NumDmaChannels - 1)
                     ));
-                return ApiDmaChannelInvalid;
+                return PLX_STATUS_INVALID_ACCESS;
             }
             break;
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify owner
     if ((pdx->DmaInfo[channel].bOpen) && (pdx->DmaInfo[channel].pOwner != pOwner))
     {
         DebugPrintf(("ERROR - DMA owned by different process\n"));
-        return ApiDeviceInUse;
+        return PLX_STATUS_IN_USE;
     }
 
     // Set the channel's base register offset (200h, 300h, etc)
@@ -2153,7 +2182,9 @@ PlxDmaControl(
 
             // Return if already paused
             if (RegStatus & (1 << 0))
-                return ApiSuccess;
+            {
+                return PLX_STATUS_OK;
+            }
 
             // Clear pause done status ([9]) & request pause ([0])
             RegStatus |= (1 << 9) | (1 << 0);
@@ -2170,7 +2201,9 @@ PlxDmaControl(
 
                 LoopCount--;
                 if (LoopCount == 0)
-                    return ApiWaitTimeout;
+                {
+                    return PLX_STATUS_TIMEOUT;
+                }
             }
             while ((RegStatus & (1 << 9)) == 0);
 
@@ -2196,7 +2229,9 @@ PlxDmaControl(
 
             // Return if already stopped
             if (RegStatus & (1 << 16))
-                return ApiSuccess;
+            {
+                return PLX_STATUS_OK;
+            }
 
             // Halt DMA from issuing more reads ([16])
             RegStatus |= (1 << 16);
@@ -2213,7 +2248,9 @@ PlxDmaControl(
 
                 LoopCount--;
                 if (LoopCount == 0)
-                    return ApiWaitTimeout;
+                {
+                    return PLX_STATUS_TIMEOUT;
+                }
             }
             while ((RegStatus & (1 << 12)) == 0);
 
@@ -2270,7 +2307,9 @@ PlxDmaControl(
 
                 LoopCount--;
                 if (LoopCount == 0)
-                    return ApiWaitTimeout;
+                {
+                    return PLX_STATUS_TIMEOUT;
+                }
             }
             while ((RegStatus & (1 << 10)) == 0);
 
@@ -2287,10 +2326,10 @@ PlxDmaControl(
             break;
 
         default:
-            return ApiDmaCommandInvalid;
+            return PLX_STATUS_INVALID_DATA;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2327,13 +2366,13 @@ PlxDmaStatus(
                     "Error - Channel %d exceeds max supported (%d)\n",
                     channel, (pdx->NumDmaChannels - 1)
                     ));
-                return ApiDmaChannelInvalid;
+                return PLX_STATUS_INVALID_ACCESS;
             }
             break;
 
         default:
             DebugPrintf(("ERROR - Invalid DMA channel\n"));
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     // Verify ownership if requested
@@ -2343,14 +2382,14 @@ PlxDmaStatus(
         if (pdx->DmaInfo[channel].bOpen == FALSE)
         {
             DebugPrintf(("ERROR - DMA channel has not been opened\n"));
-            return ApiDmaChannelUnavailable;
+            return PLX_STATUS_INVALID_ACCESS;
         }
 
         // Verify owner
         if (pdx->DmaInfo[channel].pOwner != pOwner)
         {
             DebugPrintf(("ERROR - DMA owned by different process\n"));
-            return ApiDeviceInUse;
+            return PLX_STATUS_IN_USE;
         }
     }
 
@@ -2369,19 +2408,25 @@ PlxDmaStatus(
             case 1:
                 // Only channel 0 active
                 if (channel != 0)
-                    return ApiDmaChannelUnavailable;
+                {
+                    return PLX_STATUS_INVALID_ACCESS;
+                }
                 break;
 
             case 2:
                 // Channels 0 & 2 active
                 if ((channel != 0) && (channel != 2))
-                    return ApiDmaChannelUnavailable;
+                {
+                    return PLX_STATUS_INVALID_ACCESS;
+                }
                 break;
 
             case 3:
                 // Channels 0, 1, & 2 active
                 if (channel == 3)
-                    return ApiDmaChannelUnavailable;
+                {
+                    return PLX_STATUS_INVALID_ACCESS;
+                }
                 break;
         }
     }
@@ -2399,14 +2444,14 @@ PlxDmaStatus(
         if (RegValue & (1 << 0))
         {
             DebugPrintf(("DMA is paused\n"));
-            return ApiDmaPaused;
+            return PLX_STATUS_PAUSED;
         }
 
         DebugPrintf(("DMA is in-progress\n"));
-        return ApiDmaInProgress;
+        return PLX_STATUS_IN_PROGRESS;
     }
 
-    return ApiDmaDone;
+    return PLX_STATUS_COMPLETE;
 }
 
 
@@ -2440,7 +2485,7 @@ PlxDmaTransferBlock(
             pOwner
             );
 
-    if (status != ApiDmaDone)
+    if (status != PLX_STATUS_COMPLETE)
     {
         DebugPrintf(("ERROR - DMA unavailable or in-progress\n"));
         return status;
@@ -2475,7 +2520,9 @@ PlxDmaTransferBlock(
         (pParams->bConstAddrDest << 28) |   // Keep destination address constant
         (pParams->ByteCount      <<  0);    // Byte count
     if (pParams->bIgnoreBlockInt == 0)
+    {
         RegValue |= (1 << 30);
+    }
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x10, RegValue );
 
     // Get DMA control/status
@@ -2483,9 +2530,13 @@ PlxDmaTransferBlock(
 
     // Set DMA to block mode
     if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
+    {
         RegValue &= ~(1 << 4);
+    }
     else
+    {
         RegValue &= ~(3 << 5);
+    }
 
     // Make sure descriptor write-back ([2]) is disabled
     RegValue &= ~(1 << 2);
@@ -2502,7 +2553,7 @@ PlxDmaTransferBlock(
     // Start DMA ([3])
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x38, RegValue | (1 << 3) );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2538,7 +2589,7 @@ PlxDmaTransferUserBuffer(
             pOwner
             );
 
-    if (status != ApiDmaDone)
+    if (status != PLX_STATUS_COMPLETE)
     {
         DebugPrintf(("ERROR - DMA unavailable or in-progress\n"));
         return status;
@@ -2552,10 +2603,8 @@ PlxDmaTransferUserBuffer(
     if (pdx->DmaInfo[channel].bSglPending)
     {
         DebugPrintf(("ERROR - An SGL DMA transfer is currently pending\n"));
-        spin_unlock(
-            &(pdx->Lock_Dma[channel])
-            );
-        return ApiDmaInProgress;
+        spin_unlock( &(pdx->Lock_Dma[channel]) );
+        return PLX_STATUS_IN_PROGRESS;
     }
 
     // Set the SGL DMA pending flag
@@ -2575,7 +2624,7 @@ PlxDmaTransferUserBuffer(
             &NumDescriptors
             );
 
-    if (status != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         DebugPrintf(("ERROR - Unable to lock buffer and build SGL list\n"));
         pdx->DmaInfo[channel].bSglPending = FALSE;
@@ -2594,11 +2643,17 @@ PlxDmaTransferUserBuffer(
 
     // Verify DMA prefetch doesn't exceed descriptor count & is a multiple of 4
     if (NumDescriptors < 4)
+    {
         RegValue = 1;
+    }
     else if (NumDescriptors >= 256)
+    {
         RegValue = 0;
+    }
     else
+    {
         RegValue = (NumDescriptors & (U8)~0x3);
+    }
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x34, RegValue );
 
     spin_lock(
@@ -2659,7 +2714,7 @@ PlxDmaTransferUserBuffer(
     // Start DMA (x38[3])
     PLX_DMA_REG_WRITE( pdx, OffsetDmaBase + 0x38, RegValue | (1 << 3) );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2694,15 +2749,19 @@ PlxDmaChannelClose(
             );
 
     // Verify DMA is not in progress
-    if (status != ApiDmaDone)
+    if (status != PLX_STATUS_COMPLETE)
     {
         // Check for errors
-        if ((status != ApiDmaInProgress) && (status != ApiDmaPaused))
+        if ((status != PLX_STATUS_IN_PROGRESS) && (status != PLX_STATUS_PAUSED))
+        {
             return status;
+        }
 
         // DMA is still in progress
         if (bCheckInProgress)
+        {
             return status;
+        }
 
         DebugPrintf(("DMA in progress, aborting...\n"));
 
@@ -2752,5 +2811,5 @@ PlxDmaChannelClose(
             );
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }

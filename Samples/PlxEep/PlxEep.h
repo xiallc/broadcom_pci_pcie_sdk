@@ -1,6 +1,39 @@
 #ifndef _PLX_EEP_H
 #define _PLX_EEP_H
 
+/*******************************************************************************
+ * Copyright 2013-2017 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
+ *
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
+ *
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
+ *
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
+ *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
 /******************************************************************************
  *
  * File Name:
@@ -23,7 +56,7 @@
  *          Definitions
  ************************************/
 #define APP_VERSION_MAJOR           2       // Version information
-#define APP_VERSION_MINOR           6
+#define APP_VERSION_MINOR           9
 #define APP_VERSION_REVISION        0
 
 #define BOOLEAN_UNKNOWN             4
@@ -52,7 +85,7 @@ typedef struct _EEP_OPTIONS
     BOOLEAN bVerbose;
     BOOLEAN bLoadFile;
     BOOLEAN bIgnoreWarnings;
-    char    FileName[200];
+    char    FileName[255];
     S8      DeviceNumber;
     U8      EepWidthSet;
     U16     LimitPlxChip;
@@ -66,12 +99,6 @@ typedef struct _EEP_OPTIONS
 /*************************************
  *            Functions
  ************************************/
-S16
-SelectDevice(
-    PLX_DEVICE_KEY *pKey,
-    EEP_OPTIONS    *pOptions
-    );
-
 S8
 ProcessCommandLine(
     int          argc,
@@ -82,6 +109,12 @@ ProcessCommandLine(
 VOID
 DisplayHelp(
     VOID
+    );
+
+S16
+SelectDevice(
+    PLX_DEVICE_KEY *pKey,
+    EEP_OPTIONS    *pOptions
     );
 
 S8

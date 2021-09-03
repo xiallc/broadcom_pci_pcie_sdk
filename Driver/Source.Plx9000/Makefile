@@ -7,34 +7,25 @@
 
 
 #=============================================================================
-# Set driver name
+# Set C_SRC to contain the list of files to compile
+#=============================================================================
+C_SRC = \
+    ApiFunc.c       \
+    Dispatch.c      \
+    Driver.c        \
+    Eep_9000.c      \
+    ModuleVersion.c \
+    PciFunc.c       \
+    SuppFunc.c      \
+
+
+#=============================================================================
+# Set C_SRC_CHIP to contain the list of chip-specific files to compile
 #
-# ImageName = The final image name
+# 9000-series is special case since multiple chips share same source but also
+# have chip-specific directories contain source files.
 #=============================================================================
-ImageName = Plx$(PLX_CHIP)$(DBG)
-
-
-
-#=============================================================================
-# Put all object files here
-#=============================================================================
-
-# Set source folder
-SRC_DIR      = $(COMMON_DIR)
-SRC_CHIP_DIR = $(PLX_CHIP_DIR)
-
-# Files to build
-PLX_OBJECTS = \
-    $(SRC_DIR)/ApiFunc.o       \
-    $(SRC_DIR)/Dispatch.o      \
-    $(SRC_DIR)/Driver.o        \
-    $(SRC_DIR)/Eep_9000.o      \
-    $(SRC_DIR)/ModuleVersion.o \
-    $(SRC_DIR)/PciFunc.o       \
-    $(SRC_DIR)/SuppFunc.o      \
-
-# Add chip-specific files
-PLX_OBJECTS += \
-    $(SRC_CHIP_DIR)/PlxChipApi.o    \
-    $(SRC_CHIP_DIR)/PlxChipFn.o     \
-    $(SRC_CHIP_DIR)/PlxInterrupt.o
+C_SRC_CHIP = \
+    PlxChipApi.c    \
+    PlxChipFn.c     \
+    PlxInterrupt.c

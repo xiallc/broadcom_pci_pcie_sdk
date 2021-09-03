@@ -1,22 +1,34 @@
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -31,7 +43,7 @@
  *
  * Revision:
  *
- *     08-01-13: PLX SDK v7.10
+ *     07-01-16: PLX SDK v7.25
  *
  *****************************************************************************/
 
@@ -55,6 +67,7 @@
      * items below were added.  These may be removed in future.
      *******************************************************************/
     #define _CRT_SECURE_NO_DEPRECATE        // Prevents deprecation warnings during compile
+    #define _CRT_NONSTDC_NO_WARNINGS        // Prevents POSIX function warnings
     #pragma warning( once : 4996 )          // Limits deprecation warnings to display only once
 #endif
 
@@ -131,7 +144,8 @@ static char *PlxDrivers[] =
     "Plx9656",
     "Plx8311",
     "Plx6000_NT",
-    "Plx8000_ND",
+    "Plx_Mgr",
+    "Plx_SVF",
     PLX_SVC_DRIVER_NAME,    // PLX PCI service must be last driver
     "0"                     // Must be last item to mark end of list
 };
@@ -142,7 +156,7 @@ static char *PlxDrivers[] =
 /**********************************************
  *       Private Function Prototypes
  *********************************************/
-static BOOLEAN
+static PLX_STATUS
 Driver_Connect(
     PLX_DRIVER_HANDLE *pHandle,
     U8                 ApiIndex,
@@ -237,18 +251,15 @@ PlxPci_DeviceOpen(
     PLX_DEVICE_OBJECT *pDevice
     )
 {
-    U8         VerMajor;
-    U8         VerMinor;
-    U8         VerRevision;
-    PLX_STATUS rc;
+    PLX_STATUS status;
 
 
     if ((pDevice == NULL) || (pKey == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Make sure device object is not already in use
     if (IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Clear device object
     RtlZeroMemory( pDevice, sizeof(PLX_DEVICE_OBJECT) );
@@ -270,7 +281,7 @@ PlxPci_DeviceOpen(
     else
     {
         // Default to PCI mode & fill in missing key information
-        rc =
+        status =
             PlxPci_DeviceFindEx(
                 &(pDevice->Key),
                 0,                      // First matching device,
@@ -278,50 +289,25 @@ PlxPci_DeviceOpen(
                 NULL                    // Mode properties ignored in PCI mode
                 );
 
-        if (rc != ApiSuccess)
-        {
-            return rc;
-        }
+        if (status != PLX_STATUS_OK)
+            return status;
     }
 
     // Connect to driver
-    if (Driver_Connect(
+    status =
+        Driver_Connect(
             &pDevice->hDevice,
             pDevice->Key.ApiIndex,
             pDevice->Key.DeviceNumber
-            ) == FALSE)
-    {
-        return ApiInvalidDeviceInfo;
-    }
+            );
+
+    if (status != PLX_STATUS_OK)
+        return status;
 
     // Mark object as valid
     ObjectValidate( pDevice );
 
-    // Verify the driver version
-    PlxPci_DriverVersion(
-        pDevice,
-        &VerMajor,
-        &VerMinor,
-        &VerRevision
-        );
-
-    // Update version until API updates
-    VerMinor = (VerMinor * 10) + VerRevision;
-
-    // Make sure the driver matches the DLL
-    if ((VerMajor != PLX_SDK_VERSION_MAJOR) ||
-        (VerMinor != PLX_SDK_VERSION_MINOR))
-    {
-        // Close the handle
-        Driver_Disconnect( pDevice->hDevice );
-
-        // Mark object as invalid
-        ObjectInvalidate( pDevice );
-
-        return ApiInvalidDriverVersion;
-    }
-
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -340,11 +326,11 @@ PlxPci_DeviceClose(
     )
 {
     if (pDevice == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Check for non-PCI mode
     if (pDevice->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK)
@@ -363,7 +349,7 @@ PlxPci_DeviceClose(
     // Mark object key as invalid
     ObjectInvalidate( &(pDevice->Key) );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -384,17 +370,15 @@ PlxPci_DeviceFind(
 {
     U8                i;
     U16               TotalMatches;
-    BOOLEAN           bConnect;
     BOOLEAN           bDriverOpened;
+    PLX_STATUS        status;
     PLX_PARAMS        IoBuffer;
     PLX_DEVICE_OBJECT Device;
 
 
-    // Check for null pointers
+    // Verify parameter
     if (pKey == NULL)
-    {
-        return ApiNullParam;
-    }
+        return PLX_STATUS_NULL_PARAM;
 
     i             = 0;
     TotalMatches  = 0;
@@ -409,14 +393,14 @@ PlxPci_DeviceFind(
     while (PlxDrivers[i][0] != '0')
     {
         // Connect to driver
-        bConnect =
+        status =
             Driver_Connect(
                 &(Device.hDevice),
                 i,                  // Driver index
                 0                   // Device index in driver
                 );
 
-        if (bConnect)
+        if (status == PLX_STATUS_OK)
         {
             //
             // Driver is open.  Find any devices that match
@@ -440,7 +424,7 @@ PlxPci_DeviceFind(
             Driver_Disconnect( Device.hDevice );
 
             // Return if specified device was found
-            if (IoBuffer.ReturnCode == ApiSuccess)
+            if (IoBuffer.ReturnCode == PLX_STATUS_OK)
             {
                 // Copy device key information
                 *pKey = IoBuffer.Key;
@@ -451,7 +435,7 @@ PlxPci_DeviceFind(
                 // Validate key
                 ObjectValidate( pKey );
 
-                return ApiSuccess;
+                return PLX_STATUS_OK;
             }
 
             // Add number of matches to total
@@ -463,11 +447,9 @@ PlxPci_DeviceFind(
     }
 
     if (bDriverOpened == FALSE)
-    {
-        return ApiNoActiveDriver;
-    }
+        return PLX_STATUS_NO_DRIVER;
 
-    return ApiInvalidDeviceInfo;
+    return PLX_STATUS_INVALID_OBJECT;
 }
 
 
@@ -510,10 +492,10 @@ PlxPci_DeviceFindEx(
     if (ApiMode == PLX_API_MODE_TCP)
     {
         // Not yet supported
-        return ApiUnsupportedFunction;
+        return PLX_STATUS_UNSUPPORTED;
     }
 
-    return ApiInvalidAccessType;
+    return PLX_STATUS_INVALID_ACCESS;
 }
 
 
@@ -534,7 +516,7 @@ PlxPci_I2cGetPorts(
 {
     // Only Aardvark I2C currently supported
     if (ApiMode != PLX_API_MODE_I2C_AARDVARK)
-        return ApiInvalidAccessType;
+        return PLX_STATUS_INVALID_ACCESS;
 
     return PlxI2c_I2cGetPorts(
         ApiMode,
@@ -563,14 +545,14 @@ PlxPci_ApiVersion(
         (pVersionMinor    == NULL) ||
         (pVersionRevision == NULL))
     {
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
     }
 
     *pVersionMajor    = PLX_SDK_VERSION_MAJOR;
     *pVersionMinor    = PLX_SDK_VERSION_MINOR / 10;
     *pVersionRevision = PLX_SDK_VERSION_MINOR - (*pVersionMinor * 10);
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -620,7 +602,7 @@ PlxPci_DriverVersion(
         (pVersionMinor    == NULL) ||
         (pVersionRevision == NULL))
     {
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
     }
 
     // Clear version information in case of error
@@ -630,7 +612,7 @@ PlxPci_DriverVersion(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -644,7 +626,7 @@ PlxPci_DriverVersion(
     *pVersionMinor    = (U8)((IoBuffer.value[0] >>  8) & 0xFF) / 10;
     *pVersionRevision = (U8)((IoBuffer.value[0] >>  8) & 0xFF) - (*pVersionMinor * 10);
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -667,11 +649,11 @@ PlxPci_DriverProperties(
 
 
     if (pDriverProp == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -683,11 +665,11 @@ PlxPci_DriverProperties(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
         *pDriverProp = IoBuffer.u.DriverProp;
 #else
     // Bypass for now
-    IoBuffer.ReturnCode = ApiSuccess;
+    IoBuffer.ReturnCode = PLX_STATUS_OK;
 
     // Set driver version
     pDriverProp->Version =
@@ -759,7 +741,7 @@ PlxPci_DriverScheduleRescan(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -795,12 +777,12 @@ PlxPci_ChipTypeGet(
     if ((pChipType == NULL) ||
         (pRevision == NULL))
     {
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
     }
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -819,7 +801,7 @@ PlxPci_ChipTypeGet(
     pDevice->Key.PlxChip     = *pChipType;
     pDevice->Key.PlxRevision = *pRevision;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -844,7 +826,7 @@ PlxPci_ChipTypeSet(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -859,7 +841,7 @@ PlxPci_ChipTypeSet(
         );
 
     // If successful, update device properties
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         pDevice->Key.PlxChip     = ChipType;
         pDevice->Key.PlxRevision = (U8)IoBuffer.value[1];
@@ -887,7 +869,7 @@ PlxPci_ChipGetPortMask(
     )
 {
     if (pPortMask == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     switch (PlxChip)
     {
@@ -1128,7 +1110,7 @@ PlxPci_ChipGetPortMask(
 
         case 0x8714:
         case 0x8718:
-            *pPortMask  = 0x0000001F;  // 0-4,NT 0,ALUT 0-3
+            *pPortMask  = 0x0000001F;  // 0-4,NT,ALUT 0-3
             *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
                           ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
@@ -1191,11 +1173,13 @@ PlxPci_ChipGetPortMask(
                           ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1);
             break;
 
         case 0x8747:
-            *pPortMask  = 0x00030303;  // 0,1,8,9,16,17
+            *pPortMask  = 0x00030301;  // 0,8,9,16,17
             break;
 
         case 0x8748:
@@ -1229,7 +1213,10 @@ PlxPci_ChipGetPortMask(
                           ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2);
             break;
 
         case 0x8764:
@@ -1241,7 +1228,11 @@ PlxPci_ChipGetPortMask(
                           ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3);
             break;
 
         case 0x8780:
@@ -1253,7 +1244,12 @@ PlxPci_ChipGetPortMask(
                           ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4);
             break;
 
         case 0x8796:
@@ -1265,26 +1261,129 @@ PlxPci_ChipGetPortMask(
                           ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
                           ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
-                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S5);
             break;
 
-        case 0x8715:
-        case 0x8719:
-        case 0x8735:
-        case 0x8751:
-        case 0x8765:
-        case 0x8781:
-        case 0x8797:
-            *pPortMask  = 0x0000000F;
+        case 0x9712:
+        case 0x9716:
+            *pPortMask  = 0x0300001F;   // 0-4,GEP,GEP_P2P,NT,ALUT 0-3,GEP,S0
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0);
+            break;
+
+        case 0x9733:
+            *pPortMask  = 0x030000FF;   // 0-7,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-1
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1);
+            break;
+
+        case 0x9749:
+            *pPortMask  = 0x03007FFF;   // 0-14,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-2
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2);
+            break;
+
+        case 0x9765:
+            *pPortMask  = 0x0300FFFF;   // 0-15,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-3
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3);
+            break;
+
+        case 0x9781:
+            *pPortMask  = 0x030FFFFF;   // 0-19,GEP,GEP_P2P,NT 0/1,ALUT 0-3,GEP,S0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4);
+            break;
+
+        case 0x9797:
+            *pPortMask  = 0x03FFFFFF;   // 0-25,NT 0/1,ALUT 0-3,GEP,S0-5
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP) |
+                          ((U64)1 << PLX_FLAG_PORT_GEP_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S0) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S1) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S2) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S3) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S4) |
+                          ((U64)1 << PLX_FLAG_PORT_STN_REGS_S5);
             break;
 
         default:
             // For unsupported chips, set default
-            *pPortMask = 0x00000001;  // 0
-            return ApiUnsupportedFunction;
+            *pPortMask = 0x00000001;
+            ErrorPrintf(("ERROR: Port mask not set for %04X\n", PlxChip));
+            return PLX_STATUS_UNSUPPORTED;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -1308,12 +1407,12 @@ PlxPci_GetPortProperties(
 
     if (pPortProp == NULL)
     {
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
     }
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1325,7 +1424,7 @@ PlxPci_GetPortProperties(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         // Return port information
         *pPortProp = IoBuffer.u.PortProp;
@@ -1360,7 +1459,7 @@ PlxPci_DeviceReset(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1455,7 +1554,7 @@ PlxPci_PciRegisterReadFast(
     if (!IsObjectValid(pDevice))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidDeviceInfo;
+            *pStatus = PLX_STATUS_INVALID_OBJECT;
         return (U32)-1;
     }
 
@@ -1499,7 +1598,7 @@ PlxPci_PciRegisterWriteFast(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1536,7 +1635,7 @@ PlxPci_PciRegisterRead_BypassOS(
     )
 {
     PLX_PARAMS        IoBuffer;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_DEVICE_OBJECT Device;
 
 
@@ -1544,16 +1643,16 @@ PlxPci_PciRegisterRead_BypassOS(
     memset( &IoBuffer.Key, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY) );
     RtlZeroMemory( &Device, sizeof(PLX_DEVICE_OBJECT) );
 
-    rc =
+    status =
         PlxPci_DeviceOpen(
             &IoBuffer.Key,
             &Device
             );
 
-    if (rc != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         if (pStatus != NULL)
-            *pStatus = rc;
+            *pStatus = status;
 
         return (U32)-1;
     }
@@ -1602,7 +1701,7 @@ PlxPci_PciRegisterWrite_BypassOS(
     )
 {
     PLX_PARAMS        IoBuffer;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_DEVICE_OBJECT Device;
 
 
@@ -1610,14 +1709,14 @@ PlxPci_PciRegisterWrite_BypassOS(
     memset( &IoBuffer.Key, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY) );
     RtlZeroMemory( &Device, sizeof(PLX_DEVICE_OBJECT) );
 
-    rc =
+    status =
         PlxPci_DeviceOpen(
             &IoBuffer.Key,
             &Device
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != PLX_STATUS_OK)
+        return status;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1664,7 +1763,7 @@ PlxPci_PlxRegisterRead(
     if (!IsObjectValid(pDevice))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidDeviceInfo;
+            *pStatus = PLX_STATUS_INVALID_OBJECT;
         return (U32)-1;
     }
 
@@ -1707,7 +1806,7 @@ PlxPci_PlxRegisterWrite(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1746,7 +1845,7 @@ PlxPci_PlxMappedRegisterRead(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1787,7 +1886,7 @@ PlxPci_PlxMappedRegisterWrite(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1828,7 +1927,7 @@ PlxPci_PlxMailboxRead(
     if (!IsObjectValid(pDevice))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidDeviceInfo;
+            *pStatus = PLX_STATUS_INVALID_OBJECT;
         return (U32)-1;
     }
 
@@ -1871,7 +1970,7 @@ PlxPci_PlxMailboxWrite(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1909,14 +2008,14 @@ PlxPci_PciBarProperties(
 
 
     if (pBarProp == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Set default value
     RtlZeroMemory( pBarProp, sizeof(PLX_PCI_BAR_PROP) );
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify BAR number
     switch (BarIndex)
@@ -1930,7 +2029,7 @@ PlxPci_PciBarProperties(
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_ACCESS;
     }
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
@@ -1944,7 +2043,7 @@ PlxPci_PciBarProperties(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         // Copy properties
         *pBarProp = IoBuffer.u.BarProp;
@@ -1972,19 +2071,19 @@ PlxPci_PciBarMap(
 {
     U32              BarOffset;
     PLX_PARAMS       IoBuffer;
-    PLX_STATUS       rc;
+    PLX_STATUS       status;
     PLX_PCI_BAR_PROP BarProp;
 
 
     if (pVa == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Set default value
     *(PLX_UINT_PTR*)pVa = 0;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify BAR number
     switch (BarIndex)
@@ -1998,7 +2097,7 @@ PlxPci_PciBarMap(
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_DATA;
     }
 
     // Check if mapping has already been performed
@@ -2009,25 +2108,23 @@ PlxPci_PciBarMap(
         // Increment map count
         pDevice->BarMapRef[BarIndex]++;
 
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Get the PCI BAR properties
-    rc =
+    status =
         PlxPci_PciBarProperties(
             pDevice,
             BarIndex,
             &BarProp
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != PLX_STATUS_OK)
+        return status;
 
     // Verify BAR exists and is memory type
     if ((BarProp.Physical == 0) || (BarProp.Size == 0) || (BarProp.Flags & PLX_BAR_FLAG_IO))
-    {
-        return ApiInvalidPciSpace;
-    }
+        return PLX_STATUS_INVALID_ADDR;
 
     // Calculate starting offset from page boundary
     BarOffset = BarProp.Physical & ~PAGE_MASK;
@@ -2049,7 +2146,7 @@ PlxPci_PciBarMap(
             &IoBuffer
             );
 
-        if (IoBuffer.ReturnCode != ApiSuccess)
+        if (IoBuffer.ReturnCode != PLX_STATUS_OK)
         {
             pDevice->PciBarVa[BarIndex] = 0;
             return IoBuffer.ReturnCode;
@@ -2070,7 +2167,7 @@ PlxPci_PciBarMap(
     if (pDevice->PciBarVa[BarIndex] == (PLX_UINT_PTR)MAP_FAILED)
     {
         pDevice->PciBarVa[BarIndex] = 0;
-        return ApiInsufficientResources;
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
     // Store BAR properties
@@ -2085,7 +2182,7 @@ PlxPci_PciBarMap(
     // Set map count
     pDevice->BarMapRef[BarIndex] = 1;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2110,14 +2207,14 @@ PlxPci_PciBarUnmap(
 
 
     if (pVa == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     if (*(PLX_UINT_PTR*)pVa == 0)
-        return ApiInvalidAddress;
+        return PLX_STATUS_INVALID_ADDR;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Search for actual mapped address
     for (BarIndex = 0; BarIndex < PCI_NUM_BARS_TYPE_00; BarIndex++)
@@ -2144,9 +2241,7 @@ PlxPci_PciBarUnmap(
                         );
 
                 if (rc != 0)
-                {
-                    return ApiInvalidAddress;
-                }
+                    return PLX_STATUS_INVALID_ADDR;
 
                 // Clear internal data
                 pDevice->PciBarVa[BarIndex] = 0;
@@ -2155,11 +2250,11 @@ PlxPci_PciBarUnmap(
             // Clear address
             *(PLX_UINT_PTR*)pVa = 0;
 
-            return ApiSuccess;
+            return PLX_STATUS_OK;
         }
     }
 
-    return ApiInvalidAddress;
+    return PLX_STATUS_INVALID_ADDR;
 }
 
 
@@ -2185,7 +2280,7 @@ PlxPci_EepromPresent(
     if (!IsObjectValid(pDevice))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidDeviceInfo;
+            *pStatus = PLX_STATUS_INVALID_OBJECT;
         return PLX_EEPROM_STATUS_NONE;
     }
 
@@ -2228,7 +2323,7 @@ PlxPci_EepromProbe(
     if (!IsObjectValid(pDevice))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidDeviceInfo;
+            *pStatus = PLX_STATUS_INVALID_OBJECT;
         return FALSE;
     }
 
@@ -2273,7 +2368,7 @@ PlxPci_EepromCrcGet(
     {
         if (pCrc != NULL)
             *pCrc = 0;
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
     }
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
@@ -2320,7 +2415,7 @@ PlxPci_EepromCrcUpdate(
     {
         if (pCrc != NULL)
             *pCrc = 0;
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
     }
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
@@ -2361,10 +2456,10 @@ PlxPci_EepromGetAddressWidth(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     if (pWidth == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2402,7 +2497,7 @@ PlxPci_EepromSetAddressWidth(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2439,11 +2534,11 @@ PlxPci_EepromReadByOffset(
 
 
     if (pValue == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2456,7 +2551,7 @@ PlxPci_EepromReadByOffset(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
         *pValue = (U32)IoBuffer.value[1];
     else
         *pValue = 0;
@@ -2486,7 +2581,7 @@ PlxPci_EepromWriteByOffset(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2524,11 +2619,11 @@ PlxPci_EepromReadByOffset_16(
 
 
     if (pValue == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2541,7 +2636,7 @@ PlxPci_EepromReadByOffset_16(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
         *pValue = (U16)IoBuffer.value[1];
     else
         *pValue = 0;
@@ -2571,7 +2666,7 @@ PlxPci_EepromWriteByOffset_16(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2611,11 +2706,11 @@ PlxPci_IoPortRead(
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2656,11 +2751,11 @@ PlxPci_IoPortWrite(
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2703,7 +2798,7 @@ PlxPci_PciBarSpaceRead(
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify BAR number
     switch (BarIndex)
@@ -2717,12 +2812,12 @@ PlxPci_PciBarSpaceRead(
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_DATA;
     }
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2767,7 +2862,7 @@ PlxPci_PciBarSpaceWrite(
 
 
     if (pBuffer == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify BAR number
     switch (BarIndex)
@@ -2781,12 +2876,12 @@ PlxPci_PciBarSpaceWrite(
             break;
 
         default:
-            return ApiInvalidIndex;
+            return PLX_STATUS_INVALID_DATA;
     }
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2827,11 +2922,11 @@ PlxPci_PhysicalMemoryAllocate(
 
 
     if (pMemoryInfo == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -2871,11 +2966,11 @@ PlxPci_PhysicalMemoryFree(
 
 
     if (pMemoryInfo == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Unmap the buffer if it was previously mapped to user space
     if (pMemoryInfo->UserAddr != 0)
@@ -2920,20 +3015,20 @@ PlxPci_PhysicalMemoryMap(
     )
 {
     if (pMemoryInfo == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Set default return value
     pMemoryInfo->UserAddr = 0;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify buffer object
     if ((pMemoryInfo->CpuPhysical == 0) ||
         (pMemoryInfo->Size        == 0))
     {
-        return ApiInvalidData;
+        return PLX_STATUS_INVALID_DATA;
     }
 
     // Map the buffer to user space
@@ -2950,11 +3045,10 @@ PlxPci_PhysicalMemoryMap(
     if (pMemoryInfo->UserAddr == (PLX_UINT_PTR)MAP_FAILED)
     {
         pMemoryInfo->UserAddr = 0;
-
-        return ApiInsufficientResources;
+        return PLX_STATUS_INSUFFICIENT_RES;
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -2977,22 +3071,22 @@ PlxPci_PhysicalMemoryUnmap(
 
 
     if (pMemoryInfo == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify buffer object
     if ((pMemoryInfo->CpuPhysical == 0) ||
         (pMemoryInfo->Size        == 0))
     {
-        return ApiInvalidData;
+        return PLX_STATUS_INVALID_DATA;
     }
 
     // Verify virtual address
     if (pMemoryInfo->UserAddr == 0)
-        return ApiInvalidAddress;
+        return PLX_STATUS_INVALID_ADDR;
 
     // Unmap buffer from virtual space
     rc =
@@ -3002,14 +3096,12 @@ PlxPci_PhysicalMemoryUnmap(
             );
 
     if (rc != 0)
-    {
-        return ApiInvalidAddress;
-    }
+        return PLX_STATUS_INVALID_ADDR;
 
     // Clear buffer address
     pMemoryInfo->UserAddr = 0;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -3032,17 +3124,17 @@ PlxPci_CommonBufferProperties(
 
 
     if (pMemoryInfo == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // If we already have the information, just copy it
     if (pDevice->CommonBuffer.PhysicalAddr != 0)
     {
         *pMemoryInfo = pDevice->CommonBuffer;
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Clear properties in case not supported in driver
@@ -3056,7 +3148,7 @@ PlxPci_CommonBufferProperties(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode != ApiSuccess)
+    if (IoBuffer.ReturnCode != PLX_STATUS_OK)
         return IoBuffer.ReturnCode;
 
     // Copy buffer properties
@@ -3068,7 +3160,7 @@ PlxPci_CommonBufferProperties(
     // Save the data for any future calls
     pDevice->CommonBuffer = *pMemoryInfo;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -3087,39 +3179,39 @@ PlxPci_CommonBufferMap(
     VOID              **pVa
     )
 {
-    PLX_STATUS       rc;
+    PLX_STATUS       status;
     PLX_PHYSICAL_MEM MemInfo;
 
 
     if (pVa == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Set default return value
     *(PLX_UINT_PTR*)pVa = 0;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // If buffer was previously mapped, just copy it
     if (pDevice->CommonBuffer.UserAddr != 0)
     {
         *(PLX_UINT_PTR*)pVa = (PLX_UINT_PTR)pDevice->CommonBuffer.UserAddr;
-        return ApiSuccess;
+        return PLX_STATUS_OK;
     }
 
     // Check for valid common buffer info
     if (pDevice->CommonBuffer.PhysicalAddr == 0)
     {
         // Get buffer properties
-        rc =
+        status =
             PlxPci_CommonBufferProperties(
                 pDevice,
                 &MemInfo
                 );
 
-        if (rc != ApiSuccess)
-            return rc;
+        if (status != PLX_STATUS_OK)
+            return status;
     }
     else
     {
@@ -3127,16 +3219,16 @@ PlxPci_CommonBufferMap(
         MemInfo = pDevice->CommonBuffer;
     }
 
-    rc =
+    status =
         PlxPci_PhysicalMemoryMap(
             pDevice,
             &MemInfo
             );
 
-    if (rc != ApiSuccess)
+    if (status != PLX_STATUS_OK)
     {
         *(PLX_UINT_PTR*)pVa = 0;
-        return rc;
+        return status;
     }
 
     // Pass virtual address
@@ -3145,7 +3237,7 @@ PlxPci_CommonBufferMap(
     // Save the data for any future calls
     pDevice->CommonBuffer.UserAddr = MemInfo.UserAddr;
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -3164,37 +3256,35 @@ PlxPci_CommonBufferUnmap(
     VOID              **pVa
     )
 {
-    PLX_STATUS       rc;
+    PLX_STATUS       status;
     PLX_PHYSICAL_MEM MemInfo;
 
 
     if (pVa == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     if (*(PLX_UINT_PTR*)pVa == 0)
-        return ApiInvalidAddress;
+        return PLX_STATUS_INVALID_ADDR;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify virtual address
     if (pDevice->CommonBuffer.UserAddr != *(PLX_UINT_PTR*)pVa)
-    {
-        return ApiInvalidAddress;
-    }
+        return PLX_STATUS_INVALID_ADDR;
 
     // Copy buffer properties
     MemInfo = pDevice->CommonBuffer;
 
     // Unmap the buffer
-    rc =
+    status =
         PlxPci_PhysicalMemoryUnmap(
             pDevice,
             &MemInfo
             );
 
-    if (rc == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
         // Clear internal data
         pDevice->CommonBuffer.UserAddr = 0;
@@ -3203,7 +3293,7 @@ PlxPci_CommonBufferUnmap(
         *(PLX_UINT_PTR*)pVa = 0;
     }
 
-    return rc;
+    return status;
 }
 
 
@@ -3227,11 +3317,11 @@ PlxPci_InterruptEnable(
 
     // Check for null pointers
     if (pPlxIntr == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3267,11 +3357,11 @@ PlxPci_InterruptDisable(
 
     // Check for null pointers
     if (pPlxIntr == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3306,7 +3396,7 @@ PlxPci_NotificationRegisterFor(
 #if defined(PLX_DOS)
 
     // Notification events not supported in DOS
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 
 #elif defined(PLX_LINUX)
 
@@ -3315,11 +3405,11 @@ PlxPci_NotificationRegisterFor(
 
     // Check for null pointers
     if ((pPlxIntr == NULL) || (pEvent == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3331,7 +3421,7 @@ PlxPci_NotificationRegisterFor(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         // Mark object as valid if successful
         ObjectValidate( pEvent );
@@ -3365,7 +3455,7 @@ PlxPci_NotificationWait(
 #if defined(PLX_DOS)
 
     // Notification events not supported in DOS
-    return ApiUnsupportedFunction;
+    return PLX_STATUS_UNSUPPORTED;
 
 #elif defined(PLX_LINUX)
 
@@ -3374,15 +3464,15 @@ PlxPci_NotificationWait(
 
     // Verify notify object
     if (pEvent == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify event object
     if (!IsObjectValid(pEvent))
-        return ApiFailed;
+        return PLX_STATUS_FAILED;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3423,15 +3513,15 @@ PlxPci_NotificationStatus(
 
     // Verify notify object
     if ((pPlxIntr == NULL) || (pEvent == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify event object
     if (!IsObjectValid(pEvent))
-        return ApiFailed;
+        return PLX_STATUS_FAILED;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3443,7 +3533,7 @@ PlxPci_NotificationStatus(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         // Return interrupt sources
         *pPlxIntr = IoBuffer.u.PlxIntr;
@@ -3473,15 +3563,15 @@ PlxPci_NotificationCancel(
 
     // Verify notify object
     if (pEvent == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Verify event object
     if (!IsObjectValid(pEvent))
-        return ApiFailed;
+        return PLX_STATUS_FAILED;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3493,7 +3583,7 @@ PlxPci_NotificationCancel(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         // Mark object as invalid
         ObjectInvalidate( pEvent );
@@ -3526,7 +3616,7 @@ PlxPci_VpdRead(
     if (!IsObjectValid(pDevice))
     {
         if (pStatus != NULL)
-            *pStatus = ApiInvalidDeviceInfo;
+            *pStatus = PLX_STATUS_INVALID_OBJECT;
         return (U32)-1;
     }
 
@@ -3569,7 +3659,7 @@ PlxPci_VpdWrite(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3608,7 +3698,7 @@ PlxPci_DmaChannelOpen(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3621,7 +3711,7 @@ PlxPci_DmaChannelOpen(
         );
 
     // If channel opened, update properties if provided
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         if (pDmaProp != NULL)
         {
@@ -3658,11 +3748,11 @@ PlxPci_DmaGetProperties(
 
 
     if (pDmaProp == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3675,7 +3765,7 @@ PlxPci_DmaGetProperties(
         );
 
     // Return properties on success
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         *pDmaProp = IoBuffer.u.DmaProp;
     }
@@ -3704,11 +3794,11 @@ PlxPci_DmaSetProperties(
 
 
     if (pDmaProp == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3746,7 +3836,7 @@ PlxPci_DmaControl(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3783,7 +3873,7 @@ PlxPci_DmaStatus(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -3818,17 +3908,17 @@ PlxPci_DmaTransferBlock(
 {
     BOOLEAN           bIgnoreInt;
     PLX_PARAMS        IoBuffer;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_INTERRUPT     PlxIntr;
     PLX_NOTIFY_OBJECT Event;
 
 
     if (pDmaParams == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Added to avoid compiler warning
     bIgnoreInt = FALSE;
@@ -3843,7 +3933,7 @@ PlxPci_DmaTransferBlock(
         if (((S8)channel >= 0) && ((S8)channel < 4))
             PlxIntr.DmaDone = (1 << channel);
         else
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ADDR;
 
         // Register to wait for DMA interrupt
         PlxPci_NotificationRegisterFor(
@@ -3870,41 +3960,37 @@ PlxPci_DmaTransferBlock(
         &IoBuffer
         );
 
-    rc = IoBuffer.ReturnCode;
+    status = IoBuffer.ReturnCode;
 
     // Don't wait for completion if requested not to
     if (Timeout_ms == 0)
-    {
-        return rc;
-    }
-    else
-    {
-        // Restore original value of interrupt ignore
-        pDmaParams->bIgnoreBlockInt = bIgnoreInt;
-    }
+        return status;
+
+    // Restore original value of interrupt ignore
+    pDmaParams->bIgnoreBlockInt = bIgnoreInt;
 
     // Wait for completion if requested
-    if (rc == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
-        rc =
+        status =
             PlxPci_NotificationWait(
                 pDevice,
                 &Event,
                 Timeout_ms
                 );
 
-        switch (rc)
+        switch (status)
         {
-            case ApiSuccess:
+            case PLX_STATUS_OK:
                 // DMA transfer completed
                 break;
 
-            case ApiWaitTimeout:
-                rc = ApiWaitTimeout;
+            case PLX_STATUS_TIMEOUT:
+                status = PLX_STATUS_TIMEOUT;
                 break;
 
-            case ApiWaitCanceled:
-                rc = ApiFailed;
+            case PLX_STATUS_CANCELED:
+                status = PLX_STATUS_FAILED;
                 break;
 
             default:
@@ -3919,7 +4005,7 @@ PlxPci_DmaTransferBlock(
         &Event
         );
 
-    return rc;
+    return status;
 }
 
 
@@ -3941,17 +4027,17 @@ PlxPci_DmaTransferUserBuffer(
     )
 {
     PLX_PARAMS        IoBuffer;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_INTERRUPT     PlxIntr;
     PLX_NOTIFY_OBJECT Event;
 
 
     if (pDmaParams == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Setup to wait for interrupt if requested
     if (Timeout_ms != 0)
@@ -3963,7 +4049,7 @@ PlxPci_DmaTransferUserBuffer(
         if (((S8)channel >= 0) && ((S8)channel < 4))
             PlxIntr.DmaDone = (1 << channel);
         else
-            return ApiDmaChannelInvalid;
+            return PLX_STATUS_INVALID_ADDR;
 
         // Register to wait for DMA interrupt
         PlxPci_NotificationRegisterFor(
@@ -3984,34 +4070,34 @@ PlxPci_DmaTransferUserBuffer(
         &IoBuffer
         );
 
-    rc = IoBuffer.ReturnCode;
+    status = IoBuffer.ReturnCode;
 
     // Don't wait for completion if requested not to
     if (Timeout_ms == 0)
-        return rc;
+        return status;
 
     // Wait for completion if requested
-    if (rc == ApiSuccess)
+    if (status == PLX_STATUS_OK)
     {
-        rc =
+        status =
             PlxPci_NotificationWait(
                 pDevice,
                 &Event,
                 Timeout_ms
                 );
 
-        switch (rc)
+        switch (status)
         {
-            case ApiSuccess:
+            case PLX_STATUS_OK:
                 // DMA transfer completed
                 break;
 
-            case ApiWaitTimeout:
-                rc = ApiWaitTimeout;
+            case PLX_STATUS_TIMEOUT:
+                status = PLX_STATUS_TIMEOUT;
                 break;
 
-            case ApiWaitCanceled:
-                rc = ApiFailed;
+            case PLX_STATUS_CANCELED:
+                status = PLX_STATUS_FAILED;
                 break;
 
             default:
@@ -4026,7 +4112,7 @@ PlxPci_DmaTransferUserBuffer(
         &Event
         );
 
-    return rc;
+    return status;
 }
 
 
@@ -4050,7 +4136,7 @@ PlxPci_DmaChannelClose(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4085,15 +4171,15 @@ PlxPci_PerformanceInitializeProperties(
 
 
     if ((pDevice == NULL) || (pPerfProp == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Make sure Performance object is not already in use
     if (IsObjectValid(pPerfProp))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4106,13 +4192,13 @@ PlxPci_PerformanceInitializeProperties(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode != ApiSuccess)
+    if (IoBuffer.ReturnCode != PLX_STATUS_OK)
         return IoBuffer.ReturnCode;
 
     // Mark object as valid
     ObjectValidate( pPerfProp );
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -4135,11 +4221,11 @@ PlxPci_PerformanceMonitorControl(
 
 
     if (pDevice == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4177,17 +4263,17 @@ PlxPci_PerformanceResetCounters(
 
 
     if ((pDevice == NULL) || (pPerfProps == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Make sure each Performance object is valid
     for (i=0; i<NumOfObjects; i++)
     {
         if (!IsObjectValid(&pPerfProps[i]))
-            return ApiInvalidDeviceInfo;
+            return PLX_STATUS_INVALID_OBJECT;
 
         // Clear all current and previous counter values (14 counters)
         RtlZeroMemory(
@@ -4232,17 +4318,17 @@ PlxPci_PerformanceGetCounters(
 
 
     if ((pDevice == NULL) || (pPerfProps == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     // Make sure each Performance object is valid
     for (i=0; i<NumOfObjects; i++)
     {
         if (!IsObjectValid(&pPerfProps[i]))
-            return ApiInvalidDeviceInfo;
+            return PLX_STATUS_INVALID_OBJECT;
     }
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
@@ -4292,14 +4378,20 @@ PlxPci_PerformanceCalcStatistics(
     if (ElapsedTime_ms == 0)
     {
         RtlZeroMemory( pPerfStats, sizeof(PLX_PERF_STATS) );
-        return ApiInvalidData;
+        return PLX_STATUS_INVALID_DATA;
     }
 
     // Determine theoretical max link rate for 1 second
-    if (pPerfProp->LinkSpeed == PLX_PCIE_GEN_3_0)
-        MaxLinkRate = (S64)(PERF_MAX_BPS_GEN_3_0 * pPerfProp->LinkWidth);
+    if ((pPerfProp->LinkSpeed == PLX_PCIE_GEN_1_0) ||
+        (pPerfProp->LinkSpeed == PLX_PCIE_GEN_2_0))
+    {
+        MaxLinkRate =
+            (S64)(PERF_MAX_BPS_GEN_1_0 * pPerfProp->LinkWidth * pPerfProp->LinkSpeed);
+    }
     else
-        MaxLinkRate = (S64)(PERF_MAX_BPS_GEN_1_0 * pPerfProp->LinkWidth * pPerfProp->LinkSpeed);
+    {
+        MaxLinkRate = (S64)(PERF_MAX_BPS_GEN_3_0 * pPerfProp->LinkWidth);
+    }
 
     // Adjust rate for specified elapsed period (ms)
     MaxLinkRate = (MaxLinkRate * ElapsedTime_ms) / 1000;
@@ -4316,22 +4408,34 @@ PlxPci_PerformanceCalcStatistics(
 
     // Add 4GB in case counter wrapped
     if (Counter_PostedHeader < pPerfProp->Prev_IngressPostedHeader)
+    {
         Counter_PostedHeader += ((S64)1 << 32);
+    }
 
     if (Counter_PostedDW < pPerfProp->Prev_IngressPostedDW)
+    {
         Counter_PostedDW += ((S64)1 << 32);
+    }
 
     if (Counter_NonpostedDW < pPerfProp->Prev_IngressNonpostedDW)
+    {
         Counter_NonpostedDW += ((S64)1 << 32);
+    }
 
     if (Counter_CplHeader < pPerfProp->Prev_IngressCplHeader)
+    {
         Counter_CplHeader += ((S64)1 << 32);
+    }
 
     if (Counter_CplDW < pPerfProp->Prev_IngressCplDW)
+    {
         Counter_CplDW += ((S64)1 << 32);
+    }
 
     if (Counter_Dllp < pPerfProp->Prev_IngressDllp)
+    {
         Counter_Dllp += ((S64)1 << 32);
+    }
 
     // Determine counter differences
     Counter_PostedHeader = Counter_PostedHeader - pPerfProp->Prev_IngressPostedHeader;
@@ -4376,9 +4480,14 @@ PlxPci_PerformanceCalcStatistics(
     PayloadAvg = Counter_PostedHeader + Counter_CplHeader;
 
     if (PayloadAvg != 0)
-        pPerfStats->IngressPayloadAvgPerTlp = (long double)pPerfStats->IngressPayloadTotalBytes / PayloadAvg;
+    {
+        pPerfStats->IngressPayloadAvgPerTlp =
+            (long double)pPerfStats->IngressPayloadTotalBytes / PayloadAvg;
+    }
     else
+    {
         pPerfStats->IngressPayloadAvgPerTlp = 0;
+    }
 
     // Total number of TLP data ((P_DW + NP_DW + CPL_DW) * size(DW))
     TotalBytes = (Counter_PostedDW    +
@@ -4392,7 +4501,8 @@ PlxPci_PerformanceCalcStatistics(
     pPerfStats->IngressTotalBytes = TotalBytes;
 
     // Total byte rate
-    pPerfStats->IngressTotalByteRate = (long double)((TotalBytes * 1000) / ElapsedTime_ms);
+    pPerfStats->IngressTotalByteRate =
+        (long double)((TotalBytes * 1000) / ElapsedTime_ms);
 
     // Payload rate
     pPerfStats->IngressPayloadByteRate =
@@ -4405,13 +4515,15 @@ PlxPci_PerformanceCalcStatistics(
     }
     else
     {
-        pPerfStats->IngressLinkUtilization = ((long double)TotalBytes * 100) / MaxLinkRate;
+        pPerfStats->IngressLinkUtilization =
+            ((long double)TotalBytes * 100) / MaxLinkRate;
 
         // Account for error margin
         if (pPerfStats->IngressLinkUtilization > (double)100)
+        {
             pPerfStats->IngressLinkUtilization = 100;
+        }
     }
-
 
     //
     // Calculate Egress actual counters, adjusting for counter wrapping
@@ -4425,22 +4537,34 @@ PlxPci_PerformanceCalcStatistics(
 
     // Add 4GB in case counter wrapped
     if (Counter_PostedHeader < pPerfProp->Prev_EgressPostedHeader)
+    {
         Counter_PostedHeader += ((S64)1 << 32);
+    }
 
     if (Counter_PostedDW < pPerfProp->Prev_EgressPostedDW)
+    {
         Counter_PostedDW += ((S64)1 << 32);
+    }
 
     if (Counter_NonpostedDW < pPerfProp->Prev_EgressNonpostedDW)
+    {
         Counter_NonpostedDW += ((S64)1 << 32);
+    }
 
     if (Counter_CplHeader < pPerfProp->Prev_EgressCplHeader)
+    {
         Counter_CplHeader += ((S64)1 << 32);
+    }
 
     if (Counter_CplDW < pPerfProp->Prev_EgressCplDW)
+    {
         Counter_CplDW += ((S64)1 << 32);
+    }
 
     if (Counter_Dllp < pPerfProp->Prev_EgressDllp)
+    {
         Counter_Dllp += ((S64)1 << 32);
+    }
 
     // Determine counter differences
     Counter_PostedHeader = Counter_PostedHeader - pPerfProp->Prev_EgressPostedHeader;
@@ -4450,6 +4574,18 @@ PlxPci_PerformanceCalcStatistics(
     Counter_CplDW        = Counter_CplDW        - pPerfProp->Prev_EgressCplDW;
     Counter_Dllp         = Counter_Dllp         - pPerfProp->Prev_EgressDllp;
 
+    /*************************************************************************
+     * Capella-2 does not count the 2DW overhead for egress DW. The DW counts
+     * are adjusted by adding 2DW per TLP to account for the overhead.
+     ************************************************************************/
+    if (pPerfProp->PlxFamily == PLX_FAMILY_CAPELLA_2)
+    {
+        Counter_PostedDW += (Counter_PostedHeader * PERF_TLP_OH_DW);
+        Counter_CplDW    += (Counter_CplHeader * PERF_TLP_OH_DW);
+
+        // No TLP count is provided for non-posted, unable to adjust
+        Counter_NonpostedDW += 0;
+    }
 
     //
     // Calculate Egress statistics
@@ -4481,9 +4617,14 @@ PlxPci_PerformanceCalcStatistics(
     PayloadAvg = Counter_PostedHeader + Counter_CplHeader;
 
     if (PayloadAvg != 0)
-        pPerfStats->EgressPayloadAvgPerTlp = (long double)pPerfStats->EgressPayloadTotalBytes / PayloadAvg;
+    {
+        pPerfStats->EgressPayloadAvgPerTlp =
+            (long double)pPerfStats->EgressPayloadTotalBytes / PayloadAvg;
+    }
     else
+    {
         pPerfStats->EgressPayloadAvgPerTlp = 0;
+    }
 
     // Total number of TLP data ((P_DW + NP_DW + CPL_DW) * size(DW))
     TotalBytes = (Counter_PostedDW    +
@@ -4497,7 +4638,8 @@ PlxPci_PerformanceCalcStatistics(
     pPerfStats->EgressTotalBytes = TotalBytes;
 
     // Total byte rate
-    pPerfStats->EgressTotalByteRate = ((long double)TotalBytes * 1000) / ElapsedTime_ms;
+    pPerfStats->EgressTotalByteRate =
+        ((long double)TotalBytes * 1000) / ElapsedTime_ms;
 
     // Payload rate
     pPerfStats->EgressPayloadByteRate =
@@ -4510,14 +4652,17 @@ PlxPci_PerformanceCalcStatistics(
     }
     else
     {
-        pPerfStats->EgressLinkUtilization = ((long double)TotalBytes * 100) / MaxLinkRate;
+        pPerfStats->EgressLinkUtilization =
+            ((long double)TotalBytes * 100) / MaxLinkRate;
 
         // Account for error margin
         if (pPerfStats->EgressLinkUtilization > (double)100)
+        {
             pPerfStats->EgressLinkUtilization = 100;
+        }
     }
 
-    return ApiSuccess;
+    return PLX_STATUS_OK;
 }
 
 
@@ -4540,11 +4685,11 @@ PlxPci_MH_GetProperties(
 
 
     if ((pDevice == NULL) || (pMHProp == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4556,7 +4701,7 @@ PlxPci_MH_GetProperties(
         &IoBuffer
         );
 
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         // Return properties
         *pMHProp = IoBuffer.u.MH_Prop;
@@ -4593,11 +4738,11 @@ PlxPci_MH_MigratePorts(
 
 
     if (pDevice == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4636,11 +4781,11 @@ PlxPci_Nt_ReqIdProbe(
 
 
     if ((pDevice == NULL) || (pReqId == NULL))
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4654,7 +4799,7 @@ PlxPci_Nt_ReqIdProbe(
         );
 
     // Return ReqID
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
         *pReqId = (U16)IoBuffer.value[1];
 
     return IoBuffer.ReturnCode;
@@ -4683,11 +4828,11 @@ PlxPci_Nt_LutProperties(
 
 
     if (pDevice == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4701,7 +4846,7 @@ PlxPci_Nt_LutProperties(
         );
 
     // Return LUT entry properties requested
-    if (IoBuffer.ReturnCode == ApiSuccess)
+    if (IoBuffer.ReturnCode == PLX_STATUS_OK)
     {
         if (pReqId != NULL)
             *pReqId = (U16)IoBuffer.value[0];
@@ -4749,11 +4894,11 @@ PlxPci_Nt_LutAdd(
 
 
     if (pDevice == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4773,7 +4918,7 @@ PlxPci_Nt_LutAdd(
         );
 
     // Return assigned LUT index if requested
-    if ((IoBuffer.ReturnCode == ApiSuccess) && (pLutIndex != NULL))
+    if ((IoBuffer.ReturnCode == PLX_STATUS_OK) && (pLutIndex != NULL))
         *pLutIndex = (U16)IoBuffer.value[0];
 
     return IoBuffer.ReturnCode;
@@ -4799,11 +4944,11 @@ PlxPci_Nt_LutDisable(
 
 
     if (pDevice == NULL)
-        return ApiNullParam;
+        return PLX_STATUS_NULL_PARAM;
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+        return PLX_STATUS_INVALID_OBJECT;
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -4835,11 +4980,8 @@ PlxPci_Nt_LutDisable(
  *
  * Description:  Attempts to connect a registered driver by link name
  *
- * Returns    :  TRUE   - Driver was found and connected to
- *               FALSE  - Driver not found
- *
  *****************************************************************************/
-BOOLEAN
+PLX_STATUS
 Driver_Connect(
     PLX_DRIVER_HANDLE *pHandle,
     U8                 ApiIndex,
@@ -4848,6 +4990,9 @@ Driver_Connect(
 {
     char Extension[10];
     char DriverName[30];
+#if defined(PLX_LINUX)
+    PLX_PARAMS IoBuffer;        // Driver version verification
+#endif
 
 
     // Build driver name
@@ -4907,9 +5052,7 @@ Driver_Connect(
             );
 
     if (*pHandle == INVALID_HANDLE_VALUE)
-    {
-        return FALSE;
-    }
+        return PLX_STATUS_NO_DRIVER;
 
 #elif defined(PLX_LINUX)
 
@@ -4922,7 +5065,33 @@ Driver_Connect(
 
     if (*pHandle < 0)
     {
-        return FALSE;
+        *pHandle = INVALID_HANDLE_VALUE;
+        return PLX_STATUS_NO_DRIVER;
+    }
+
+    /******************************************
+     * For Linux, query driver version & verify
+     * match with API since driver link names
+     * don't include version information.
+     *****************************************/
+    if (ioctl(
+            *pHandle,                   // Driver handle
+            PLX_IOCTL_DRIVER_VERSION,   // Control code
+            &IoBuffer                   // Pointer to buffer
+            ) < 0)
+    {
+        *pHandle = INVALID_HANDLE_VALUE;
+        close( *pHandle );
+        return PLX_STATUS_UNSUPPORTED;
+    }
+
+    // Verify matching version
+    if (((U8)(IoBuffer.value[0] >> 16) != PLX_SDK_VERSION_MAJOR) ||
+        ((U8)(IoBuffer.value[0] >>  8) != PLX_SDK_VERSION_MINOR))
+    {
+        close( *pHandle );
+        *pHandle = INVALID_HANDLE_VALUE;
+        return PLX_STATUS_VER_MISMATCH;
     }
 
 #elif defined(PLX_DOS)
@@ -4936,20 +5105,20 @@ Driver_Connect(
             PLX_SVC_DRIVER_NAME
             ) == NULL)
     {
-        return FALSE;
+        return PLX_STATUS_FAILED;
     }
 
     // Get a handle to the driver
     if (PlxSvc_DriverEntry( pHandle ) == FALSE)
-        return FALSE;
+        return PLX_STATUS_NO_DRIVER;
 
     // Open the device
     if (Dispatch_Create( *pHandle ) == FALSE)
-        return FALSE;
+        return PLX_STATUS_INVALID_OBJECT;
 
 #endif
 
-    return TRUE;
+    return PLX_STATUS_OK;
 }
 
 

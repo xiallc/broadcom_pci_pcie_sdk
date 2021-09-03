@@ -2,24 +2,36 @@
 #define _PLX_SYSDEP_H_
 
 /*******************************************************************************
- * Copyright (c) PLX Technology, Inc.
+ * Copyright 2013-2016 Avago Technologies
+ * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
- * PLX Technology Inc. licenses this source file under the GNU Lesser General Public
- * License (LGPL) version 2.  This source file may be modified or redistributed
- * under the terms of the LGPL and without express permission from PLX Technology.
+ * This software is available to you under a choice of one of two
+ * licenses.  You may choose to be licensed under the terms of the GNU
+ * General Public License (GPL) Version 2, available from the file
+ * COPYING in the main directorY of this source tree, or the
+ * BSD license below:
  *
- * PLX Technology, Inc. provides this software AS IS, WITHOUT ANY WARRANTY,
- * EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTY OF
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  PLX makes no guarantee
- * or representations regarding the use of, or the results of the use of,
- * the software and documentation in terms of correctness, accuracy,
- * reliability, currentness, or otherwise; and you rely on the software,
- * documentation and results solely at your own risk.
+ *     Redistribution and use in source and binary forms, with or
+ *     without modification, are permitted provided that the following
+ *     conditions are met:
  *
- * IN NO EVENT SHALL PLX BE LIABLE FOR ANY LOSS OF USE, LOSS OF BUSINESS,
- * LOSS OF PROFITS, INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES
- * OF ANY KIND.
+ *      - Redistributions of source code must retain the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer.
  *
+ *      - Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  ******************************************************************************/
 
 /******************************************************************************
@@ -35,7 +47,7 @@
  *
  * Revision History:
  *
- *      05-01-13 : PLX SDK v7.10
+ *      09-01-16 : PLX SDK v7.25
  *
  *****************************************************************************/
 
@@ -49,6 +61,18 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
     #error "ERROR: Linux kernel versions prior to v2.6 not supported"
 #endif
+
+
+
+
+/***********************************************************
+ * This definition is used by the PLX driver's PCI functions
+ * implementation to decide whether to default to using Linux
+ * built-in PCIe configuration access functions. Kernel versions
+ * prior to this will using the ACPI ECAM access. Kernels
+ * equal to or newer will pass PCIe accesses to kernel functions.
+ **********************************************************/
+#define PLX_KER_VER_PCIE_USE_OS         KERNEL_VERSION(2,6,18)
 
 
 
@@ -104,13 +128,27 @@
 /***********************************************************
  * ioremap_prot
  *
- * This function is supported after 2.6.27. PLX drivers only
- * used it for probing ACPI tables. In newer kernels, calls
- * to ioremap() for ACPI locations report errors since the
+ * This function is supported after 2.6.27 on x86. PLX drivers
+ * use it for probing ACPI tables. In newer kernels, calls
+ * to ioremap() for ACPI locations may report errors if the
  * default flags conflict with kernel mappings.
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27))
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)) || \
+     (!defined(__i386__) && !defined(__x86_64__)))
     #define ioremap_prot(addr,size,flags)     ioremap((addr), (size))
+#endif
+
+
+
+
+/***********************************************************
+ * pgprot_writecombine
+ *
+ * This function is not supported on all platforms. There is
+ * a standard definition for it starting with 2.6.29.
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
+    #define pgprot_writecombine              pgprot_noncached
 #endif
 
 
@@ -172,51 +210,96 @@
  * the kernel headers to support older drivers until 2.6.24.
  **********************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
-    #define PLX_IRQF_SHARED    SA_SHIRQ
-#else
-    #define PLX_IRQF_SHARED    IRQF_SHARED
+    #define IRQF_SHARED         SA_SHIRQ
 #endif
 
 
 
 
 /***********************************************************
- * pci_find_device / pci_get_device
- * pci_find_slot   / pci_get_bus_and_slot
+ * pci_get_domain_bus_and_slot not added until 2.6.33
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33))
+    #define Plx_pci_get_domain_bus_and_slot(d,b,df)    pci_get_bus_and_slot( b, df )
+#else
+    #define Plx_pci_get_domain_bus_and_slot            pci_get_domain_bus_and_slot
+#endif
+
+
+
+
+/***********************************************************
+ * pci_enable_msi  --> pci_enable_msi_exact
+ * pci_enable_msix --> pci_enable_msix_exact
  *
- * In kernel 2.6, pci_find_* was deprecated and replaced
- * with pci_get_*.  The new functions were official in 2.6.19.
- * If pci_get_* functions are used, the kernel increments the
- * reference count to the device.  To decement the count, the
- * function pci_dev_put() must be called.
+ * A new set of pci_enable_msi* functions were added in 3.14
+ * to replace existing functions.
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-    #define Plx_pci_get_device          pci_find_device
-    #define Plx_pci_get_bus_and_slot    pci_find_slot
-    #define Plx_pci_dev_put( pPciDev )
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0))
+    #define Plx_pci_enable_msi_exact(dev,nvec)         pci_enable_msi( (dev) )
+    #define Plx_pci_enable_msix_exact                  pci_enable_msix
 #else
-    #define Plx_pci_get_device          pci_get_device
-    #define Plx_pci_get_bus_and_slot    pci_get_bus_and_slot
-    #define Plx_pci_dev_put             pci_dev_put
+    #define Plx_pci_enable_msi_exact                   pci_enable_msi_exact
+    #define Plx_pci_enable_msix_exact                  pci_enable_msix_exact
 #endif
 
 
 
 
 /***********************************************************
- * pci_enable_msi   - Added in 2.6.1
- * pci_disable_msi  - Added in 2.6.8
+ * kmap_atomic/kunmap_atomic - 2nd parameter removed in 2.6.37
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,1))
-    #define Plx_pci_enable_msi(pDev)    (-1)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37))
+    #define Plx_kmap_atomic                  kmap_atomic
+    #define Plx_kunmap_atomic                kunmap_atomic
 #else
-    #define Plx_pci_enable_msi          pci_enable_msi
+    #define Plx_kmap_atomic(page,kmtype)     kmap_atomic( (page) )
+    #define Plx_kunmap_atomic(page,kmtype)   kunmap_atomic( (page) )
 #endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8))
-    #define Plx_pci_disable_msi(pDev)
+
+
+
+/***********************************************************
+ * 'secondary' & 'subordinate' fields removed from 'struct pci_bus'
+ * in 3.6 & replaced with start/end fields in a 'struct resource'.
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0))
+    #define Plx_STRUCT_PCI_BUS_SEC(pbus)   (pbus)->secondary
+    #define Plx_STRUCT_PCI_BUS_SUB(pbus)   (pbus)->subordinate
 #else
-    #define Plx_pci_disable_msi         pci_disable_msi
+    #define Plx_STRUCT_PCI_BUS_SEC(pbus)   (pbus)->busn_res.start
+    #define Plx_STRUCT_PCI_BUS_SUB(pbus)   (pbus)->busn_res.end
+#endif
+
+
+
+
+/***********************************************************
+ * skb_frag_struct "page" field changed from pointer to
+ * a page pointer within a structure in 3.2.0
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0))
+    #define Plx_SKB_FRAG_STRUCT_PAGE(frag)   (frag)->page
+#else
+    #define Plx_SKB_FRAG_STRUCT_PAGE(frag)   (frag)->page.p
+#endif
+
+
+
+
+/***********************************************************
+ * pcie_cap field in pci_dev   - Added by 2.6.38
+ *
+ * The pci_dev structure has a pcie_cap field to report the
+ * device's PCIe capability (10h) starting offset.
+ * This field is was also added to updated RedHat kernels.
+ **********************************************************/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)) || \
+    ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)) && defined(RED_HAT_LINUX_KERNEL))
+    #define Plx_pcie_cap(pDev)      ((pDev)->pcie_cap)
+#else
+    #define Plx_pcie_cap(pDev)      pci_find_capability( (pDev), 0x10 )
 #endif
 
 
@@ -224,17 +307,37 @@
 
 /***********************************************************
  * is_virtfn field in pci_dev   - Added in 2.6.30
+ * pci_physfn                   - Added by 2.6.35
  *
  * For SR-IOV devices, there is an 'is_virtfn' field in the
  * pci_dev structure to report whether the device is a VF. This
  * field is was also added to updated RedHat kernels.
- **********************************************************/
-#if (defined(CONFIG_PCI_IOV) || \
-     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30)) || \
+ *
+ * pci_physfn returns the parent PF of a VF; otherwise, returns
+ * the passed device.
+ ***********************************************************/
+#if defined(CONFIG_PCI_IOV) && \
+     ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30)) || \
      ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)) && defined(RED_HAT_LINUX_KERNEL)))
-    #define Plx_pcie_is_virtfn(pDev)    (pDev->is_virtfn)
+    #define Plx_pcie_is_virtfn(pDev)    ((pDev)->is_virtfn)
+
+    #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
+        #define Plx_pci_physfn(pDev)       \
+            ({                             \
+               struct pci_dev *_pDev;      \
+                                           \
+               if (pDev->is_virtfn)        \
+                   _pDev = (pDev->physfn); \
+               else                        \
+                   _pDev = pDev;           \
+               _pDev;                      \
+            })
+    #else
+        #define Plx_pci_physfn          pci_physfn
+    #endif
 #else
     #define Plx_pcie_is_virtfn(pDev)    (FALSE)
+    #define Plx_pci_physfn(pDev)        (pDev)
 #endif
 
 

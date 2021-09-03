@@ -1,0 +1,206 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  builddriver
+#      Abstract     :  Builds a specific PLX driver
+#
+#-----------------------------------------------------------------------------
+
+
+clear
+
+# Remove comment to display script commands as it runs
+#set -x
+
+
+#=============================================================================
+# Modify the "export" statement below to set 'PEX_SDK_DIR' to the location
+# of the PLX Linux installation path.  Some examples are:
+#
+#      export PLX_SDK_DIR=/usr/src/PlxSdk
+#      export PLX_SDK_DIR=/home/$USER/PlxSdk
+#=============================================================================
+if [ "${PLX_SDK_DIR}1" == "1" ]; then
+    # Add PLX_SDK_DIR environment variable
+    export PLX_SDK_DIR=/usr/src/PlxSdk
+
+    echo
+    echo "  Note:"
+    echo
+    echo "      The required environment variable, PLX_SDK_DIR, is not defined"
+    echo "      in the environment.  The default value (\"$PLX_SDK_DIR\")"
+    echo "      will be used instead.  Please update your environment to override"
+    echo "      the default, or modify this script accordingly.  To set an"
+    echo "      environment variable, use the \"export\" command as follows:"
+    echo
+    echo "         export PLX_SDK_DIR=<root of PLX Linux installation>"
+    echo
+else
+    # Make sure that PLX_SDK_DIR is in the environment, not just a shell variable
+    export PLX_SDK_DIR=${PLX_SDK_DIR}
+fi
+
+
+#=============================================================================
+# The following determines the kernel version (2.4 or 2.6). The environment
+# variable KERNEL_VER can be set to override the setting in this macro.
+#=============================================================================
+if [ "${KERNEL_VER}" == "" ]; then
+    # Add KERNEL_VER environment variable
+    export KERNEL_VER=`uname -r | awk -F. "{ print \\$1\".\"\\$2 }"`
+fi
+
+
+#=============================================================================
+# For kernel 2.4, the driver needs to know whether the distribution is RedHat.
+# Usually, the kernel headers automatically do this by including "rhconfig.h",
+# which defines RED_HAT_LINUX_KERNEL.  This seems to not always work on RH kernels,
+# so this script attempts to detect RH and set an environment variable if so.
+# The driver makefile will then define RED_HAT_LINUX_KERNEL if needed.
+#=============================================================================
+if [ "${KERNEL_VER}" == "2.4" ]; then
+    if [[ -r /etc/redhat-release ]]; then
+        # Add variable to environment
+        export PLX_RED_HAT_KERNEL=1
+    else
+        # Remove variable from environment
+        unset PLX_RED_HAT_KERNEL
+    fi
+fi
+
+
+#=============================================================================
+# The following determines whether a 64-bit kernel is running.  The variable
+# PLX_CPU_BITS can be set to override the setting.
+#=============================================================================
+if [ "${PLX_CPU_BITS}" == "" ]; then
+    # Add PLX_CPU_BITS environment variable (default=32-bit)
+    export PLX_CPU_BITS=32
+
+    if [ `uname -i` == ia64 ]; then
+        export PLX_CPU_BITS=64
+    fi
+
+    if [ `uname -i` == x86_64 ]; then
+        export PLX_CPU_BITS=64
+    fi
+fi
+
+# Store parameters
+Param2=$2
+Param3=$3
+
+# Check for debug version
+if [ "$2" == "d" ]; then
+    # Add PLX_DEBUG environment variable
+    export PLX_DEBUG=1
+    Param2=
+else
+    # Make sure PLX_DEBUG is not in environment
+    unset PLX_DEBUG
+fi
+
+
+# Check for clean option
+if [ "$2" == "c" ]; then Param2=clean;    fi
+if [ "$2" == "a" ]; then Param2=cleanall; fi
+if [ "$3" == "c" ]; then Param3=clean;    fi
+if [ "$3" == "a" ]; then Param3=cleanall; fi
+
+
+# Verify command-line
+if [ "$1" = "" ]; then
+    plx_error=1
+else
+    plx_error=1
+
+    if [ "$1" = "9050" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9030" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9080" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9054" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9056" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9656" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "8311" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "6000" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "8000" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "Dma" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "EoPCIe" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "Svc" ]; then
+        plx_error=0
+    fi
+fi
+
+if [ "${plx_error}" == "1" ]; then
+    echo
+    echo "PLX Linux module build script"
+    echo "Copyright (c) 2007, PLX Technology, Inc."
+    echo
+    echo "  Usage: builddriver {PLX_Chip} [DebugOption] [CleanOption]"
+    echo
+    echo "     PLX_Chip    = 6000       : PLX 6254/6540/6466 NT-mode PnP driver"
+    echo "                   8000       : PLX 8000 NT-mode PnP driver"
+    echo "                   9050       : PLX 9050/9052 PnP driver"
+    echo "                   9030       : PLX 9030 PnP driver"
+    echo "                   9080       : PLX 9080 PnP driver"
+    echo "                   9054       : PLX 9054 PnP driver"
+    echo "                   9056       : PLX 9056 PnP driver"
+    echo "                   9656       : PLX 9656 PnP driver"
+    echo "                   8311       : PLX 8311 PnP driver"
+    echo "                   Dma        : PLX 8000 DMA Controller PnP driver"
+    echo "                   EoPCIe     : PLX 8000 Ethernet over NT PCIe PnP driver"
+    echo "                   Svc        : PLX PCI/PCIe Service driver"
+    echo
+    echo "     DebugOption = <none>     : Build Release build of module"
+    echo "                   'd'        : Build Debug build of module"
+    echo
+    echo "     CleanOption = <none>     : Build the driver"
+    echo "                   'clean'    : Remove intermediate build files"
+    echo "                   'cleanall' : Remove all build files"
+    echo
+    echo "  E.g.: builddriver 9054 d     - Build 9054 module debug version"
+    echo "        builddriver Svc        - Build PlxSvc service module release version"
+    echo "        builddriver 8000 clean - Remove intermediate build files of 8000 module"
+    echo
+    exit
+fi
+
+
+# Set PLX Chip type
+PlxChip=$1
+
+
+# Build the driver
+make PLX_CHIP=$PlxChip $Param2 $Param3 $4 $5 $6 $7
+

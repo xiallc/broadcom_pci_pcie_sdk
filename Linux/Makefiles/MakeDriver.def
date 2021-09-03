@@ -1,0 +1,125 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  MakeDriver.def
+#      Abstract     :  The makefile for building device drivers
+#      Usage        :  To Build Target:
+#                          make
+#
+#                      To Cleanup Intermdiate files only:
+#                          make clean
+#
+#                      To Cleanup All files:
+#                          make cleanall
+#
+#-----------------------------------------------------------------------------
+
+
+#=============================================================================
+# Target build options:
+#
+# ImageName   = The final image name
+# TGT_TYPE    = Type of Target image [App | Lib | Driver]
+#=============================================================================
+ImageName = Plx$(PLX_CHIP)$(DBG)
+TGT_TYPE  = Driver
+
+
+
+#=============================================================================
+# Put all object files here
+#=============================================================================
+ifeq ($(KERNEL_VER), 2.4)
+    SRC_COM_DIR  = $(OBJ_DIR)
+    SRC_CHIP_DIR = $(OBJ_DIR)
+else
+    SRC_COM_DIR  = $(COMMON_DIR)
+    SRC_CHIP_DIR = $(PLX_CHIP_DIR)
+endif
+
+
+ifeq ($(PLX_CHIP), Svc)
+    PLX_OBJECTS = \
+        $(SRC_COM_DIR)/ApiFunc.o       \
+        $(SRC_COM_DIR)/ChipFunc.o      \
+        $(SRC_COM_DIR)/Dispatch.o      \
+        $(SRC_COM_DIR)/Driver.o        \
+        $(SRC_COM_DIR)/Eep_6000.o      \
+        $(SRC_COM_DIR)/Eep_8000.o      \
+        $(SRC_COM_DIR)/Eep_8111.o      \
+        $(SRC_COM_DIR)/ModuleVersion.o \
+        $(SRC_COM_DIR)/PciFunc.o       \
+        $(SRC_COM_DIR)/SuppFunc.o
+endif
+
+ifeq ($(PLX_CHIP), 8000)
+    PLX_OBJECTS = \
+        $(SRC_COM_DIR)/ApiFunc.o       \
+        $(SRC_COM_DIR)/Dispatch.o      \
+        $(SRC_COM_DIR)/Driver.o        \
+        $(SRC_COM_DIR)/Eep_8000.o      \
+        $(SRC_COM_DIR)/ModuleVersion.o \
+        $(SRC_COM_DIR)/PciFunc.o       \
+        $(SRC_COM_DIR)/PlxChipFn.o     \
+        $(SRC_COM_DIR)/PlxInterrupt.o  \
+        $(SRC_COM_DIR)/SuppFunc.o
+endif
+
+ifeq ($(PLX_CHIP), 6000)
+    PLX_OBJECTS = \
+        $(SRC_COM_DIR)/ApiFunc.o       \
+        $(SRC_COM_DIR)/Dispatch.o      \
+        $(SRC_COM_DIR)/Driver.o        \
+        $(SRC_COM_DIR)/Eep_6000.o      \
+        $(SRC_COM_DIR)/ModuleVersion.o \
+        $(SRC_COM_DIR)/PciFunc.o       \
+        $(SRC_COM_DIR)/PlxChipFn.o     \
+        $(SRC_COM_DIR)/PlxInterrupt.o  \
+        $(SRC_COM_DIR)/SuppFunc.o
+endif
+
+ifeq ($(PLX_CHIP), Dma)
+    PLX_OBJECTS = \
+        $(SRC_COM_DIR)/ApiFunc.o       \
+        $(SRC_COM_DIR)/Dispatch.o      \
+        $(SRC_COM_DIR)/Driver.o        \
+        $(SRC_COM_DIR)/ModuleVersion.o \
+        $(SRC_COM_DIR)/PciFunc.o       \
+        $(SRC_COM_DIR)/PlxChipFn.o     \
+        $(SRC_COM_DIR)/PlxInterrupt.o  \
+        $(SRC_COM_DIR)/SuppFunc.o
+endif
+
+ifeq ($(PLX_CHIP), EoPCIe)
+    PLX_OBJECTS = \
+        $(SRC_COM_DIR)/ApiFunc.o       \
+        $(SRC_COM_DIR)/Dispatch.o      \
+        $(SRC_COM_DIR)/Driver.o        \
+        $(SRC_COM_DIR)/Eep_8000.o      \
+        $(SRC_COM_DIR)/ModuleVersion.o \
+        $(SRC_COM_DIR)/PciFunc.o       \
+        $(SRC_COM_DIR)/PlxChipFn.o     \
+        $(SRC_COM_DIR)/PlxInterrupt.o  \
+        $(SRC_COM_DIR)/SuppFunc.o
+endif
+
+# Default to 9000 driver
+ifeq ($(PLX_OBJECTS), )
+    PLX_OBJECTS = \
+        $(SRC_COM_DIR)/ApiFunc.o       \
+        $(SRC_COM_DIR)/Dispatch.o      \
+        $(SRC_COM_DIR)/Driver.o        \
+        $(SRC_COM_DIR)/Eep_9000.o      \
+        $(SRC_COM_DIR)/ModuleVersion.o \
+        $(SRC_COM_DIR)/PciFunc.o       \
+        $(SRC_COM_DIR)/SuppFunc.o      \
+        $(SRC_CHIP_DIR)/PlxChipApi.o   \
+        $(SRC_CHIP_DIR)/PlxChipFn.o    \
+        $(SRC_CHIP_DIR)/PlxInterrupt.o
+endif
+
+
+
+#=============================================================================
+# Include shared PLX makefile
+#=============================================================================
+include $(PLX_SDK_DIR)/Linux/Makefiles/PlxMake.def

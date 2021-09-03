@@ -1,0 +1,49 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  buildalldrivers
+#      Abstract     :  Builds all PLX drivers
+#
+#-----------------------------------------------------------------------------
+
+
+clear
+
+# Remove comment to display script commands as it runs
+#set -x
+
+
+# Set sleep delay depending upon build or clean
+sd=2
+
+if [ "$1" = "c" ];        then sd=1; fi
+if [ "$2" = "a" ];        then sd=1; fi
+if [ "$1" = "clean" ];    then sd=1; fi
+if [ "$2" = "clean" ];    then sd=1; fi
+if [ "$1" = "cleanall" ]; then sd=1; fi
+if [ "$2" = "cleanall" ]; then sd=1; fi
+
+
+./builddriver 6000 $1 $2
+sleep $sd
+./builddriver 8000 $1 $2
+sleep $sd
+./builddriver 9050 $1 $2
+sleep $sd
+./builddriver 9030 $1 $2
+sleep $sd
+./builddriver 9080 $1 $2
+sleep $sd
+./builddriver 9054 $1 $2
+sleep $sd
+./builddriver 9056 $1 $2
+sleep $sd
+./builddriver 9656 $1 $2
+sleep $sd
+./builddriver 8311 $1 $2
+sleep $sd
+./builddriver Dma $1 $2
+sleep $sd
+./builddriver Svc $1 $2
+sleep $sd
+
+echo

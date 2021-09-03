@@ -1,0 +1,61 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  startlog
+#      Abstract     :  Set up a terminal window to capture module debug output
+#
+#-----------------------------------------------------------------------------
+
+clear
+
+echo
+echo "   ****************************************************"
+echo "   * NOTE:  You must be superuser, logged in as root, *"
+echo "   *        or have sufficient rights to kill/start   *"
+echo "   *        daemons and view log messages.  This      *"
+echo "   *        script will not work, otherwise.          *"
+echo "   ****************************************************"
+echo
+
+
+# Determine which log daemon is installed
+SysLogd=syslogd
+if [ -f /sbin/rsyslogd ]; then
+    SysLogd=rsyslogd
+fi
+
+
+# Stop kernel log daemon if running
+if [ -f /var/run/klogd.pid ]; then
+    echo Stopping current klogd...
+    kill -s SIGTERM `cat /var/run/klogd.pid`
+    # Delay to let daemon halt
+    sleep 1
+fi
+
+
+# Stop current daemons if running
+if [ -f /var/run/rsyslogd.pid ]; then
+    echo Stopping current rsyslogd...
+    kill -s SIGTERM `cat /var/run/rsyslogd.pid`
+    # Delay to let daemon halt
+    sleep 1
+fi
+
+if [ -f /var/run/syslogd.pid ]; then
+    echo Stopping current syslogd...
+    kill -s SIGTERM `cat /var/run/syslogd.pid`
+    # Delay to let daemon halt
+    sleep 1
+fi
+
+
+# Start new daemon only if 'syslogd'
+if [ "${SysLogd}" = "syslogd" ]; then
+    echo Starting new ${SysLogd}...
+    /sbin/${SysLogd}
+fi
+
+echo Starting log to console...
+echo ">>>>>"
+echo
+cat /proc/kmsg

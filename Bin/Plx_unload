@@ -1,0 +1,140 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  Plx_unload
+#      Abstract     :  Unloads a PLX module
+#
+#-----------------------------------------------------------------------------
+
+clear
+
+# Remove comment to display script commands as it runs
+#set -x
+
+# Path to the driver nodes
+path=/dev/plx
+
+
+# Verify command-line
+if [ "$1" = "" ]; then
+    plx_error=1
+else
+    plx_error=1
+
+    if [ "$1" = "9050" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9030" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9080" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9054" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9056" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9656" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "8311" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "6000" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "8000" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "Dma" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "EoPCIe" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "Svc" ]; then
+        plx_error=0
+    fi
+fi
+
+if [ "${plx_error}" == "1" ]; then
+    echo
+    echo "PLX Linux module unload script"
+    echo
+    echo "  Usage: Plx_unload {PLX_Chip} [DebugOption]"
+    echo
+    echo "     PLX_Chip    = 6000       : PLX 6254/6540/6466 NT-mode PnP driver"
+    echo "                   8000       : PLX 8000 NT-mode PnP driver"
+    echo "                   9050       : PLX 9050/9052 PnP driver"
+    echo "                   9030       : PLX 9030 PnP driver"
+    echo "                   9080       : PLX 9080 PnP driver"
+    echo "                   9054       : PLX 9054 PnP driver"
+    echo "                   9056       : PLX 9056 PnP driver"
+    echo "                   9656       : PLX 9656 PnP driver"
+    echo "                   8311       : PLX 8311 PnP driver"
+    echo "                   Dma        : PLX 8600 DMA Controller PnP driver"
+    echo "                   Svc        : PLX PCI/PCIe Service driver"
+    echo
+    echo "     DebugOption = <none>     : Unload Release build of module"
+    echo "                   'd'        : Unload Debug build of module"
+    echo
+    echo "  E.g.: Plx_unload 9054 d   - Unload 9054 module debug version"
+    echo "        Plx_unload 8000     - Unload 8000 NT module release version"
+    echo
+    exit
+fi
+
+# PLX Chip to load module for
+plx_chip=$1
+
+# Check for debug version
+if [ "$2" != "" ]; then
+    debug=_dbg
+fi
+
+# Registered name of driver
+name=Plx${plx_chip}
+
+# Name of module to unload
+module=${name}${debug}.ko
+
+
+echo
+echo "   ****************************************************"
+echo "   * NOTE:  You must be superuser, logged in as root, *"
+echo "   *        or have sufficient rights to remove       *"
+echo "   *        modules or this script will not work.     *"
+echo "   ****************************************************"
+echo
+echo
+echo -n "Clear existing device nodes..... "
+rm -f $path/${name}*
+echo "Ok (${path}/${name})"
+
+# Delete the directory only if empty
+if [ -d ${path} ]; then
+    echo -n "Delete device node path......... "
+    rmdir --ignore-fail-on-non-empty ${path}
+    echo "Ok (${path})"
+fi
+
+echo -n "Remove module................... "
+/sbin/rmmod $module
+echo "Ok ($module)"
+
+echo
+echo Module unload complete.
+echo
+echo

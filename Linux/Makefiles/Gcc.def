@@ -1,0 +1,76 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  Gcc.def
+#      Abstract     :  The definitions for building with the GCC tools
+#      Last Revision:  06-01-05
+#      SDK Version  :  4.40
+#
+#-----------------------------------------------------------------------------
+
+
+#=============================================================================
+# Compiler/Assembler names
+#=============================================================================
+AS = as
+AR = ar
+LD = ld
+CC = gcc
+
+
+
+#=============================================================================
+# Options for debug and release builds
+#=============================================================================
+EXTRA_CFLAGS += -DGCC
+
+ifneq ($(TGT_TYPE), Driver)
+    ifdef PLX_DEBUG
+        EXTRA_CFLAGS += -g3
+    else
+        EXTRA_CFLAGS += -O2
+    endif
+endif
+
+# Optimizations required for drivers to expand in-line functions
+ifeq ($(TGT_TYPE), Driver)
+    EXTRA_CFLAGS += -O2
+endif
+
+
+
+#=============================================================================
+# Tools command-line
+#
+# Flag descriptions:
+#    -c          Compile only, skip link phase
+#    -Wall       Enable all warnings to be displayed
+#    -pipe       Use pipes instead of temp files for passing data to assembler
+#=============================================================================
+EXTRA_CFLAGS += -c -Wall -pipe
+
+
+
+#=============================================================================
+# Compile rules
+#=============================================================================
+.SUFFIXES: .c
+
+%.o : %.c
+	@echo Compiling: $<
+	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
+	@echo
+
+$(OBJ_DIR)/%.o : %.c
+	@echo Compiling: $<
+	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
+	@echo
+
+$(OBJ_DIR)/%.o : $(COMMON_DIR)/%.c
+	@echo Compiling: $*.c
+	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
+	@echo
+
+$(OBJ_DIR)/%.o : $(PLX_CHIP_DIR)/%.c
+	@echo Compiling: Pci$(PLX_CHIP)/$*.c
+	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
+	@echo

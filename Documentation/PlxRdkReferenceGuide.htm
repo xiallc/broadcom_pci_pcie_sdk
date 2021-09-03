@@ -1,0 +1,3358 @@
+<html xmlns:v="urn:schemas-microsoft-com:vml"
+xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=ProgId content=Word.Document>
+<meta name=Generator content="Microsoft Word 10">
+<meta name=Originator content="Microsoft Word 10">
+<link rel=File-List href="PlxRdkReferenceGuide_files/filelist.xml">
+<title>PLX RDK Quick Reference Guide</title>
+<!--[if gte mso 9]><xml>
+ <w:WordDocument>
+  <w:SpellingState>Clean</w:SpellingState>
+  <w:GrammarState>Clean</w:GrammarState>
+  <w:BrowserLevel>MicrosoftInternetExplorer4</w:BrowserLevel>
+ </w:WordDocument>
+</xml><![endif]-->
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:"MS Mincho";
+	panose-1:2 2 6 9 4 2 5 8 3 4;
+	mso-font-alt:"\FF2D\FF33 \660E\671D";
+	mso-font-charset:128;
+	mso-generic-font-family:roman;
+	mso-font-format:other;
+	mso-font-pitch:fixed;
+	mso-font-signature:1 134676480 16 0 131072 0;}
+@font-face
+	{font-family:Tahoma;
+	panose-1:2 11 6 4 3 5 4 4 2 4;
+	mso-font-charset:0;
+	mso-generic-font-family:swiss;
+	mso-font-pitch:variable;
+	mso-font-signature:1627421319 -2147483648 8 0 66047 0;}
+@font-face
+	{font-family:"Arial Black";
+	panose-1:2 11 10 4 2 1 2 2 2 4;
+	mso-font-charset:0;
+	mso-generic-font-family:swiss;
+	mso-font-pitch:variable;
+	mso-font-signature:647 0 0 0 159 0;}
+@font-face
+	{font-family:"\@MS Mincho";
+	panose-1:0 0 0 0 0 0 0 0 0 0;
+	mso-font-charset:128;
+	mso-generic-font-family:roman;
+	mso-font-format:other;
+	mso-font-pitch:fixed;
+	mso-font-signature:1 134676480 16 0 131072 0;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{mso-style-parent:"";
+	margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"Times New Roman";
+	mso-bidi-font-family:"Times New Roman";}
+h1
+	{mso-style-next:"Body Text";
+	margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:5.75pt;
+	mso-pagination:widow-orphan lines-together;
+	page-break-after:avoid;
+	mso-outline-level:1;
+	background:black;
+	mso-shading:windowtext;
+	mso-pattern:solid auto;
+	border:none;
+	mso-border-top-alt:solid white 6.0pt;
+	mso-border-left-alt:solid white .75pt;
+	mso-border-bottom-alt:solid white .75pt;
+	padding:0in;
+	mso-padding-alt:3.0pt 0in 3.0pt 3.0pt;
+	font-size:11.0pt;
+	mso-bidi-font-size:10.0pt;
+	font-family:"Arial Black";
+	color:white;
+	letter-spacing:-.5pt;
+	mso-font-kerning:10.0pt;
+	font-weight:normal;}
+h2
+	{mso-style-next:Normal;
+	margin-top:24.0pt;
+	margin-right:0in;
+	margin-bottom:6.0pt;
+	margin-left:.5in;
+	text-indent:-.25in;
+	mso-pagination:widow-orphan;
+	page-break-after:avoid;
+	mso-outline-level:2;
+	mso-list:l3 level1 lfo2;
+	tab-stops:list .5in;
+	font-size:11.0pt;
+	mso-bidi-font-size:14.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";
+	font-style:italic;}
+h3
+	{mso-style-next:Normal;
+	margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	text-align:center;
+	mso-pagination:widow-orphan;
+	page-break-after:avoid;
+	mso-outline-level:3;
+	font-size:20.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";
+	font-weight:normal;}
+h4
+	{mso-style-next:Normal;
+	margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	text-align:center;
+	mso-pagination:widow-orphan;
+	page-break-after:avoid;
+	mso-outline-level:4;
+	font-size:14.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";
+	font-weight:normal;}
+h5
+	{mso-style-next:Normal;
+	margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	text-align:center;
+	mso-pagination:widow-orphan;
+	page-break-after:avoid;
+	mso-outline-level:5;
+	font-size:14.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-bidi-font-family:"Times New Roman";}
+p.MsoToc2, li.MsoToc2, div.MsoToc2
+	{mso-style-next:Normal;
+	margin-top:6.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:.25in;
+	text-align:justify;
+	mso-pagination:widow-orphan;
+	tab-stops:45.35pt right dotted 6.5in;
+	font-size:10.0pt;
+	mso-bidi-font-size:20.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"Times New Roman";
+	mso-bidi-font-family:"Times New Roman";}
+p.MsoTitle, li.MsoTitle, div.MsoTitle
+	{margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	text-align:center;
+	mso-pagination:widow-orphan;
+	font-size:22.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";}
+p.MsoBodyText, li.MsoBodyText, div.MsoBodyText
+	{margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:.25in;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";
+	mso-bidi-font-family:"Times New Roman";}
+p.MsoBodyTextIndent, li.MsoBodyTextIndent, div.MsoBodyTextIndent
+	{margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:45.0pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";}
+p.MsoListContinue, li.MsoListContinue, div.MsoListContinue
+	{margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:6.0pt;
+	margin-left:.25in;
+	text-align:justify;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"Times New Roman";
+	mso-bidi-font-family:"Times New Roman";}
+p.MsoSubtitle, li.MsoSubtitle, div.MsoSubtitle
+	{margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	text-align:center;
+	mso-pagination:widow-orphan;
+	font-size:20.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";
+	mso-bidi-font-family:"Times New Roman";}
+p.MsoBodyTextIndent2, li.MsoBodyTextIndent2, div.MsoBodyTextIndent2
+	{margin-top:12.0pt;
+	margin-right:0in;
+	margin-bottom:6.0pt;
+	margin-left:45.0pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Arial;
+	mso-fareast-font-family:"MS Mincho";}
+a:link, span.MsoHyperlink
+	{color:blue;
+	mso-text-animation:none;
+	text-decoration:none;
+	text-underline:none;
+	text-decoration:none;
+	text-line-through:none;}
+a:visited, span.MsoHyperlinkFollowed
+	{color:purple;
+	mso-text-animation:none;
+	text-decoration:none;
+	text-underline:none;
+	text-decoration:none;
+	text-line-through:none;}
+p.MsoDocumentMap, li.MsoDocumentMap, div.MsoDocumentMap
+	{margin-top:3.0pt;
+	margin-right:0in;
+	margin-bottom:3.0pt;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	background:navy;
+	font-size:10.0pt;
+	mso-bidi-font-size:12.0pt;
+	font-family:Tahoma;
+	mso-fareast-font-family:"Times New Roman";}
+span.SpellE
+	{mso-style-name:"";
+	mso-spl-e:yes;}
+span.GramE
+	{mso-style-name:"";
+	mso-gram-e:yes;}
+@page Section1
+	{size:8.5in 11.0in;
+	margin:1.0in 65.95pt 1.0in 65.95pt;
+	mso-header-margin:.5in;
+	mso-footer-margin:.5in;
+	mso-paper-source:0;}
+div.Section1
+	{page:Section1;}
+ /* List Definitions */
+ @list l0
+	{mso-list-id:188103721;
+	mso-list-type:hybrid;
+	mso-list-template-ids:1887856456 -939649182 67698713 67698715 67698703 67698713 67698715 67698703 67698713 67698715;}
+@list l0:level1
+	{mso-level-tab-stop:.75in;
+	mso-level-number-position:left;
+	margin-left:.75in;
+	text-indent:-.25in;}
+@list l0:level2
+	{mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level3
+	{mso-level-tab-stop:1.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level4
+	{mso-level-tab-stop:2.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level5
+	{mso-level-tab-stop:2.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level6
+	{mso-level-tab-stop:3.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level7
+	{mso-level-tab-stop:3.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level8
+	{mso-level-tab-stop:4.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l0:level9
+	{mso-level-tab-stop:4.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1
+	{mso-list-id:268897205;
+	mso-list-type:hybrid;
+	mso-list-template-ids:-1038562552 -1091381518 67698691 67698693 67698689 67698691 67698693 67698689 67698691 67698693;}
+@list l1:level1
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:.75in;
+	mso-level-number-position:left;
+	margin-left:.75in;
+	text-indent:-.25in;
+	font-family:Symbol;}
+@list l1:level2
+	{mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level3
+	{mso-level-tab-stop:1.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level4
+	{mso-level-tab-stop:2.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level5
+	{mso-level-tab-stop:2.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level6
+	{mso-level-tab-stop:3.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level7
+	{mso-level-tab-stop:3.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level8
+	{mso-level-tab-stop:4.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level9
+	{mso-level-tab-stop:4.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2
+	{mso-list-id:1465926987;
+	mso-list-type:hybrid;
+	mso-list-template-ids:-124607860 67698703 67698713 67698715 67698703 67698713 67698715 67698703 67698713 67698715;}
+@list l2:level1
+	{mso-level-tab-stop:.75in;
+	mso-level-number-position:left;
+	margin-left:.75in;
+	text-indent:-.25in;}
+@list l2:level2
+	{mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level3
+	{mso-level-tab-stop:1.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level4
+	{mso-level-tab-stop:2.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level5
+	{mso-level-tab-stop:2.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level6
+	{mso-level-tab-stop:3.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level7
+	{mso-level-tab-stop:3.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level8
+	{mso-level-tab-stop:4.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2:level9
+	{mso-level-tab-stop:4.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3
+	{mso-list-id:2051682126;
+	mso-list-type:hybrid;
+	mso-list-template-ids:-379544322 727120058 67698713 67698715 67698703 67698713 67698715 67698703 67698713 67698715;}
+@list l3:level1
+	{mso-level-style-link:"Heading 2";
+	mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level2
+	{mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level3
+	{mso-level-tab-stop:1.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level4
+	{mso-level-tab-stop:2.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level5
+	{mso-level-tab-stop:2.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level6
+	{mso-level-tab-stop:3.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level7
+	{mso-level-tab-stop:3.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level8
+	{mso-level-tab-stop:4.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l3:level9
+	{mso-level-tab-stop:4.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+ol
+	{margin-bottom:0in;}
+ul
+	{margin-bottom:0in;}
+-->
+</style>
+<!--[if gte mso 10]>
+<style>
+ /* Style Definitions */
+ table.MsoNormalTable
+	{mso-style-name:"Table Normal";
+	mso-tstyle-rowband-size:0;
+	mso-tstyle-colband-size:0;
+	mso-style-noshow:yes;
+	mso-style-parent:"";
+	mso-padding-alt:0in 5.4pt 0in 5.4pt;
+	mso-para-margin:0in;
+	mso-para-margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	font-family:"Times New Roman";}
+</style>
+<![endif]--><!--[if gte mso 9]><xml>
+ <o:shapedefaults v:ext="edit" spidmax="3074"/>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <o:shapelayout v:ext="edit">
+  <o:idmap v:ext="edit" data="1"/>
+ </o:shapelayout></xml><![endif]-->
+</head>
+
+<body lang=EN-US link=blue vlink=purple style='tab-interval:.5in'>
+
+<div class=Section1>
+
+<p class=MsoTitle><span style='font-size:24.0pt;mso-bidi-font-size:12.0pt;
+color:green'>PLX RDK<o:p></o:p></span></p>
+
+<p class=MsoSubtitle><span style='font-size:22.0pt;mso-bidi-font-size:12.0pt;
+color:green'>Quick Reference Guide<o:p></o:p></span></p>
+
+<p class=MsoNormal align=center style='text-align:center'><span
+style='font-size:11.0pt;mso-bidi-font-size:12.0pt'><o:p>&nbsp;</o:p></span></p>
+
+<p class=MsoNormal align=center style='text-align:center'><span
+style='font-size:11.0pt;mso-bidi-font-size:12.0pt'><o:p>&nbsp;</o:p></span></p>
+
+<h4 style='page-break-after:auto'>December 2005</h4>
+
+<p class=MsoNormal><span style='font-size:12.0pt;mso-fareast-font-family:"MS Mincho";
+mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+
+<div style='margin-left:5.75pt'>
+
+<div style='border-top:solid white 6.0pt;border-left:solid white 1.0pt;
+border-bottom:solid white 1.0pt;border-right:none;mso-border-top-alt:solid white 6.0pt;
+mso-border-left-alt:solid white .75pt;mso-border-bottom-alt:solid white .75pt;
+padding:3.0pt 0in 3.0pt 3.0pt;background:black;mso-shading:windowtext;
+mso-pattern:solid auto'>
+
+<h1 style='margin-left:0in;background:black;mso-shading:windowtext;mso-pattern:
+solid auto'><a name="_INSTALLATION"></a>Contents</h1>
+
+</div>
+
+</div>
+
+<p class=MsoBodyText>This reference provides information useful to a software
+engineer when working with PLX Reference Design Kits (<span class=SpellE>RDKs</span>).<span
+style='mso-spacerun:yes'>  </span>It is intended to give a quick source of reference
+to lookup device memory maps, devices types installed, etc.<span
+style='mso-spacerun:yes'>  </span>The information provided herein is by no
+means a complete reference for the PLX <span class=SpellE>RDKs</span>.<span
+style='mso-spacerun:yes'>  </span>For a complete RDK reference, please refer to
+the <i>PLX Hardware Development Kit (HDK)</i>.</p>
+
+<p class=MsoBodyText>The first section lists PLX <span class=SpellE>RDKs</span>
+currently available from PLX.<span style='mso-spacerun:yes'>  </span>The legacy
+RDK section provides information about PLX <span class=SpellE>RDKs</span> no
+longer in production, but still supported in the PLX SDK.<span
+style='mso-spacerun:yes'>  </span>The following properties are provided for
+each RDK:</p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo4;
+tab-stops:list .75in'><![if !supportLists]><span style='font-family:Symbol;
+mso-fareast-font-family:Symbol;mso-bidi-font-family:Symbol;mso-bidi-font-weight:
+bold;mso-bidi-font-style:italic'><span style='mso-list:Ignore'>·<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><b>Device/Vendor ID<br>
+</b><span class=GramE><i>The</i></span><i> Device/Vendor ID assigned by PLX to
+the RDK.<span style='mso-spacerun:yes'>  </span>This value can be found in the
+EEPROM on the board and in the Device/Vendor ID PCI configuration register,
+offset 0h. <b><o:p></o:p></b></i></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo4;
+tab-stops:list .75in'><![if !supportLists]><span style='font-family:Symbol;
+mso-fareast-font-family:Symbol;mso-bidi-font-family:Symbol;mso-bidi-font-weight:
+bold;mso-bidi-font-style:italic'><span style='mso-list:Ignore'>·<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><b>Local CPU<br>
+</b><i>The local CPU type, if any, on the RDK.<b><o:p></o:p></b></i></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo4;
+tab-stops:list .75in'><![if !supportLists]><span style='font-family:Symbol;
+mso-fareast-font-family:Symbol;mso-bidi-font-family:Symbol;mso-bidi-font-weight:
+bold;mso-bidi-font-style:italic'><span style='mso-list:Ignore'>·<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><b>Flash Type<br>
+</b><i>The Flash device(s) model number used on the RDK<b><o:p></o:p></b></i></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo4;
+tab-stops:list .75in'><![if !supportLists]><span style='font-family:Symbol;
+mso-fareast-font-family:Symbol;mso-bidi-font-family:Symbol;mso-bidi-font-style:
+italic'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><b>Flash Program Offset</b><br>
+<i>Refers to the hex value placed into the “Flash offset” field of the <span
+class=SpellE>PLXMon</span> download dialog when performing a ROM download, i.e.
+re-programming the Flash.<span style='mso-spacerun:yes'>  </span><b>Note</b>:
+The default RDK Flash images (in binary format) can be found in the folder &lt;<span
+class=SpellE>Sdk_Dir</span>&gt;\<span class=SpellE>PciSdk\SupportFiles\RdkFlashFiles</span>.<o:p></o:p></i></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo4;
+tab-stops:list .75in'><![if !supportLists]><span style='font-family:Symbol;
+mso-fareast-font-family:Symbol;mso-bidi-font-family:Symbol;mso-bidi-font-style:
+italic'><span style='mso-list:Ignore'>·<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><b>EEPROM Type</b><br>
+<span class=GramE><i>The</i></span><i> EEPROM device model number used on the
+RDK.<span style='mso-spacerun:yes'>  </span><b>Note</b>: The default RDK EEPROM
+values are not provided in this reference, but they can be found (in binary
+format) in the folder &lt;<span class=SpellE>Sdk_Dir</span>&gt;\<span
+class=SpellE>PciSdk\SupportFiles\EepromFiles\Plx_Rdk_Defaults</span>.<o:p></o:p></i></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l1 level1 lfo4;
+tab-stops:list .75in'><![if !supportLists]><span style='font-family:Symbol;
+mso-fareast-font-family:Symbol;mso-bidi-font-family:Symbol;mso-bidi-font-weight:
+bold;mso-bidi-font-style:italic'><span style='mso-list:Ignore'>·<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><b>Memory Map<br>
+</b><span class=GramE><i>The</i></span><i> RDK memory map displaying the mapped
+location of devices on the local bus.<b><o:p></o:p></b></i></p>
+
+<p class=MsoBodyText><b><o:p>&nbsp;</o:p></b></p>
+
+<p class=MsoBodyText><b><i>PLX <span class=SpellE>RDKs</span>:<o:p></o:p></i></b></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>1.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9052_RDK-LITE">PCI 9052 RDK-LITE</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>2.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_&amp;_Compact">PCI &amp; Compact PCI 9030 RDK-LITE</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>3.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9656_RDK-LITE">PCI 9656 RDK-LITE</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>4.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_Compact_PCI_9656-860">Compact PCI 9656-860</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>5.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9056_RDK-LITE">PCI 9056 RDK-LITE</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>6.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_Compact_PCI_9056-860">Compact PCI 9056-860</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>7.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9054_RDK-LITE">PCI 9054 RDK-LITE</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>8.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_&amp;_Compact_1">PCI &amp; Compact PCI 9054-860</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l2 level1 lfo6;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>9.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_Express_8111-9056">PCI Express 8311 RDK</a></p>
+
+<p class=MsoBodyText style='margin-left:.5in'><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyText><b><i>PLX Legacy <span class=SpellE>RDKs</span>:<o:p></o:p></i></b></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l0 level1 lfo8;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>1.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9050_RDK">PCI 9050 RDK</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l0 level1 lfo8;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>2.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9080-401B">PCI 9080-401B</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in;mso-list:l0 level1 lfo8;
+tab-stops:list .75in'><![if !supportLists]><span style='mso-fareast-font-family:
+Arial;mso-bidi-font-family:Arial'><span style='mso-list:Ignore'>3.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]><a
+href="#_PCI_9080-860">PCI 9080-860</a></p>
+
+<p class=MsoBodyText style='margin-left:5.75pt'><o:p>&nbsp;</o:p></p>
+
+<div style='margin-left:5.75pt'>
+
+<div style='border-top:solid white 6.0pt;border-left:solid white 1.0pt;
+border-bottom:solid white 1.0pt;border-right:none;mso-border-top-alt:solid white 6.0pt;
+mso-border-left-alt:solid white .75pt;mso-border-bottom-alt:solid white .75pt;
+padding:3.0pt 0in 3.0pt 3.0pt;background:black;mso-shading:windowtext;
+mso-pattern:solid auto'>
+
+<h1 style='margin-left:0in;background:black;mso-shading:windowtext;mso-pattern:
+solid auto'>PLX <span class=SpellE>RDKs</span></h1>
+
+</div>
+
+</div>
+
+<h2><a name="_Building_Windows_Drivers"></a><a
+name="_Manufacturing_Test_Utility"></a><a name="_PLX_SDK_Installation"></a><a
+name="_PCI_9052_RDK-LITE"></a><![if !supportLists]><span style='mso-fareast-font-family:
+Arial'><span style='mso-list:Ignore'>1.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]>PCI 9052 RDK-LITE</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>5201_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC46B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent style='tab-stops:153.0pt'><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:.8in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.8in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0300 0000<o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:.8in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0200 0000<o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>USER/ROM Socket<br>
+  Chip Select 3<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0100 0000<o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SRAM (128 Kb)<br>
+  Chip Select 2<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>ISA Memory Space<br>
+  (1&nbsp;MB)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>ISA I/O Space<br>
+  (16 bytes)<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_Toc508705296"></a><a name="_PCI_&amp;_Compact"></a><![if !supportLists]><span
+style='mso-bookmark:_Toc508705296'><span style='mso-fareast-font-family:Arial'><span
+style='mso-list:Ignore'>2.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span></span><![endif]><span style='mso-bookmark:_Toc508705296'>PCI
+&amp; Compact PCI 9030 RDK-LITE</span></h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>3001_10B5 (PCI) or
+  30C2_10B5 (Compact PCI)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;mso-table-layout-alt:fixed;
+ border:none;mso-border-alt:solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:54.85pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:solid windowtext 1.0pt;
+  border-left:none;border-bottom:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>0000 4000</p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>POM Connector</p>
+  <p class=MsoNormal align=center style='text-align:center'>Chip Select 1</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>0000 <span
+  class=SpellE>0000</span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>DPRAM (8 Kb,
+  16-bit)</p>
+  <p class=MsoNormal align=center style='text-align:center'>Chip Select 0</p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_PCI_9656_RDK-LITE"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>3.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>PCI
+9656 RDK-LITE</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>9601_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:54.85pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:solid windowtext 1.0pt;
+  border-left:none;border-bottom:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>1000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>POM Connector<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:13.9pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:13.9pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0002 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:13.9pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SRAM (128 Kb, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_PLX_SDK_Compatibility_1"></a><a name="_Compact_PCI_9656-860"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>4.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>Compact
+PCI 9656-860</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>96C2_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Motorola MPC 860</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>ATMEL AT49LV040 or AMD
+  29LV040B</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0000_0000h</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:16.6pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:16.6pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:16.6pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.3in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>FFF0 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Boot FLASH<br>
+  (512&nbsp;Kb, 8-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:.3in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>FF00 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>MPC860 Internal Memory-Mapped Registers
+  (IMMR)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:37.75pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:37.75pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>F000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:37.75pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Secondary FLASH<br>
+  (8&nbsp;MB, 16-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:62.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:62.5pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:62.5pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>5000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Direct Master Memory Space<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>4000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Direct Master I/O Space<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:7;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>3000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>PLX Chip Internal Registers<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:8;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:9;height:26.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:26.5pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:26.5pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SBSRAM<br>
+  (512&nbsp;Kb, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:10;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:11;mso-yfti-lastrow:yes;height:51.25pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:51.25pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:51.25pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SDRAM<br>
+  (64&nbsp;MB, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_PCI_9056_RDK-LITE"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>5.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>PCI
+9056 RDK-LITE</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>5601_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:54.85pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:solid windowtext 1.0pt;
+  border-left:none;border-bottom:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>1000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>POM Connector<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:13.9pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:13.9pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0002 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:13.9pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SRAM (128 Kb, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_Compact_PCI_9056-860"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>6.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>Compact
+PCI 9056-860</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>56C2_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Motorola MPC 860</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>ATMEL AT49LV040 or AMD
+  29LV040B</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0000_0000h</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:25.6pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:25.6pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:25.6pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.3in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>FFF0 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Boot FLASH<br>
+  (512&nbsp;Kb, 8-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:.3in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>FF00 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>MPC860 Internal Memory-Mapped Registers
+  (IMMR)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:33.25pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:33.25pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>F000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:33.25pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Secondary FLASH<br>
+  (8&nbsp;MB, 16-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:71.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:71.5pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:71.5pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>5000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Direct Master Memory Space<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>4000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Direct Master I/O Space<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:7;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>3000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>PLX Chip Internal Registers<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:8;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:9;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SBSRAM<br>
+  (512&nbsp;Kb, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:10;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:11;mso-yfti-lastrow:yes;height:40.0pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:40.0pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:40.0pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SDRAM<br>
+  (64&nbsp;MB, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_PCI_9054_RDK-LITE"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>7.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>PCI
+9054 RDK-LITE</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>5406_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:70.6pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:70.6pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2002 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:solid windowtext 1.0pt;
+  border-left:none;border-bottom:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:70.6pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SRAM (128 Kb)<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_Toc479469310"></a><a name="_Ref482784432"></a><a
+name="_Toc508705298"></a><a name="_PCI_&amp;_Compact_1"></a><![if !supportLists]><span
+style='mso-bookmark:_Toc479469310'><span style='mso-bookmark:_Ref482784432'><span
+style='mso-bookmark:_Toc508705298'><span style='mso-fareast-font-family:Arial'><span
+style='mso-list:Ignore'>8.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span></span></span></span><![endif]><span style='mso-bookmark:
+_Toc479469310'><span style='mso-bookmark:_Ref482784432'><span style='mso-bookmark:
+_Toc508705298'>PCI &amp; Compact PCI 9054-860</span></span></span></h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>1860_10B5 (PCI) or
+  C860_10B5 (Compact PCI)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Motorola MPC 860</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>ATMEL AT49LV040 or AMD
+  29LV040B</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0000_0000h</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;mso-table-layout-alt:fixed;
+ border:none;mso-border-alt:solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>FFF8 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:38.65pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:38.65pt'>
+  <p class=MsoNormal align=center style='text-align:center'>FFF0 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:38.65pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>FLASH (512 Kb)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:.3in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='text-align:center'>FF00 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>MPC860 Internal Memory-Mapped Registers (IMMR)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:.8in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.8in'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.8in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>5000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Direct Master I/O Space</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>4000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Direct Master Memory Space</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>3000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>PLX Chip Internal Registers</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:7;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:8;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>2000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>SBSRAM (512 Kb)<br>
+  (Compact PCI board only)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:9;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:10;mso-yfti-lastrow:yes;height:35.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:35.5pt'>
+  <p class=MsoNormal align=center style='text-align:center'>0000 <span
+  class=SpellE>0000</span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:35.5pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>SDRAM (32 MB)</p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_PCI_Express_8111-9056"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>9.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>PCI
+Express 8311 RDK</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>86E1_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Microchip 93LC56B or
+  equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:54.85pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>2000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border-top:solid windowtext 1.0pt;
+  border-left:none;border-bottom:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:54.85pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>1000 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>POM Connector<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:13.9pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:13.9pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0002 0000<o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:13.9pt'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=155 style='width:116.25pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SRAM (128 Kb, 32-bit)<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<div style='margin-left:5.75pt'>
+
+<div style='border-top:solid white 6.0pt;border-left:solid white 1.0pt;
+border-bottom:solid white 1.0pt;border-right:none;mso-border-top-alt:solid white 6.0pt;
+mso-border-left-alt:solid white .75pt;mso-border-bottom-alt:solid white .75pt;
+padding:3.0pt 0in 3.0pt 3.0pt;background:black;mso-shading:windowtext;
+mso-pattern:solid auto'>
+
+<h1 style='margin-left:0in;background:black;mso-shading:windowtext;mso-pattern:
+solid auto'>PLX Legacy <span class=SpellE>RDKs</span></h1>
+
+</div>
+
+</div>
+
+<h2 style='mso-list:l3 level1 lfo9'><a name="_PCI_9050_RDK"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>1.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>PCI
+9050 RDK</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>9050_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>N/A</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>NM93CS46 or equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:.8in'>
+  <td width=94 style='width:70.65pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.8in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:.8in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:.4in'>
+  <td width=94 style='width:70.65pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0300 0400<o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>ISA I/O Space<br>
+  Chip Select 1<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:.4in'>
+  <td width=94 style='width:70.65pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:.4in'>
+  <td width=94 style='width:70.65pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0280 0000<o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>ISA Memory Space<br>
+  Chip Select 0<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:.4in'>
+  <td width=94 style='width:70.65pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'><o:p>&nbsp;</o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:.4in'>
+  <td width=94 style='width:70.65pt;border:none;border-right:solid windowtext 1.0pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0101 FFFF<br>
+  <br>
+  0100 0000<o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>SRAM (128 Kb)<br>
+  Chip Select 2<o:p></o:p></span></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>0000 <span class=SpellE>0000</span><o:p></o:p></span></p>
+  </td>
+  <td width=158 style='width:118.35pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='margin-top:6.0pt;text-align:center'><span
+  style='mso-bidi-font-family:Arial'>Unused<o:p></o:p></span></p>
+  </td>
+ </tr>
+</table>
+
+<h2 style='mso-list:l3 level1 lfo9'><a name="_PCI_9080-401B"></a><![if !supportLists]><span
+style='mso-fareast-font-family:Arial'><span style='mso-list:Ignore'>2.<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span></span><![endif]>PCI
+9080-401B</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0401_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>IBM PPC 401</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>AMD 29F040</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0060_0000h<span
+  style='mso-spacerun:yes'>  </span>(assuming a 128 Kb image)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>NM93CS46 or equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;mso-table-layout-alt:fixed;
+ border:none;mso-border-alt:solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:32.35pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:32.35pt'>
+  <p class=MsoNormal align=center style='text-align:center'>FFF8 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;padding:0in .05in 0in .05in;
+  height:32.35pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>FLASH (512 Kb)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:17.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:17.5pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:17.5pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:28.75pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:28.75pt'>
+  <p class=MsoNormal align=center style='text-align:center'>C000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:28.75pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>PLX Option Module (POM)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:14.35pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:14.35pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:14.35pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>B800 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Direct Master<br>
+  Memory Space</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>B000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Direct Master<br>
+  I/O Space</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;height:42.25pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:42.25pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:42.25pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:7;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>8000 0400</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Reset Register</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:8;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>7E00 0400</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Interrupt Controller</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:9;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>7E00 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>16C550 UART</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:10;height:13.9pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:13.9pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:13.9pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:11;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>2000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>PLX Chip Internal Registers</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:12;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>1000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>SRAM (512 Kb)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:13;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>0000 <span
+  class=SpellE>0000</span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>DRAM (16 MB)</p>
+  </td>
+ </tr>
+</table>
+
+<h2><a name="_PCI_9080-860"></a><![if !supportLists]><span style='mso-fareast-font-family:
+Arial'><span style='mso-list:Ignore'>3.<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]>PCI 9080-860</h2>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:45.0pt;border-collapse:collapse;border:none;mso-border-alt:
+ solid windowtext .5pt;mso-padding-alt:0in 5.4pt 0in 5.4pt'>
+ <tr style='mso-yfti-irow:0'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  mso-border-alt:solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Property<o:p></o:p></span></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border:solid windowtext 1.0pt;
+  border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:
+  solid windowtext .5pt;background:teal;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent align=center style='margin-left:0in;text-align:
+  center'><b><span style='color:white'>Value<o:p></o:p></span></b></p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Device/Vendor ID<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0860_10B5</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Local CPU<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>Motorola MPC 860</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>AMD 29F040</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>Flash Program Offset<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>0000_0000h</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;mso-yfti-lastrow:yes'>
+  <td width=155 valign=top style='width:116.6pt;border:solid windowtext 1.0pt;
+  border-top:none;mso-border-top-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;
+  padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'><b>EEPROM Type<o:p></o:p></b></p>
+  </td>
+  <td width=324 valign=top style='width:243.0pt;border-top:none;border-left:
+  none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-left-alt:solid windowtext .5pt;
+  mso-border-alt:solid windowtext .5pt;padding:0in 5.4pt 0in 5.4pt'>
+  <p class=MsoBodyTextIndent style='margin-left:0in'>NM93CS46 or equivalent</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoBodyTextIndent><o:p>&nbsp;</o:p></p>
+
+<p class=MsoBodyTextIndent>Memory map:</p>
+
+<table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0
+ style='margin-left:99.0pt;border-collapse:collapse;mso-table-layout-alt:fixed;
+ border:none;mso-border-alt:solid windowtext .5pt;mso-padding-alt:0in .05in 0in .05in'>
+ <tr style='mso-yfti-irow:0;height:17.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:17.5pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border:solid windowtext 1.0pt;border-left:
+  none;mso-border-top-alt:solid windowtext .5pt;mso-border-bottom-alt:solid windowtext .5pt;
+  mso-border-right-alt:solid windowtext .5pt;background:#F1F1F1;mso-shading:
+  windowtext;mso-pattern:thin-diag-stripe silver;padding:0in .05in 0in .05in;
+  height:17.5pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:1;height:32.35pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:32.35pt'>
+  <p class=MsoNormal align=center style='text-align:center'>FFF0 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:32.35pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>FLASH (512 Kb)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:2;height:.3in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='text-align:center'>FF00 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.3in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>MPC860 Internal Memory-Mapped Registers (IMMR)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:3;height:17.5pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:17.5pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:17.5pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:4;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>C000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>PLX Chip Internal Registers</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:5;height:48.1pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:48.1pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:48.1pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:6;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>5000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Direct Master<br>
+  I/O Space</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:7;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>4000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Direct Master<br>
+  Memory Space</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:8;height:31.9pt'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:31.9pt'>
+  <p class=MsoNormal align=center style='text-align:center'><o:p>&nbsp;</o:p></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  background:#F1F1F1;mso-shading:windowtext;mso-pattern:thin-diag-stripe silver;
+  padding:0in .05in 0in .05in;height:31.9pt'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>Unused</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:9;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>1000 0000</p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>DRAM (16 MB)</p>
+  </td>
+ </tr>
+ <tr style='mso-yfti-irow:10;mso-yfti-lastrow:yes;height:.4in'>
+  <td width=94 valign=bottom style='width:70.65pt;border:none;border-right:
+  solid windowtext 1.0pt;mso-border-right-alt:solid windowtext .5pt;padding:
+  0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center'>0000 <span
+  class=SpellE>0000</span></p>
+  </td>
+  <td width=166 style='width:124.6pt;border-top:none;border-left:none;
+  border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;
+  mso-border-top-alt:solid windowtext .5pt;mso-border-top-alt:solid windowtext .5pt;
+  mso-border-bottom-alt:solid windowtext .5pt;mso-border-right-alt:solid windowtext .5pt;
+  padding:0in .05in 0in .05in;height:.4in'>
+  <p class=MsoNormal align=center style='text-align:center;page-break-after:
+  avoid'>SRAM (512 Kb)</p>
+  </td>
+ </tr>
+</table>
+
+<p class=MsoNormal><o:p>&nbsp;</o:p></p>
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,224 @@
+#-----------------------------------------------------------------------------
+#
+#      File         :  Plx_load
+#      Abstract     :  Loads a PLX module
+#
+#-----------------------------------------------------------------------------
+
+
+clear
+
+# Remove comment to display script commands as it runs
+#set -x
+
+
+#=============================================================================
+# Modify the "export" statement below to set 'PLX_SDK_DIR' to the location
+# of the PLX Linux installation path.  Some examples are:
+#
+#      export PLX_SDK_DIR=/usr/src/PlxSdk
+#      export PLX_SDK_DIR=/$HOME/PlxSdk
+#=============================================================================
+if [ "${PLX_SDK_DIR}1" == "1" ]; then
+    # Add PLX_SDK_DIR to environment variables
+    export PLX_SDK_DIR=/usr/src/PlxSdk
+
+    echo
+    echo "  Note:"
+    echo
+    echo "      The required environment variable, PLX_SDK_DIR, is not defined"
+    echo "      in the environment.  The default value (\"$PLX_SDK_DIR\")"
+    echo "      will be used instead.  Please update your environment to override"
+    echo "      the default, or modify this script accordingly.  To set an"
+    echo "      environment variable, use the \"declare\" command as follows:"
+    echo
+    echo "         export PLX_SDK_DIR=<root of PLX Linux installation>"
+    echo
+else
+    # Make sure that PLX_SDK_DIR is in the environment, not just a shell variable
+    export PLX_SDK_DIR=${PLX_SDK_DIR}
+fi
+
+
+# Path to the driver nodes
+path=/dev/plx
+
+# Default to non-service driver
+bServiceDriver=0
+
+
+# Verify command-line
+if [ "$1" = "" ]; then
+    plx_error=1
+else
+    plx_error=1
+
+    if [ "$1" = "9050" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9030" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9080" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9054" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9056" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "9656" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "8311" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "6000" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "8000" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "Dma" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "EoPCIe" ]; then
+        plx_error=0
+    fi
+
+    if [ "$1" = "Svc" ]; then
+        plx_error=0
+        bServiceDriver=1
+    fi
+fi
+
+if [ "${plx_error}" == "1" ]; then
+    echo
+    echo "PLX Linux module load script"
+    echo
+    echo "  Usage: Plx_load {PLX_Chip} [DebugOption]"
+    echo
+    echo "     PLX_Chip    = 6000       : PLX 6254/6540/6466 NT-mode PnP driver"
+    echo "                   8000       : PLX 8000 NT-mode PnP driver"
+    echo "                   9050       : PLX 9050/9052 PnP driver"
+    echo "                   9030       : PLX 9030 PnP driver"
+    echo "                   9080       : PLX 9080 PnP driver"
+    echo "                   9054       : PLX 9054 PnP driver"
+    echo "                   9056       : PLX 9056 PnP driver"
+    echo "                   9656       : PLX 9656 PnP driver"
+    echo "                   8311       : PLX 8311 PnP driver"
+    echo "                   Dma        : PLX 8600 DMA Controller PnP driver"
+    echo "                   Svc        : PLX PCI/PCIe Service driver"
+    echo
+    echo "     DebugOption = <none>     : Load Release build of module"
+    echo "                   'd'        : Load Debug build of module"
+    echo
+    echo "  E.g.: Plx_load 9054 d   - Load 9054 module debug version"
+    echo "        Plx_load 8000     - Load 8000 NT module release version"
+    echo
+    exit
+fi
+
+
+# PLX Chip to load module for
+plx_chip=$1
+
+# Check for debug version
+if [ "$2" != "" ]; then
+    debug=_dbg
+fi
+
+# Registered name of driver
+name=Plx${plx_chip}
+
+# Name of module to load
+module=${name}${debug}.ko
+
+# Install the module
+echo
+echo "   *****************************************************************"
+echo "   * NOTES:                                                        *"
+echo "   *                                                               *"
+echo "   *  You must be superuser, logged in as root, or have sufficient *"
+echo "   *  rights to install modules or this script will not work.      *"
+echo "   *                                                               *"
+echo "   *  A warning regarding 'kernel tainting' is normal.  This is    *"
+echo "   *  because the PLX driver is marked with a 'Proprietary'        *"
+echo "   *  license tag, not GPL.  For more information, please refer    *"
+echo "   *  to:                                                          *"
+echo "   *        http://www.tux.org/lkml/#export-tainted                *"
+echo "   *****************************************************************"
+echo
+
+echo "Installing module ($module)...."
+/sbin/insmod $PLX_SDK_DIR/Linux/Driver/${name}/${module}
+echo
+
+# Get the major number
+echo -n "Getting Module major number..... "
+major=`cat /proc/devices | awk "\\$2==\"$name\" {print \\$1}"`
+
+# Check if valid
+if [ "$major" = "" ]; then
+    echo "ERROR: Module not loaded or no device found"
+    echo
+    exit
+fi
+
+# Display Major ID
+echo "Ok (MajorID = $major)"
+
+# Create the device node path
+echo -n "Creating device node path....... "
+if [ -d ${path} ]; then
+    echo "$path already exists"
+else
+    mkdir $path
+    chmod 0777 $path
+    echo "Ok ($path)"
+fi
+
+# Create the device nodes (up to 10 by default)
+echo -n "Creating device nodes........... "
+rm -f ${path}/${name}*
+mknod ${path}/${name} c $major 255
+
+# Create additional nodes for non-service driver
+if [ "${bServiceDriver}" == "0" ]; then
+    mknod ${path}/${name}-0  c $major 0
+    mknod ${path}/${name}-1  c $major 1
+    mknod ${path}/${name}-2  c $major 2
+    mknod ${path}/${name}-3  c $major 3
+    mknod ${path}/${name}-4  c $major 4
+    mknod ${path}/${name}-5  c $major 5
+    mknod ${path}/${name}-6  c $major 6
+    mknod ${path}/${name}-7  c $major 7
+    mknod ${path}/${name}-8  c $major 8
+    mknod ${path}/${name}-9  c $major 9
+    mknod ${path}/${name}-10 c $major 10
+    mknod ${path}/${name}-11 c $major 11
+    mknod ${path}/${name}-12 c $major 12
+    mknod ${path}/${name}-13 c $major 13
+    mknod ${path}/${name}-14 c $major 14
+    mknod ${path}/${name}-15 c $major 15
+    mknod ${path}/${name}-16 c $major 16
+fi
+
+chmod 777 $path/*
+echo "Ok ($path/$name)"
+
+echo
+echo Module load complete.
+echo
+echo

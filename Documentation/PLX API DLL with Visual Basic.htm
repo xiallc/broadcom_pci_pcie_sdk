@@ -1,0 +1,397 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html xmlns:v="urn:schemas-microsoft-com:vml"
+xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=ProgId content=Word.Document>
+<meta name=Generator content="Microsoft Word 10">
+<meta name=Originator content="Microsoft Word 10">
+<link rel=File-List
+href="PLX%20API%20DLL%20with%20Visual%20Basic_files/filelist.xml">
+<title>Calling DLL Functions from Visual Basic Applications</title>
+<!--[if gte mso 9]><xml>
+ <o:DocumentProperties>
+  <o:Author>Plx Software</o:Author>
+  <o:LastAuthor>PLX</o:LastAuthor>
+  <o:Revision>14</o:Revision>
+  <o:TotalTime>47</o:TotalTime>
+  <o:Created>2001-02-16T21:51:00Z</o:Created>
+  <o:LastSaved>2007-10-22T21:18:00Z</o:LastSaved>
+  <o:Pages>1</o:Pages>
+  <o:Words>496</o:Words>
+  <o:Characters>2833</o:Characters>
+  <o:Company>Plx Technology, Inc.</o:Company>
+  <o:Lines>23</o:Lines>
+  <o:Paragraphs>6</o:Paragraphs>
+  <o:CharactersWithSpaces>3323</o:CharactersWithSpaces>
+  <o:Version>10.6817</o:Version>
+ </o:DocumentProperties>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <w:WordDocument>
+  <w:SpellingState>Clean</w:SpellingState>
+  <w:GrammarState>Clean</w:GrammarState>
+  <w:BrowserLevel>MicrosoftInternetExplorer4</w:BrowserLevel>
+ </w:WordDocument>
+</xml><![endif]-->
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:"Lucida Console";
+	panose-1:2 11 6 9 4 5 4 2 2 4;
+	mso-font-charset:0;
+	mso-generic-font-family:modern;
+	mso-font-pitch:fixed;
+	mso-font-signature:-2147482993 6144 0 0 31 0;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{mso-style-parent:"";
+	margin:0in;
+	margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:12.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";}
+h1
+	{mso-margin-top-alt:auto;
+	margin-right:0in;
+	mso-margin-bottom-alt:auto;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	mso-outline-level:1;
+	font-size:24.0pt;
+	font-family:"Times New Roman";
+	font-weight:bold;}
+a:link, span.MsoHyperlink
+	{color:blue;
+	text-decoration:none;
+	text-underline:none;}
+a:visited, span.MsoHyperlinkFollowed
+	{color:blue;
+	text-decoration:underline;
+	text-underline:single;}
+p
+	{mso-margin-top-alt:auto;
+	margin-right:0in;
+	mso-margin-bottom-alt:auto;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	font-size:12.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";}
+code
+	{font-family:"Courier New";
+	mso-ascii-font-family:"Courier New";
+	mso-fareast-font-family:"Courier New";
+	mso-hansi-font-family:"Courier New";
+	mso-bidi-font-family:"Courier New";}
+pre
+	{margin:0in;
+	margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	tab-stops:45.8pt 91.6pt 137.4pt 183.2pt 229.0pt 274.8pt 320.6pt 366.4pt 412.2pt 458.0pt 503.8pt 549.6pt 595.4pt 641.2pt 687.0pt 732.8pt;
+	font-size:10.0pt;
+	font-family:"Courier New";
+	mso-fareast-font-family:"Courier New";}
+p.indent, li.indent, div.indent
+	{mso-style-name:indent;
+	mso-margin-top-alt:auto;
+	margin-right:0in;
+	mso-margin-bottom-alt:auto;
+	margin-left:0in;
+	mso-pagination:widow-orphan;
+	font-size:12.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";}
+p.HTMLPreformatted2, li.HTMLPreformatted2, div.HTMLPreformatted2
+	{mso-style-name:"HTML Preformatted2";
+	margin-top:0in;
+	margin-right:0in;
+	margin-bottom:0in;
+	margin-left:12.0pt;
+	margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	tab-stops:45.8pt 91.6pt 137.4pt 183.2pt 229.0pt 274.8pt 320.6pt 366.4pt 412.2pt 458.0pt 503.8pt 549.6pt 595.4pt 641.2pt 687.0pt 732.8pt;
+	background:#DDDDDD;
+	font-size:10.0pt;
+	font-family:"Lucida Console";
+	mso-fareast-font-family:"Times New Roman";
+	mso-bidi-font-family:"Courier New";}
+span.SpellE
+	{mso-style-name:"";
+	mso-spl-e:yes;}
+span.GramE
+	{mso-style-name:"";
+	mso-gram-e:yes;}
+@page Section1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.25in 1.0in 1.25in;
+	mso-header-margin:.5in;
+	mso-footer-margin:.5in;
+	mso-paper-source:0;}
+div.Section1
+	{page:Section1;}
+ /* List Definitions */
+ @list l0
+	{mso-list-id:278607136;
+	mso-list-template-ids:-1443735440;}
+@list l1
+	{mso-list-id:285235833;
+	mso-list-template-ids:1334881914;}
+@list l1:level1
+	{mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level2
+	{mso-level-tab-stop:1.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level3
+	{mso-level-tab-stop:1.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level4
+	{mso-level-tab-stop:2.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level5
+	{mso-level-tab-stop:2.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level6
+	{mso-level-tab-stop:3.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level7
+	{mso-level-tab-stop:3.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level8
+	{mso-level-tab-stop:4.0in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l1:level9
+	{mso-level-tab-stop:4.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;}
+@list l2
+	{mso-list-id:1353726526;
+	mso-list-template-ids:634447668;}
+@list l2:level1
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:.5in;
+	mso-level-number-position:left;
+	text-indent:-.25in;
+	mso-ansi-font-size:10.0pt;
+	font-family:Symbol;}
+ol
+	{margin-bottom:0in;}
+ul
+	{margin-bottom:0in;}
+-->
+</style>
+<!--[if gte mso 10]>
+<style>
+ /* Style Definitions */
+ table.MsoNormalTable
+	{mso-style-name:"Table Normal";
+	mso-tstyle-rowband-size:0;
+	mso-tstyle-colband-size:0;
+	mso-style-noshow:yes;
+	mso-style-parent:"";
+	mso-padding-alt:0in 5.4pt 0in 5.4pt;
+	mso-para-margin:0in;
+	mso-para-margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	font-family:"Times New Roman";}
+</style>
+<![endif]--><!--[if gte mso 9]><xml>
+ <o:shapedefaults v:ext="edit" spidmax="2050"/>
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <o:shapelayout v:ext="edit">
+  <o:idmap v:ext="edit" data="1"/>
+ </o:shapelayout></xml><![endif]-->
+</head>
+
+<body lang=EN-US link=blue vlink=blue style='tab-interval:.5in'>
+
+<div class=Section1>
+
+<div style='border-top:double windowtext 4.5pt;border-left:none;border-bottom:
+double windowtext 4.5pt;border-right:none;padding:1.0pt 0in 1.0pt 0in'>
+
+<h1 style='margin-left:.25in;text-indent:-.25in;border:none;mso-border-top-alt:
+double windowtext 4.5pt;mso-border-bottom-alt:double windowtext 4.5pt;
+padding:0in;mso-padding-alt:1.0pt 0in 1.0pt 0in'><a
+name="_core_calling_dll_functions_from_visual_"></a><i><span style='font-size:
+10.0pt;font-family:Arial'>Note<span class=GramE>:</span><br>
+</span></i><i><span style='font-size:10.0pt;font-family:Arial;font-weight:normal'>For
+customers using Visual Basic (VB), PLX provides a special build of the PLX API
+DLL and LIB files for use with Visual Basic, per the Microsoft notes
+below.<span style='mso-spacerun:yes'>  </span>These files are provided in the </span></i><span
+class=SpellE><i><span style='font-size:10.0pt;font-family:Arial'>PlxSdk\Windows\PlxApi\VisualBasic</span></i></span><i><span
+style='font-size:10.0pt;font-family:Arial'>\&lt;Debug or Release&gt;</span></i><i><span
+style='font-size:10.0pt;font-family:Arial;font-weight:normal'> directory.<span
+style='mso-spacerun:yes'>  </span>These versions of the DLL are built with the </span></i><i><span
+style='font-size:10.0pt;font-family:Arial'>__<span class=SpellE>stdcall</span></span></i><i><span
+style='font-size:10.0pt;font-family:Arial;font-weight:normal'> calling convention
+compiler option (/<span class=SpellE>Gz</span>) enabled.<span
+style='mso-spacerun:yes'>  </span>As mentioned in the specification notes
+below, you may use this DLL along with the </span></i><i><span
+style='font-size:10.0pt;font-family:Arial'>ALIAS</span></i><i><span
+style='font-size:10.0pt;font-family:Arial;font-weight:normal'> option of the VB
+</span></i><i><span style='font-size:10.0pt;font-family:Arial'>declare</span></i><i><span
+style='font-size:10.0pt;font-family:Arial;font-weight:normal'> statement to
+call PLX API functions in the <span class=GramE>DLL.</span><span
+style='mso-spacerun:yes'>  </span>The </span></i><span class=SpellE><i><span
+style='font-size:10.0pt;font-family:Arial'>DumpBin</span></i></span><i><span
+style='font-size:10.0pt;font-family:Arial;font-weight:normal'> utility can be
+used to view the names of exported functions in the DLL.<br>
+<br>
+Please be aware that the VB version of the API DLL files are provided as-is and
+PLX has not tested them with Visual Basic.<span style='mso-spacerun:yes'> 
+</span>PLX does NOT support use of the API DLL in environments other than
+C/C++.<br>
+<br>
+The following is taken directly from the Microsoft Visual C/C++
+documentation.<span style='mso-spacerun:yes'>  </span>It is provided for
+customers interested in using the PLX Host API with Visual Basic applications.<span
+style='mso-spacerun:yes'>  </span>At the time of this writing, the location was
+</span></i><i><span style='font-size:10.0pt;font-family:Arial'><a
+href="http://msdn2.microsoft.com/en-us/library/dt232c9t(vs.71).aspx">http://msdn2.microsoft.com/en-us/library/dt232c9t(vs.71).aspx</a></span></i><i><span
+style='font-size:10.0pt;font-family:Arial;font-weight:normal'>.<o:p></o:p></span></i></h1>
+
+</div>
+
+<h1><span style='font-size:10.0pt;font-family:Arial;font-weight:normal;
+mso-bidi-font-weight:bold'><o:p>&nbsp;</o:p></span></h1>
+
+<h1><span style='font-size:22.0pt;mso-bidi-font-size:24.0pt;font-family:Arial'>Calling
+DLL Functions from Visual Basic Applications<o:p></o:p></span></h1>
+
+<p style='line-height:140%;vertical-align:top'><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>In order for Visual Basic applications (or
+applications in other languages such as Pascal or <span class=GramE>Fortran</span>)
+to call functions in a C/C++ DLL, the functions must be exported using the
+correct calling convention without any name decoration done by the compiler. <o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><b><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>__<span class=SpellE>stdcall</span></span></b><span
+style='font-size:10.0pt;line-height:140%;font-family:Arial'> creates the
+correct calling convention for the function (the called function cleans up the
+stack and parameters are passed from right to left) but decorates the function
+name differently. So, when <b>__<span class=SpellE><span class=GramE>declspec</span></span><span
+class=GramE>(</span><span class=SpellE>dllexport</span>)</b> is used on an
+exported function in a DLL, the decorated name is exported.<o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>The <b>__<span class=SpellE>stdcall</span></b>
+name decoration prefixes the symbol name with an underscore (_) and appends the
+symbol with <span class=GramE>an at</span> sign (@) character followed by the
+number of bytes in the argument list (the required stack space). So, the
+function when declared as: <o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+class=SpellE><span class=GramE><span style='font-family:Arial'>int</span></span></span><span
+style='font-family:Arial'> __<span class=SpellE>stdcall</span> <span
+class=SpellE>func</span> (<span class=SpellE>int</span> a, double b)<o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span class=GramE><span
+style='font-size:10.0pt;line-height:140%;font-family:Arial'>is</span></span><span
+style='font-size:10.0pt;line-height:140%;font-family:Arial'> decorated as:<o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+style='font-family:Arial'>_func@12<o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>The C calling convention (<b>__<span
+class=SpellE>cdecl</span></b>) decorates the name as </span><code><span
+style='font-size:10.0pt;line-height:140%;font-family:Arial'>_<span
+class=SpellE>func</span></span></code><span style='font-size:10.0pt;line-height:
+140%;font-family:Arial'>.<o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span class=GramE><span
+style='font-size:10.0pt;line-height:140%;font-family:Arial'>To get the
+decorated name, use <a
+href="http://msdn2.microsoft.com/en-us/library/k7xkk3e2(VS.71).aspx"
+onclick="javascript:Track('ctl00_LibFrame_ctl07|ctl00_LibFrame_ctl10',this);">/MAP</a>.</span></span><span
+style='font-size:10.0pt;line-height:140%;font-family:Arial'> Use of <b>__<span
+class=SpellE><span class=GramE>declspec</span></span><span class=GramE>(</span><span
+class=SpellE>dllexport</span>)</b> does the following: <o:p></o:p></span></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;margin-right:7.5pt;
+margin-bottom:3.75pt;margin-left:96.0pt;text-indent:-.25in;line-height:140%;
+mso-list:l2 level1 lfo4;tab-stops:list .5in;vertical-align:top'><![if !supportLists]><span
+style='font-size:10.0pt;line-height:140%;font-family:Symbol;mso-fareast-font-family:
+Symbol;mso-bidi-font-family:Symbol'><span style='mso-list:Ignore'>·<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><span style='font-size:10.0pt;line-height:140%;
+font-family:Arial'>If the function is exported with the C calling convention (<b>_<span
+class=SpellE>cdecl</span></b>), it strips the leading underscore (_) when the
+name is exported. <o:p></o:p></span></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;margin-right:7.5pt;
+margin-bottom:3.75pt;margin-left:96.0pt;text-indent:-.25in;line-height:140%;
+mso-list:l2 level1 lfo4;tab-stops:list .5in;vertical-align:top'><![if !supportLists]><span
+style='font-size:10.0pt;line-height:140%;font-family:Symbol;mso-fareast-font-family:
+Symbol;mso-bidi-font-family:Symbol'><span style='mso-list:Ignore'>·<span
+style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span><![endif]><span style='font-size:10.0pt;line-height:140%;
+font-family:Arial'>If the function being exported does not use the C calling
+convention (for example, <b>__<span class=SpellE>stdcall</span></b>), it
+exports the decorated name. <o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>Because there is no way to override where
+the stack cleanup occurs, you must use <b>__<span class=SpellE>stdcall</span></b>.
+To <span class=SpellE>undecorate</span> names with <b>__<span class=SpellE>stdcall</span></b>,
+you must specify them by using aliases in the EXPORTS section of the .DEF file.
+This is shown below for the following function declaration:<o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+class=SpellE><span style='font-family:Arial'>Int</span></span><span
+style='font-family:Arial'> <span style='mso-spacerun:yes'> </span><span
+style='mso-spacerun:yes'> </span>__<span class=SpellE>stdcall</span> <span
+class=SpellE>MyFunc</span> (<span class=SpellE>int</span> a, double b);<o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+class=GramE><span style='font-family:Arial'>void</span></span><span
+style='font-family:Arial'> __<span class=SpellE>stdcall</span> <span
+class=SpellE>InitCode</span> (void);<o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>In the .DEF file:<o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+style='font-family:Arial'>EXPORTS<o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+style='font-family:Arial'><span style='mso-tab-count:1'>               </span>MYFUNC=_MyFunc@12<o:p></o:p></span></p>
+
+<p class=HTMLPreformatted2 style='margin-top:0in;margin-right:7.5pt;margin-bottom:
+0in;margin-left:0in;margin-bottom:.0001pt;line-height:140%;vertical-align:top'><span
+style='font-family:Arial'><span style='mso-tab-count:1'>               </span>INITCODE=_InitCode@0<o:p></o:p></span></p>
+
+<p style='line-height:140%;vertical-align:top'><span style='font-size:10.0pt;
+line-height:140%;font-family:Arial'>For DLLs to be called by programs written
+in Visual Basic, the alias technique shown in this article is needed in the
+.DEF file. If the alias is done in the Visual Basic program, use of aliasing in
+the .DEF file is not necessary. It can be done in the Visual Basic program by
+adding an alias clause to the DECLARE statement.<o:p></o:p></span></p>
+
+</div>
+
+</body>
+
+</html>

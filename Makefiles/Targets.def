@@ -2,7 +2,6 @@
 #
 #      File         :  Targets.def
 #      Abstract     :  The definitions for building various targets
-#      Last Revision:  04-01-07
 #
 #-----------------------------------------------------------------------------
 
@@ -12,11 +11,7 @@
 # Target builds
 #=============================================================================
 ifeq ($(TGT_TYPE), Driver)
-    ifeq ($(KERNEL_VER), 2.4)
-        all:  DisplayParameters BuildDriver_2.4
-    else
-        all:  DisplayParameters RestoreDriverObjects BuildDriver SaveDriverObjects
-    endif
+    all:  DisplayParameters RestoreDriverObjects BuildDriver SaveDriverObjects
 else
     all:  DisplayParameters Build$(TGT_TYPE)
 endif
@@ -27,81 +22,82 @@ endif
 # Target builds
 #=============================================================================
 BuildApp: CreateOutputDir $(PLX_OBJECTS)
-	@echo
-	@echo Linking application: $(ImageName)
+	@echo Link: $(ImageName)
 	$(Q)$(CC) -o $(OUT_DIR)/$(ImageName) $(LFLAGS) $(PLX_OBJECTS) $(LIBS)
 	@echo
-	@echo
-	@echo Executable file \"$(OUT_DIR)/$(ImageName)\" built successfully
-	@echo
+	@echo Application \"$(OUT_DIR)/$(ImageName)\" built successfully
 	@echo
 
 
 BuildLibrary: CreateOutputDir $(PLX_OBJECTS)
-	@echo
-	@echo Creating archive: $(ImageName).a...
-	@echo
+	@echo Create: $(ImageName).a
 	$(Q)$(AR) -rcv $(OUT_DIR)/$(ImageName).a $(PLX_OBJECTS)
 	@echo
-	@echo
-	@echo Library file \"$(OUT_DIR)/$(ImageName).a\" built successfully.
-	@echo
+	@echo Library \"$(OUT_DIR)/$(ImageName).a\" built successfully
 	@echo
 
 
 BuildDriver_2.4: CreateOutputDir $(PLX_OBJECTS)
-	@echo
-	@echo Linking driver: $(ImageName).o
+	@echo Link: $(ImageName).o
 	@echo
 	$(Q)$(LD) -r $(PLX_OBJECTS) -o $(OUT_DIR)/$(ImageName).ko
 	@echo
-	@echo Device driver \"$(OUT_DIR)/$(ImageName).ko\" built sucessfully.
+	@echo Driver \"$(OUT_DIR)/$(ImageName).ko\" built sucessfully
 	@echo
 
 
 BuildDriver:
 	$(Q)$(MAKE) -C $(KDIR) M=$(PWD) modules
 	@echo
-	@echo
-	@echo Device driver \"$(OUT_DIR)/$(ImageName).ko\" built sucessfully.
+	@echo Driver \"$(OUT_DIR)/$(ImageName).ko\" built sucessfully
 	@echo
 
 
 # Saves driver objects (*.o files) back to object directory
 SaveDriverObjects: CreateOutputDir
-	$(Q)# Moving intermediate files to output folders...
+	$(Q)# Move intermediate files to output folders...
 	@rm $(VERBOSE) -f Module.symvers
 	@rm $(VERBOSE) -f Module.markers
 	@rm $(VERBOSE) -f modules.order
-	@mv $(VERBOSE) $(ImageName).*         $(OUT_DIR)
-	@mv $(VERBOSE) .$(ImageName).*        $(OUT_DIR)
+	@mv $(VERBOSE) $(ImageName).ko        $(OUT_DIR)
+	@if [ -f $(ImageName).ko.* ]; then mv $(VERBOSE) $(ImageName).ko.* $(OUT_DIR); fi
+	@mv $(VERBOSE) $(ImageName).o         $(OBJ_DIR)
+	@mv $(VERBOSE) $(ImageName).mod.*     $(OBJ_DIR)
+	@mv $(VERBOSE) .$(ImageName).*        $(OBJ_DIR)
 	@mv $(VERBOSE) $(COMMON_DIR)/*.o      $(OBJ_DIR)/Common
 	@mv $(VERBOSE) $(COMMON_DIR)/.*.cmd   $(OBJ_DIR)/Common
-	@if [[ -d "$(PLX_CHIP_DIR)" ]]; then \
+	@if [ -d "$(PLX_CHIP_DIR)" ]; then \
 	     mv $(VERBOSE) $(PLX_CHIP_DIR)/*.o    $(OBJ_DIR)/PlxChip; \
 	     mv $(VERBOSE) $(PLX_CHIP_DIR)/.*.cmd $(OBJ_DIR)/PlxChip; \
 	 fi
+	@if [ "$Q" != "@" ]; then echo; fi
 
 
 # Restores driver objects (*.o files) back to original location
 RestoreDriverObjects:
-	$(Q)# Moving intermediate files back to original folders...
-	@if [[ -n "$(PLX_CHIP_DIR)" ]]; then \
-	     if [[ -d $(OBJ_DIR)/PlxChip ]]; then \
+	$(Q)# Move intermediate files to original folders...
+	@if [ -n "$(PLX_CHIP_DIR)" ]; then \
+	     if [ -d $(OBJ_DIR)/PlxChip ]; then \
 	         mv $(VERBOSE) -u $(OBJ_DIR)/PlxChip/*.*    $(PLX_CHIP_DIR); \
 	         mv $(VERBOSE) -u $(OBJ_DIR)/PlxChip/.*.cmd $(PLX_CHIP_DIR); \
 	         rm $(VERBOSE) -r -f $(OBJ_DIR)/PlxChip; \
 	     fi \
 	 fi
-	@if [[ -d $(OBJ_DIR)/Common ]]; then \
+	@if [ -d $(OBJ_DIR)/Common ]; then \
 	     mv $(VERBOSE) -u $(OBJ_DIR)/Common/*.*     $(COMMON_DIR); \
 	     mv $(VERBOSE) -u $(OBJ_DIR)/Common/.*.cmd  $(COMMON_DIR); \
 	     rm $(VERBOSE) -r -f $(OBJ_DIR)/Common; \
 	 fi
-	@if [[ -r $(OUT_DIR)/$(ImageName).ko ]]; then \
-	     mv $(VERBOSE) -u $(OUT_DIR)/$(ImageName).*  .; \
-	     mv $(VERBOSE) -u $(OUT_DIR)/.$(ImageName).* .; \
+	@if [ -f $(OUT_DIR)/$(ImageName).ko ]; then \
+	     mv $(VERBOSE) -u $(OUT_DIR)/$(ImageName).ko    .; \
+	     mv $(VERBOSE) -u $(OBJ_DIR)/$(ImageName).o     .; \
+	     mv $(VERBOSE) -u $(OBJ_DIR)/$(ImageName).mod.* .; \
+	     mv $(VERBOSE) -u $(OBJ_DIR)/.$(ImageName).*    .; \
 	 fi
+	@if [ -f $(OUT_DIR)/$(ImageName).ko.* ]; then \
+	     mv $(VERBOSE) -u $(OUT_DIR)/$(ImageName).ko.*  .; \
+	 fi
+	@if [ "$Q" != "@" ]; then echo; fi
 
 
 
@@ -112,23 +108,23 @@ RestoreDriverObjects:
 DisplayParameters:
 	@clear
 	@echo
-	@echo Building: $(ImageName)
+	@echo Build: $(ImageName)
 	@echo
-	@if [[ -r /etc/redhat-release ]]; then \
+	@if [ -r /etc/redhat-release ]; then \
 	    echo "- PLA: `cat /etc/redhat-release`"; \
-	 elif [[ -r /etc/SuSE-release ]]; then \
+	 elif [ -r /etc/SuSE-release ]; then \
 	    echo "- PLA: `cat /etc/SuSE-release | awk "FNR==1 {print $0}"`"; \
 	 else \
 	    echo "- PLA: Linux, version ???"; \
 	 fi
 	@echo "- KER: `uname -r`"
-	@if [[ "$(TGT_TYPE)" == "Driver" ]]; then \
+	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
 	    echo - INC: $(KDIR)/include; \
 	 fi
-	@echo "- CPU: `uname -i` ($(PLX_CPU_BITS)-bit $(PLX_CPU_ENDIAN) Endian)"
+	@echo - CPU: $(ARCH) \($(PLX_CPU_BITS)-bit $(PLX_CPU_ENDIAN) Endian\)
 	@echo - CMP: $(TOOLS_NAME)
 	@echo - TYP: $(TGT_TYPE)
-	@if [[ "$(TGT_TYPE)" == "Driver" ]]; then \
+	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
 	    echo - PLX: $(PLX_CHIP); \
 	 fi
 	@echo - CFG: $(BUILD_TYPE)
@@ -136,20 +132,23 @@ DisplayParameters:
 
 
 CreateOutputDir:
-	$(Q)# Creating output directories...
+	$(Q)# Create output directories...
 	@mkdir $(VERBOSE) -p $(OUT_DIR)
 	@mkdir $(VERBOSE) -p $(OBJ_DIR)
-	@if [[ "$(TGT_TYPE)" == "Driver" ]]; then \
+	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
 	    mkdir $(VERBOSE) -p $(OBJ_DIR)/Common; \
-	    mkdir $(VERBOSE) -p $(OBJ_DIR)/PlxChip; \
+	    if [ -n "$(PLX_CHIP_DIR)" ]; then \
+	        mkdir $(VERBOSE) -p $(OBJ_DIR)/PlxChip; \
+	    fi \
 	 fi
-	@echo
+	@if [ "$Q" != "@" ]; then echo; fi
 
 
 clean:
-	@clear
 	@echo
-	@echo Deleting: Intermediate build files...
+	@echo Clean: $(ImageName)
+	@echo
+	@echo Delete: Intermediate build files...
 	@rm -v -f    Module.symvers
 	@rm -v -f    Module.markers
 	@rm -v -f    modules.order
@@ -160,26 +159,24 @@ clean:
 	@rm -v -f    $(PLX_CHIP_DIR)/.*.o.*
 	@rm -v -f    $(PLX_CHIP_DIR)/.*.cmd
 	@rm -v -f -r $(OBJ_DIR)
-	@if [[ "$(TGT_TYPE)" == "Driver" ]]; then \
+	@if [ "$(TGT_TYPE)" = "Driver" ]; then \
 	    rm -v -f $(ImageName).*; \
 	    rm -v -f .$(ImageName).*; \
 	 fi
 	@rm -v -f .tmp_versions/$(ImageName).mod
-	@if [[ -d .tmp_versions ]]; then \
+	@if [ -d .tmp_versions ]; then \
 	     rmdir -v --ignore-fail-on-non-empty .tmp_versions; \
 	 fi
-	@echo Deleting: ....finished!
-	@echo
+	@echo Delete: ....finished!
 	@echo
 
 
 cleanall: clean
-	@echo Deleting: All build files...
+	@echo Delete: All build files...
 	@rm -v -f $(OUT_DIR)/$(ImageName)*
 	@rm -v -f $(OUT_DIR)/.$(ImageName)*
-	@if [[ -d $(OUT_DIR) ]]; then \
+	@if [ -d $(OUT_DIR) ]; then \
 	     rmdir -v --ignore-fail-on-non-empty $(OUT_DIR); \
 	 fi
-	@echo Deleting: ....finished!
-	@echo
+	@echo Delete: ....finished!
 	@echo

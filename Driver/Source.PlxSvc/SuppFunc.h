@@ -1,5 +1,5 @@
-#ifndef __SUPPORT_FUNC_H
-#define __SUPPORT_FUNC_H
+#ifndef __SUPPORT_FN_H
+#define __SUPPORT_FN_H
 
 /*******************************************************************************
  * Copyright (c) PLX Technology, Inc.
@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      03-01-09 : PLX SDK v6.10
+ *      05-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -60,19 +60,19 @@ Plx_pow_int(
 
 U16
 PlxGetExtendedCapabilityOffset(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U16              CapabilityId
     );
 
 int
 PlxPciBarResourceMap(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8               BarIndex
     );
 
 int
 PlxPciBarResourcesUnmap(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8               BarIndex
     );
 
@@ -84,7 +84,7 @@ PlxResourcesReleaseAll(
 VOID
 PlxUserMappingRequestFreeAll_ByNode(
     DEVICE_EXTENSION *pdx,
-    PLX_DEVICE_NODE  *pNode
+    PLX_DEVICE_NODE  *pDevice
     );
 
 U8
@@ -95,12 +95,17 @@ PlxDeviceListBuild(
 PLX_DEVICE_NODE *
 PlxAssignParentDevice(
     DEVICE_EXTENSION *pdx,
-    PLX_DEVICE_NODE  *pNode
+    PLX_DEVICE_NODE  *pDevice
+    );
+
+VOID
+PlxProbePciBarSpaces(
+    PLX_DEVICE_NODE *pdx
     );
 
 BOOLEAN
 PlxDetermineNtPortSide(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     );
 
 PLX_DEVICE_NODE *
@@ -111,12 +116,13 @@ GetDeviceNodeFromKey(
 
 BOOLEAN
 PlxChipTypeDetect(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx,
+    BOOLEAN          bOnlySetFamily
     );
 
 VOID
 PlxChipRevisionDetect(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     );
 
 

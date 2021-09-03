@@ -34,7 +34,7 @@
  *
  * Revision:
  *
- *      11-01-10 : PLX SDK v6.40
+ *      06-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -99,12 +99,6 @@ typedef enum _PLX_STATUS
     ApiBufferTooSmall,
     ApiLastError               // Do not add API errors below this line
 } PLX_STATUS;
-
-
-// DBG - Added to support legacy code -- will be removed in future release
-#if !defined(PLX_DOS)
-    typedef PLX_STATUS        RETURN_CODE;
-#endif
 
 
 

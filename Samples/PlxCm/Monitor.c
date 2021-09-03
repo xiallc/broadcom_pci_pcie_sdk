@@ -30,6 +30,80 @@
 static PLXCM_COMMAND     *Gbl_pPostedCmd;
 static DEVICE_NODE       *Gbl_pNodeCurrent;
 static PLX_DEVICE_OBJECT  Gbl_DeviceObj;
+static FILE              *Gbl_pScriptFile = NULL;
+
+U64 Gbl_LastRetVal = 0;     // Last return value from a command
+
+// Setup the function table
+static FN_TABLE Gbl_FnTable[] =
+{
+    { CMD_CLEAR     , FALSE, "cls/clear"               , Cmd_ConsClear  },
+    { CMD_HELP      , FALSE, "help/?"                  , Cmd_Help       },
+    { CMD_EXIT      , FALSE, "exit/quit/q"             , NULL           },
+    { CMD_VERSION   , FALSE, "ver"                     , Cmd_Version    },
+    { CMD_SLEEP     ,  TRUE, "sleep"                   , Cmd_Sleep      },
+    { CMD_SCREEN    ,  TRUE, "screen"                  , Cmd_Screen     },
+    { CMD_HISTORY   , FALSE, "history/h/!"             , Cmd_History    },
+    { CMD_BOOT      , FALSE, "boot"                    , Cmd_Boot       },
+    { CMD_RESET     , FALSE, "reset"                   , Cmd_Reset      },
+    { CMD_SCAN      , FALSE, "scan"                    , Cmd_Scan       },
+    { CMD_SET_CHIP  , FALSE, "set_chip"                , Cmd_SetChip    },
+    { CMD_DEV       , FALSE, "dev"                     , Cmd_Dev        },
+    { CMD_I2C       , FALSE, "i2c"                     , Cmd_I2cConnect },
+    { CMD_PCI_CAP   , FALSE, "pci_cap"                 , Cmd_PciCapList },
+    { CMD_PORT_PROP , FALSE, "portinfo"                , Cmd_PortProp   },
+    { CMD_MH_PROP   , FALSE, "mh_prop"                 , Cmd_MH_Prop    },
+    { CMD_VARS      , FALSE, "var/vars"                , Cmd_VarDisplay },
+    { CMD_VAR_SET   ,  TRUE, "set"                     , Cmd_VarSet     },
+    { CMD_BUFFER    , FALSE, "buffer/buff"             , Cmd_ShowBuffer },
+    { CMD_MEM_READ  ,  TRUE, "db/dw/dl/dq"             , Cmd_MemRead    },
+    { CMD_MEM_WRITE ,  TRUE, "eb/ew/el/eq"             , Cmd_MemWrite   },
+    { CMD_IO_READ   ,  TRUE, "ib/iw/il"                , Cmd_IoRead     },
+    { CMD_IO_WRITE  ,  TRUE, "ob/ow/ol"                , Cmd_IoWrite    },
+    { CMD_REG_PCI   ,  TRUE, "pcr/pci"                 , Cmd_RegPci     },
+    { CMD_REG_PLX   ,  TRUE, "reg/mmr/lcr/rtr/dma/mqr" , Cmd_RegPlx     },
+    { CMD_REG_DUMP  ,  TRUE, "dp/dr"                   , Cmd_RegDump    },
+    { CMD_EEP       ,  TRUE, "eep"                     , Cmd_Eep        },
+    { CMD_EEP_FILE  , FALSE, "eep_load/eep_save"       , Cmd_EepFile    },
+    { CMD_FINAL     , FALSE, "", NULL }    // Must be last entry
+};
+
+
+// Comment out for now until help system built
+#if 0
+// Setup the help table
+static HELP_TABLE Gbl_HelpTable[] =
+{
+    { CMD_CLEAR     , "clear"               , "Clears the screen" },
+    { CMD_HELP      , "Help [command]"      , "Displays global help or for the specified command" },
+    { CMD_EXIT      , "exit"                , "Exits the application" },
+    { CMD_VERSION   , "ver"                 , "Displays detailed version information" },
+    { CMD_SLEEP     , "sleep <ms>"          , "Sleeps for the specified number of milliseconds" },
+    { CMD_SCREEN    , "screen [NumLines]"   , "Display current screen size or change to specified NumLines" },
+    { CMD_HISTORY   , "history/h/!"         , "" },
+    { CMD_BOOT      , "boot"                , "" },
+    { CMD_RESET     , "reset"               , "" },
+    { CMD_SCAN      , "scan"                , "" },
+    { CMD_SET_CHIP  , "set_chip"            , "" },
+    { CMD_DEV       , "dev"                 , "" },
+    { CMD_I2C       , "i2c"                 , "" },
+    { CMD_PCI_CAP   , "pci_cap"             , "" },
+    { CMD_PORT_PROP , "portinfo"            , "" },
+    { CMD_MH_PROP   , "mh_prop"             , "" },
+    { CMD_VARS      , "var/vars"            , "" },
+    { CMD_VAR_SET   , "set"                 , "" },
+    { CMD_BUFFER    , "buffer/buff"         , "" },
+    { CMD_MEM_READ  , "db/dw/dl/dq"         , "" },
+    { CMD_MEM_WRITE , "eb/ew/el/eq"         , "" },
+    { CMD_IO_READ   , "ib/iw/il"            , "" },
+    { CMD_IO_WRITE  , "ob/ow/ol"            , "" },
+    { CMD_REG_PCI   , "pcr/pci"             , "" },
+    { CMD_REG_PLX   , "reg/lcr/rtr/dma/mqr" , "" },
+    { CMD_EEP       , "eep"                 , "" },
+    { CMD_EEP_FILE  , "eep_load/eep_save"   , "" },
+    { CMD_FINAL     , "", "" }    // Must be last entry
+};
+#endif
 
 
 
@@ -80,10 +154,13 @@ main(
         goto __Exit_App;
     }
 
+    // Process command-line
+    ExitCode = ProcessMonitorParams( argc, argv );
+    if (ExitCode != 0)
+        goto __Exit_App;
+
     // Start the monitor
     Monitor();
-
-__Exit_App:
 
     // Free device list
     DeviceListFree();
@@ -94,10 +171,84 @@ __Exit_App:
     // Clear any variables
     CmdLine_VarDeleteAll();
 
+__Exit_App:
+
     // Restore console
     ConsoleEnd();
 
     exit(ExitCode);
+}
+
+
+
+
+/**************************************************************************
+ *
+ * Function: ProcessMonitorParams
+ *
+ * Abstract:
+ *
+ *************************************************************************/
+S8
+ProcessMonitorParams(
+    int   argc,
+    char *argv[]
+    )
+{
+    U8    bGetFileName;
+    short i;
+
+
+    // Set default options
+    Gbl_pScriptFile = NULL;
+
+    bGetFileName = FALSE;
+
+    for (i=1; i<argc; i++)
+    {
+        if (bGetFileName)
+        {
+            if ((argv[i][0] == '-') || (argv[i][0] == '/'))
+            {
+                Cons_printf("ERROR: File name not specified\n");
+                return -1;
+            }
+
+            // Attempt to open the file
+            Gbl_pScriptFile = fopen( argv[i], "rt" );
+            if (Gbl_pScriptFile == NULL)
+            {
+                Cons_printf("ERROR: Unable to open script file\n");
+                return -1;
+            }
+
+            // Flag parameter retrieved
+            bGetFileName = FALSE;
+        }
+        else if ((Plx_strcasecmp(argv[i], "/s") == 0) ||
+                 (Plx_strcasecmp(argv[i], "-s") == 0))
+        {
+            // Set flag to get file name
+            bGetFileName = TRUE;
+        }
+        else
+        {
+            Cons_printf("ERROR: Invalid argument \'%s\'\n", argv[i]);
+            return -1;
+        }
+
+        // Make sure next parameter exists
+        if ((i + 1) == argc)
+        {
+            if (bGetFileName)
+            {
+                Cons_printf("ERROR: Script file name not specified\n");
+                return -1;
+            }
+        }
+    }
+
+    return 0;
 }
 
 
@@ -116,14 +267,18 @@ Monitor(
     )
 {
     U16                i;
+    U16                count;
+    int                PrevInp;
     int                NextInp;
     char               buffer[MAX_CMDLN_LEN];
     BOOLEAN            bFlag;
+    BOOLEAN            bInsertMode;
     PLXCM_COMMAND     *pCmd;
     PLX_DEVICE_OBJECT *pDevice;
 
 
     Cons_printf("Searching for devices...");
+    Cons_fflush( stdout );
 
     // Make sure no device is selected
     Gbl_pNodeCurrent = NULL;
@@ -143,16 +298,12 @@ Monitor(
 
     if (Gbl_pNodeCurrent == NULL)
     {
-        Cons_printf("ERROR: No PCI Devices found\n\n");
-
+        Cons_printf("ERROR: No PCI devices/drivers detected\n");
 #if !defined(PLX_MSWINDOWS)
-        Cons_printf("              Press any key to exit...\n");
-        Cons_getch();
+        // Exit if other methods not supported (eg I2C)
         return;
 #endif
     }
-
-    Cons_printf("\n");
 
     // Select the device
     if (Gbl_pNodeCurrent != NULL)
@@ -179,7 +330,7 @@ Monitor(
 
     if (Gbl_pNodeCurrent == NULL)
     {
-        Cons_printf("\n* Use 'i2c' to connect over I2C or 'q' to exit *\n\n");
+        Cons_printf("\n* Use 'i2c' command to connect over I2C or 'q' to exit *\n\n");
     }
     else
     {
@@ -197,6 +348,9 @@ Monitor(
     // Initialize variables
     i              = 0;
     pCmd           = NULL;
+    NextInp        = 0;
+    PrevInp        = 0;
+    bInsertMode    = 0;
     Gbl_pPostedCmd = NULL;
 
     memset( buffer, '\0', MAX_CMDLN_LEN );
@@ -208,8 +362,25 @@ Monitor(
         // Check for posted command
         if (Gbl_pPostedCmd == NULL)
         {
+            // Store previous key
+            PrevInp = NextInp;
+
+            // Get next key from script
+            if (Gbl_pScriptFile != NULL)
+            {
+                NextInp = fgetc( Gbl_pScriptFile );
+
+                // If reached end-of-file, close scipt file
+                if (feof( Gbl_pScriptFile ))
+                {
+                    fclose( Gbl_pScriptFile );
+                    Gbl_pScriptFile = NULL;
+                }
+            }
+
             // Wait for keypress
-            NextInp = Cons_getch();
+            if (Gbl_pScriptFile == NULL)
+                NextInp = Cons_getch();
         }
         else
         {
@@ -219,7 +390,7 @@ Monitor(
             // Reset posted command
             Gbl_pPostedCmd = NULL;
 
-            i = strlen( buffer );
+            i = (U16)strlen( buffer );
 
             Cons_printf( "%s", buffer );
 
@@ -229,11 +400,11 @@ Monitor(
 
         switch (NextInp)
         {
-            case '\n':
-            case '\r':
+            case CONS_KEY_NEWLINE:
+            case CONS_KEY_CARRIAGE_RET:
                 Cons_printf("\n");
 
-                if (i != 0)
+                if (buffer[0] != '\0')
                 {
                     // Set device object parameter to pass
                     if (Gbl_pNodeCurrent == NULL)
@@ -244,8 +415,14 @@ Monitor(
                     // Process the command
                     pCmd = ProcessCommand( pDevice, buffer );
 
+                    // Update 'RetVal' system variable to latest value
+                    sprintf( buffer, "%08lX", (unsigned long)Gbl_LastRetVal );
+                    CmdLine_VarAdd( "RetVal", buffer, TRUE );
+
                     // Check for exit command
-                    if ((pCmd != NULL) && (strcmp(pCmd->szCmd, "quit") == 0))
+                    if ((pCmd != NULL) &&
+                        (pCmd->pCmdRoutine == NULL) &&
+                        (pCmd->bErrorParse == FALSE))
                     {
                         if (pDevice)
                         {
@@ -265,35 +442,65 @@ Monitor(
                     pCmd = NULL;
 
                     // Reset command line
-                    memset( buffer, '\0', i );
+                    memset( buffer, '\0', MAX_CMDLN_LEN );
                     i = 0;
                 }
 
                 Cons_printf(MONITOR_PROMPT);
                 break;
 
-            case '\b':                // BackSpace
-            case 127:
-                if (i != 0)
+            case CONS_KEY_BACKSPACE:
+                if (i > 0)
                 {
+                    // Delete left character & shift text from right
                     i--;
-                    buffer[i] = '\0';
-                    Cons_printf("\b \b");
+                    count = 0;
+                    Cons_printf("\b");
+                    while (buffer[i] != '\0')
+                    {
+                        buffer[i] = buffer[i+1];
+                        if (buffer[i+1] == '\0')
+                            Cons_printf(" \b");
+                        else
+                        {
+                            Cons_printf("%c", buffer[i]);
+                            i++;
+                            count++;
+                        }
+                    }
+
+                    // Restore cursor to original position
+                    while (count)
+                    {
+                        Cons_printf("\b");
+                        i--;
+                        count--;
+                    }
                 }
                 break;
 
-            case '\t':
+            case CONS_KEY_TAB:
                 // Ignore TAB
                 break;
 
-            case 27:                  // ESC
+            case CONS_KEY_ESCAPE:
+                // If another key already pending, then extended code
+                if (Cons_kbhit())
+                    break;
 
                 // Delay for a bit to wait for additional keys
-                Plx_sleep(100);
+                Plx_sleep(10);
 
-                // Process ESC only of no other key is pressed
+                // Process ESC only of no other key is pending
                 if (Cons_kbhit() == FALSE)
                 {
+                    // Make sure at end of line 1st
+                    while (buffer[i] != '\0')
+                    {
+                        Cons_printf("%c", buffer[i]);
+                        i++;
+                    }
+
                     // Clear the command-line
                     while (i)
                     {
@@ -304,20 +511,33 @@ Monitor(
 
                     // Reset command pointer
                     pCmd = NULL;
+
+                    // Clear previous key
+                    PrevInp = 0;
                 }
                 break;
 
-            case 0x0:               // Extended key (DOS)
-            case 0xe0:              // Extended key (Windows)
-            case '[':               // Extended key (Linux)
+            case CONS_KEY_EXT_CODE:
+            case CONS_KEY_KEYPAD_CODE:
+                // Default to not update command-line
+                bFlag = FALSE;
 
-                bFlag = TRUE;
-
-                // Get extended code
-                switch (Cons_getch())
+                // Ensure Linux extended codes are preceded by ESC (27)
+                if (PrevInp != CONS_KEY_ESCAPE)
                 {
-                    case 'A':            // Up arrow (Linux)
-                    case 'H':            // Up arrow (Windows)
+                    // Linux extended codes are standard keys
+                    if ((NextInp == '[') || (NextInp == 'O'))
+                    {
+                        // Accept key as standard key
+                        goto _Monitor_StandardKey;
+                    }
+                }
+
+                // Process actual extended key
+                NextInp = Cons_getch();
+                switch (NextInp)
+                {
+                    case CONS_KEY_ARROW_UP:
                         if (pCmd == NULL)
                         {
                             // Return last command
@@ -329,17 +549,13 @@ Monitor(
                                         PLXCM_COMMAND,
                                         ListEntry
                                         );
+                                bFlag = TRUE;
                             }
                         }
                         else
                         {
                             // Get previous command
-                            if (pCmd->ListEntry.Blink == &Gbl_ListCmds)
-                            {
-                                // Reached first command, do nothing
-                                bFlag = FALSE;
-                            }
-                            else
+                            if (pCmd->ListEntry.Blink != &Gbl_ListCmds)
                             {
                                 pCmd =
                                     PLX_CONTAINING_RECORD(
@@ -347,17 +563,13 @@ Monitor(
                                         PLXCM_COMMAND,
                                         ListEntry
                                         );
+                                bFlag = TRUE;
                             }
                         }
                         break;
 
-                    case 'B':           // Down arrow (Linux)
-                    case 'P':           // Down arrow (Windows)
-                        if (pCmd == NULL)
-                        {
-                            bFlag = FALSE;
-                        }
-                        else
+                    case CONS_KEY_ARROW_DOWN:
+                        if (pCmd != NULL)
                         {
                             // Get next command
                             if (pCmd->ListEntry.Flink == &Gbl_ListCmds)
@@ -374,29 +586,96 @@ Monitor(
                                         ListEntry
                                         );
                             }
+                            bFlag = TRUE;
                         }
                         break;
 
-                    case 'D':           // Left arrow (Linux)
-                    case 'K':           // Left arrow (Windows)
-                        // Not currently handled
-                        bFlag = FALSE;
+                    case CONS_KEY_ARROW_LEFT:
+                        if (i)
+                        {
+                            Cons_printf("\b");
+                            i--;
+                        }
                         break;
 
-                    case 'C':           // Right arrow (Linux)
-                    case 'M':           // Right arrow (Windows)
-                        // Not currently handled
-                        bFlag = FALSE;
+                    case CONS_KEY_ARROW_RIGHT:
+                        if (buffer[i] != '\0')
+                        {
+                            Cons_printf("%c", buffer[i]);
+                            i++;
+                        }
+                        break;
+
+                    case CONS_KEY_HOME:
+                    case CONS_KEY_HOME_XTERM:
+                        while (i)
+                        {
+                            Cons_printf("\b");
+                            i--;
+                        }
+                        break;
+
+                    case CONS_KEY_END:
+                    case CONS_KEY_END_XTERM:
+                        while (buffer[i] != '\0')
+                        {
+                            Cons_printf("%c", buffer[i]);
+                            i++;
+                        }
+                        break;
+
+                    case CONS_KEY_INSERT:
+                        bInsertMode ^= 1;
+                        if (bInsertMode)
+                            ConsoleCursorPropertiesSet( CONS_CURSOR_INSERT );
+                        else
+                            ConsoleCursorPropertiesSet( CONS_CURSOR_DEFAULT );
+                        break;
+
+                    case CONS_KEY_DELETE:
+                        // Delete current character & shift text from right
+                        count = 0;
+                        while (buffer[i] != '\0')
+                        {
+                            buffer[i] = buffer[i+1];
+                            if (buffer[i+1] == '\0')
+                                Cons_printf(" \b");
+                            else
+                            {
+                                Cons_printf("%c", buffer[i]);
+                                i++;
+                                count++;
+                            }
+                        }
+
+                        // Restore cursor to original position
+                        while (count)
+                        {
+                            Cons_printf("\b");
+                            i--;
+                            count--;
+                        }
                         break;
 
                     default:
                         // Unsupported key, do nothing
-                        bFlag = FALSE;
                         break;
                 }
 
+                // Linux also adds '~' in some cases, so ignore it
+                if (Cons_kbhit())
+                    Cons_getch();
+
+                // Update command line if requested to
                 if (bFlag)
                 {
+                    // Go to end of line
+                    while (buffer[i] != '\0')
+                    {
+                        Cons_printf("%c", buffer[i]);
+                        i++;
+                    }
+
                     // Clear the command-line
                     while (i)
                     {
@@ -422,12 +701,35 @@ Monitor(
                 break;
 
             default:
+_Monitor_StandardKey:
                 // Check for overflow
                 if (i < (MAX_CMDLN_LEN - 1))
                 {
+                    // If insert mode, shift character right
+                    if (bInsertMode)
+                    {
+                        count = strlen(buffer + i) + i;
+                        while (count > i)
+                        {
+                            buffer[count] = buffer[count-1];
+                            count--;
+                        }
+                    }
                     buffer[i] = (char)NextInp;
                     Cons_printf("%c", (char)NextInp);
                     i++;
+
+                    // Display updated string & restore cursor position
+                    if (bInsertMode)
+                    {
+                        count = strlen(buffer + i);
+                        if (count)
+                        {
+                            Cons_printf("%s", (buffer + i));
+                            while (count--)
+                                Cons_printf("\b");
+                        }
+                    }
                 }
                 break;
         }
@@ -455,153 +757,30 @@ ProcessCommand(
 
 
     // Add command to list if not already
-    pCmd = CmdLine_CmdAdd( buffer );
+    pCmd = CmdLine_CmdAdd( buffer, Gbl_FnTable );
 
     if (pCmd == NULL)
         return NULL;
 
-    // Check for command-line parsing errors
-    if (pCmd->bErrorParse)
-        return NULL;
-
-    if (!Plx_strcasecmp(pCmd->szCmd, "cls") ||
-        !Plx_strcasecmp(pCmd->szCmd, "clear"))
+    if (pCmd->pCmdRoutine == NULL)
     {
-        Cons_clear();
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "exit") ||
-             !Plx_strcasecmp(pCmd->szCmd, "quit") ||
-             !Plx_strcasecmp(pCmd->szCmd, "q"))
-    {
-        strcpy(pCmd->szCmd, "quit");
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "ver"))
-    {
-        Cmd_Version( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "?") ||
-             !Plx_strcasecmp(pCmd->szCmd, "help"))
-    {
-        Cmd_Help( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "sleep"))
-    {
-        Cmd_Sleep( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "screen"))
-    {
-        Cmd_Screen( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "history") ||
-             !Plx_strcasecmp(pCmd->szCmd, "h") ||
-             !Plx_strcasecmp(pCmd->szCmd, "!"))
-    {
-        Cmd_History( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "boot"))
-    {
-        Cmd_Boot( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "reset"))
-    {
-        Cmd_Reset( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "scan"))
-    {
-        Cmd_Scan( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "set_chip"))
-    {
-        Cmd_SetChip( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "dev"))
-    {
-        Cmd_Dev( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "i2c"))
-    {
-        Cmd_I2cConnect( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "pci_cap"))
-    {
-        Cmd_PciCapList( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "portinfo"))
-    {
-        Cmd_PortProp( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "mh_prop"))
-    {
-        Cmd_MH_Prop( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "var") ||
-             !Plx_strcasecmp(pCmd->szCmd, "vars"))
-    {
-        Cmd_VarDisplay( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "set"))
-    {
-        Cmd_VarSet( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "buff") ||
-             !Plx_strcasecmp(pCmd->szCmd, "buffer"))
-    {
-        Cmd_ShowBuffer( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "db") ||
-             !Plx_strcasecmp(pCmd->szCmd, "dw") ||
-             !Plx_strcasecmp(pCmd->szCmd, "dl") ||
-             !Plx_strcasecmp(pCmd->szCmd, "dq"))
-    {
-        Cmd_MemRead( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "eb") ||
-             !Plx_strcasecmp(pCmd->szCmd, "ew") ||
-             !Plx_strcasecmp(pCmd->szCmd, "el") ||
-             !Plx_strcasecmp(pCmd->szCmd, "eq"))
-    {
-        Cmd_MemWrite( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "ib") ||
-             !Plx_strcasecmp(pCmd->szCmd, "iw") ||
-             !Plx_strcasecmp(pCmd->szCmd, "il"))
-    {
-        Cmd_IoRead( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "ob") ||
-             !Plx_strcasecmp(pCmd->szCmd, "ow") ||
-             !Plx_strcasecmp(pCmd->szCmd, "ol"))
-    {
-        Cmd_IoWrite( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "pcr"))
-    {
-        Cmd_RegPci( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "reg") ||
-             !Plx_strcasecmp(pCmd->szCmd, "lcr") ||
-             !Plx_strcasecmp(pCmd->szCmd, "rtr") ||
-             !Plx_strcasecmp(pCmd->szCmd, "dma") ||
-             !Plx_strcasecmp(pCmd->szCmd, "mqr"))
-    {
-        Cmd_RegPlx( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "eep"))
-    {
-        Cmd_Eep( pDevice, pCmd );
-    }
-    else if (!Plx_strcasecmp(pCmd->szCmd, "eep_load") ||
-             !Plx_strcasecmp(pCmd->szCmd, "eep_save"))
-    {
-        Cmd_EepFile( pDevice, pCmd );
+        if (pCmd->bErrorParse)
+        {
+            Cons_printf(
+                "\"%s\" is not a valid command. Type "
+                "\"help\" for more information.\n",
+                pCmd->szCmd
+                );
+        }
     }
     else
     {
-        Cons_printf(
-            "\"%s\" is not a valid command. Type "
-            "\"help\" for more information.\n",
-            pCmd->szCmd
-            );
+        // Check for command-line parsing errors
+        if (pCmd->bErrorParse)
+            return NULL;
+
+        // Call the command
+        pCmd->pCmdRoutine( pDevice, pCmd );
     }
 
     return pCmd;
@@ -635,12 +814,18 @@ DeviceSelectByIndex(
     if (pNode == NULL)
         return NULL;
 
-    // De-select current device is selected
+    // De-select current device if selected
     if (Gbl_pNodeCurrent != NULL)
     {
+        // Do nothing if re-selecting same node
+        if (pNode == Gbl_pNodeCurrent)
+            return pNode;
+
         Gbl_pNodeCurrent->bSelected = FALSE;
         PciSpacesUnmap( &Gbl_DeviceObj );
         CommonBufferUnmap( &Gbl_DeviceObj );
+
+        // Release the device
         PlxPci_DeviceClose( &Gbl_DeviceObj );
     }
 
@@ -834,7 +1019,7 @@ CommonBufferUnmap(
         // Unmap buffer
         PlxPci_CommonBufferUnmap(
             pDevice,
-            pBuffer
+            &pBuffer
             );
 
         // Remove variable from table

@@ -14,6 +14,7 @@
 #include <ctype.h>      // isxdigit, isspace
 #include <malloc.h>     // malloc, free
 #include "CmdLine.h"
+#include "MonCmds.h"
 #include "Monitor.h"
 #include "PlxTypes.h"
 
@@ -133,8 +134,9 @@ CmdLine_IsHexValue(
  *********************************************************/
 void
 CmdLine_GetNextToken(
-    char **pStr,
-    char  *strToken
+    char    **pStr,
+    char     *strToken,
+    BOOLEAN   bAllowOps
     )
 {
     // Remove leading whitespaces
@@ -142,21 +144,33 @@ CmdLine_GetNextToken(
         (*pStr)++;
 
     // Check for operations
-    if ((**pStr == '+') || (**pStr == '-') ||
-        (**pStr == '=') || (**pStr == '!'))
+    if (bAllowOps)
     {
-        // Copy operation and return
-        *strToken = **pStr;
-        strToken[1] = '\0';
-        (*pStr)++;
-        return;
+        if ((**pStr == '+') || (**pStr == '-') ||
+            (**pStr == '=') || (**pStr == '!'))
+        {
+            // Copy operation and return
+            *strToken = **pStr;
+            strToken[1] = '\0';
+            (*pStr)++;
+            return;
+        }
     }
 
     // Get next token
-    while ((**pStr != '\0') && (!isspace( **pStr )) &&
-           (**pStr != '+')  && (**pStr != '-')      &&
-           (**pStr != '=')  && (**pStr != '!'))
+    while (1)
     {
+        // Check for terminating characters
+        if ((**pStr == '\0') || isspace( **pStr ))
+            break;
+
+        // Check for operations if allowed
+        if (bAllowOps && ((**pStr == '+')  || (**pStr == '-') ||
+                          (**pStr == '=')  || (**pStr == '!')))
+        {
+            break;
+        }
+
         // Copy character and increment pointers
         *strToken = **pStr;
         (*pStr)++;
@@ -401,7 +415,8 @@ CmdLine_VarDeleteAll(
  *********************************************************/
 PLXCM_COMMAND*
 CmdLine_CmdAdd(
-    char *buffer
+    char     *buffer,
+    FN_TABLE *pFnTable
     )
 {
     PLXCM_COMMAND *pCmd;
@@ -455,7 +470,7 @@ CmdLine_CmdAdd(
 
     // Parse command and arguments if not already
     if (pCmd->bParsed == FALSE)
-        CmdLine_CmdParse( pCmd );
+        CmdLine_CmdParse( pCmd, pFnTable );
 
     // Add item to head of list
     Plx_InsertTailList( &Gbl_ListCmds, &pCmd->ListEntry );
@@ -575,7 +590,8 @@ CmdLine_CmdExists(
  *********************************************************/
 BOOLEAN
 CmdLine_CmdParse(
-    PLXCM_COMMAND *pCmd
+    PLXCM_COMMAND *pCmd,
+    FN_TABLE      *pFnTable
     )
 {
     char         *pBuffer;
@@ -589,7 +605,15 @@ CmdLine_CmdParse(
 
     // Get the command
     pBuffer = pCmd->szCmdLine;
-    CmdLine_GetNextToken( &pBuffer, pCmd->szCmd );
+    CmdLine_GetNextToken( &pBuffer, pCmd->szCmd, FALSE );
+
+    // Lookup the command & set function pointer
+    if (pCmd->pCmdRoutine == NULL)
+    {
+        CmdLine_CmdLookup( pCmd, pFnTable );
+        if (pCmd->pCmdRoutine == NULL)
+            return pCmd->bErrorParse;
+    }
 
     // Start with no operations
     bOpOk    = FALSE;
@@ -603,7 +627,7 @@ CmdLine_CmdParse(
     do
     {
         // Get next argument
-        CmdLine_GetNextToken( &pBuffer, strArg );
+        CmdLine_GetNextToken( &pBuffer, strArg, pCmd->bAllowOps );
 
         // Reset variable from table
         pVar = NULL;
@@ -614,17 +638,20 @@ CmdLine_CmdParse(
             // Default to not add argument
             pArg = NULL;
 
-            // If variable, convert to hex string
-            pVar = CmdLine_VarLookup( strArg );
-            if (pVar != NULL)
+            // If variables allowed, check for it & convert to hex string
+            if (pCmd->bAllowOps)
             {
-                strcpy( strArg, pVar->strValue );
+                pVar = CmdLine_VarLookup( strArg );
+                if (pVar != NULL)
+                {
+                    strcpy( strArg, pVar->strValue );
 
-                // Flag string exists in command
-                pCmd->bContainString = TRUE;
+                    // Flag string exists in command
+                    pCmd->bContainString = TRUE;
+                }
             }
 
-            if ((strArg[0] == '+') || (strArg[0] == '-'))   // Math operation
+            if (pCmd->bAllowOps && ((strArg[0] == '+') || (strArg[0] == '-')))   // Math operation
             {
                 // Check if operation allowed
                 if (bOpOk == FALSE)
@@ -772,6 +799,62 @@ CmdLine_CmdParse(
     // Mark command as parsed
     pCmd->bParsed = TRUE;
 
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   : CmdLine_CmdLookup
+ *
+ * Description: Locate a command in the function table
+ *
+ *********************************************************/
+BOOLEAN
+CmdLine_CmdLookup(
+    PLXCM_COMMAND *pCmd,
+    FN_TABLE      *pFnTable
+    )
+{
+    U16   i;
+    char *Token;
+    char  strCmd[MAX_CMD_LEN];
+
+
+    if (pFnTable == NULL)
+        return FALSE;
+
+    // Lookup command in function table to assign pointer
+    i = 0;
+    while (pFnTable[i].CmdId != CMD_FINAL)
+    {
+        // Make a copy of the command
+        strcpy( strCmd, pFnTable[i].strCmd );
+
+        // Get next command
+        Token = strtok( strCmd, "/" );
+        while (Token != NULL)
+        {
+            // Check for a match
+            if (Plx_strcasecmp( Token, pCmd->szCmd ) == 0)
+            {
+                pCmd->pCmdRoutine = pFnTable[i].pCmdRoutine;
+                pCmd->bAllowOps   = pFnTable[i].bAllowOps;
+                return TRUE;
+            }
+
+            // Get next alias
+            Token = strtok( NULL, "/" );
+        }
+
+        // Jump to next command
+        i++;
+    }
+
+    pCmd->pCmdRoutine = NULL;
+    pCmd->bErrorParse = TRUE;
     return TRUE;
 }
 

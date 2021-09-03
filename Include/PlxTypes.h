@@ -30,11 +30,11 @@
  *
  * Description:
  *
- *      This file defines the basic types available to the PCI SDK.
+ *      This file includes PLX SDK types and definitions
  *
  * Revision:
  *
- *      12-01-10 : PLX SDK v6.40
+ *      07-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -60,6 +60,7 @@ extern "C" {
 #if !defined(PLX_MSWINDOWS)
     #define RtlZeroMemory(pDest, count)           memset((pDest), 0, (count))
     #define RtlCopyMemory(pDest, pSrc, count)     memcpy((pDest), (pSrc), (count))
+    #define RtlFillMemory(pDest, count, value)    memset((pDest), (value), (count))
 #endif
 
 // Convert pointer to an integer
@@ -155,6 +156,7 @@ extern "C" {
      *          jiffies = Number of HZ's per second
      ********************************************************/
     #define Plx_ms_to_jiffies( ms )     ( ((ms) * HZ) / 1000 )
+    #define Plx_jiffies_to_ms( jiff )   ( ((jiff) * 1000) / HZ )
 #endif
 
 
@@ -201,9 +203,39 @@ typedef enum _PLX_CHIP_FAMILY
     PLX_FAMILY_SCOUT,                   // 8700
     PLX_FAMILY_DRACO_1,                 // 8408,8416,8712,8716,8724,8732,8747,8748
     PLX_FAMILY_DRACO_2,                 // 8713,8717,8725,8733,8749
-    PLX_FAMILY_MIRA,
-    PLX_FAMILY_CAPELLA
+    PLX_FAMILY_MIRA,                    // 2380,3380,3382,8603,8605
+    PLX_FAMILY_CAPELLA_1,               // 8714,8718,8734,8750,8764,8780,8796
+    PLX_FAMILY_CAPELLA_2                // 8715,8719,8735,8751,8765,8781,8797
 } PLX_CHIP_FAMILY;
+
+
+// PLX port flags for mask
+typedef enum _PLX_FLAG_PORT
+{
+    PLX_FLAG_PORT_NT_LINK_1     = 63,   // Bit for NT Link port 0
+    PLX_FLAG_PORT_NT_LINK_0     = 62,   // Bit for NT Link port 1
+    PLX_FLAG_PORT_NT_VIRTUAL_1  = 61,   // Bit for NT Virtual port 0
+    PLX_FLAG_PORT_NT_VIRTUAL_0  = 60,   // Bit for NT Virtual port 1
+    PLX_FLAG_PORT_NT_DS_P2P     = 59,   // Bit for NT DS P2P port (Virtual)
+    PLX_FLAG_PORT_DMA_RAM       = 58,   // Bit for DMA RAM
+    PLX_FLAG_PORT_DMA_3         = 57,   // Bit for DMA channel 3
+    PLX_FLAG_PORT_DMA_2         = 56,   // Bit for DMA channel 2
+    PLX_FLAG_PORT_DMA_1         = 55,   // Bit for DMA channel 1
+    PLX_FLAG_PORT_DMA_0         = 54,   // Bit for DMA ch 0 or Func 1 (all 4 ch)
+    PLX_FLAG_PORT_PCIE_TO_USB   = 53,   // Bit for PCIe-to-USB P2P or Root Port
+    PLX_FLAG_PORT_USB           = 52,   // Bit for USB Host/Bridge
+    PLX_FLAG_PORT_ALUT_3        = 51,   // Bit for ALUT RAM arrays 0
+    PLX_FLAG_PORT_ALUT_2        = 50,   // Bit for ALUT RAM arrays 1
+    PLX_FLAG_PORT_ALUT_1        = 49,   // Bit for ALUT RAM arrays 2
+    PLX_FLAG_PORT_ALUT_0        = 48,   // Bit for ALUT RAM arrays 3
+    PLX_FLAG_PORT_VS_REGS_S5    = 47,   // Bit for VS mode station 0 specific regs
+    PLX_FLAG_PORT_VS_REGS_S4    = 46,   // Bit for VS mode station 1 specific regs
+    PLX_FLAG_PORT_VS_REGS_S3    = 45,   // Bit for VS mode station 2 specific regs
+    PLX_FLAG_PORT_VS_REGS_S2    = 44,   // Bit for VS mode station 3 specific regs
+    PLX_FLAG_PORT_VS_REGS_S1    = 43,   // Bit for VS mode station 4 specific regs
+    PLX_FLAG_PORT_VS_REGS_S0    = 42,   // Bit for VS mode station 5 specific regs
+    PLX_FLAG_PORT_MAX           = 41    // Bit for highest possible standard port
+} PLX_FLAG_PORT;
 
 
 // Generic states used internally by PLX software
@@ -214,6 +246,7 @@ typedef enum _PLX_STATE
     PLX_STATE_ERROR,
     PLX_STATE_ENABLED,
     PLX_STATE_DISABLED,
+    PLX_STATE_UNINITIALIZED,
     PLX_STATE_INITIALIZING,
     PLX_STATE_INITIALIZED,
     PLX_STATE_IDLE,
@@ -229,6 +262,7 @@ typedef enum _PLX_STATE
     PLX_STATE_TRIGGERED,
     PLX_STATE_PENDING,
     PLX_STATE_WAITING,
+    PLX_STATE_TIMEOUT,
     PLX_STATE_REQUESTING,
     PLX_STATE_REQUESTED,
     PLX_STATE_ACCEPTING,
@@ -241,6 +275,20 @@ typedef enum _PLX_STATE
     PLX_STATE_DISCONNECTING,
     PLX_STATE_DISCONNECTED
 } PLX_STATE;
+
+
+// BAR flags
+typedef enum _PLX_BAR_FLAG
+{
+    PLX_BAR_FLAG_MEM               = (1 << 0),
+    PLX_BAR_FLAG_IO                = (1 << 1),
+    PLX_BAR_FLAG_BELOW_1MB         = (1 << 2),
+    PLX_BAR_FLAG_32_BIT            = (1 << 3),
+    PLX_BAR_FLAG_64_BIT            = (1 << 4),
+    PLX_BAR_FLAG_PREFETCHABLE      = (1 << 5),
+    PLX_BAR_FLAG_UPPER_32          = (1 << 6),
+    PLX_BAR_FLAG_PROBED            = (1 << 7)
+} PLX_BAR_FLAG;
 
 
 // EEPROM status
@@ -268,6 +316,16 @@ typedef enum _PLX_EEPROM_PORT
     PLX_EEPROM_PORT_DMA_3       = 247,
     PLX_EEPROM_PORT_SHARED_MEM  = 246
 } PLX_EEPROM_PORT;
+
+
+// EEPROM CRC status
+typedef enum _PLX_CRC_STATUS
+{
+    PLX_CRC_INVALID             = 0,
+    PLX_CRC_VALID               = 1,
+    PLX_CRC_UNSUPPORTED         = 2,
+    PLX_CRC_UNKNOWN             = 3
+} PLX_CRC_STATUS;
 
 
 // PCI Express Link Speeds
@@ -299,7 +357,6 @@ typedef enum _PLX_PORT_TYPE
     PLX_PORT_UNKNOWN            = 0xFF,
     PLX_PORT_ENDPOINT           = 0,
     PLX_PORT_LEGACY_ENDPOINT    = 1,
-    PLX_PORT_NON_TRANS          = PLX_PORT_ENDPOINT,       // NT port is an endpoint
     PLX_PORT_ROOT_PORT          = 4,
     PLX_PORT_UPSTREAM           = 5,
     PLX_PORT_DOWNSTREAM         = 6,
@@ -320,6 +377,16 @@ typedef enum _PLX_NT_PORT_TYPE
     PLX_NT_PORT_LINK            = PLX_NT_PORT_SECONDARY,   // NT Link-side port
     PLX_NT_PORT_UNKOWN          = 0xFF                     // NT side is undetermined
 } PLX_NT_PORT_TYPE;
+
+
+// NT port configuration types
+typedef enum _PLX_NT_CONFIG_TYPE
+{
+    PLX_NT_CONFIG_TYPE_NONE     = 0,
+    PLX_NT_CONFIG_TYPE_LINK_DOWN,
+    PLX_NT_CONFIG_TYPE_STANDARD,
+    PLX_NT_CONFIG_TYPE_BACK_TO_BACK
+} PLX_NT_CONFIG_TYPE;
 
 
 // Non-transparent LUT flags
@@ -473,55 +540,53 @@ typedef struct _PLX_PHYSICAL_MEM
 // PLX Driver Properties
 typedef struct _PLX_DRIVER_PROP
 {
-    U32     Version;                 // Driver version
-    char    Name[16];                // Driver name
-    char    FullName[255];           // Full driver name
-    BOOLEAN bIsServiceDriver;        // Is service driver or PnP driver?
-    U64     AcpiPcieEcam;            // Base address of PCIe ECAM
-    U8      Reserved[40];            // Reserved for future use
+    U32  Version;                    // Driver version
+    char Name[16];                   // Driver name
+    char FullName[255];              // Full driver name
+    U8   bIsServiceDriver;           // Is service driver or PnP driver?
+    U64  AcpiPcieEcam;               // Base address of PCIe ECAM
+    U8   Reserved[40];               // Reserved for future use
 } PLX_DRIVER_PROP;
 
 
 // PCI BAR Properties
 typedef struct _PLX_PCI_BAR_PROP
 {
-    U32      BarValue;               // Actual value in BAR
-    U64      Physical;               // BAR Physical Address
-    U64      Size;                   // Size of BAR space
-    BOOLEAN  bIoSpace;               // Memory or I/O space?
-    BOOLEAN  bPrefetchable;          // Is space pre-fetchable?
-    BOOLEAN  b64bit;                 // Is PCI BAR 64-bit?
+    U64 BarValue;                    // Actual value in BAR
+    U64 Physical;                    // BAR Physical Address
+    U64 Size;                        // Size of BAR space
+    U32 Flags;                       // Additional BAR properties
 } PLX_PCI_BAR_PROP;
 
 
 // Used for getting the port properties and status
 typedef struct _PLX_PORT_PROP
 {
-    U8      PortType;                // Port configuration
-    U8      PortNumber;              // Internal port number
-    U8      LinkWidth;               // Negotiated port link width
-    U8      MaxLinkWidth;            // Max link width device is capable of
-    U8      LinkSpeed;               // Negotiated link speed
-    U8      MaxLinkSpeed;            // Max link speed device is capable of
-    U16     MaxReadReqSize;          // Max read request size allowed
-    U16     MaxPayloadSize;          // Max payload size setting
-    U16     MaxPayloadSupported;     // Max payload size supported by device
-    BOOLEAN bNonPcieDevice;          // Flag whether device is a PCIe device
+    U8  PortType;                    // Port configuration
+    U8  PortNumber;                  // Internal port number
+    U8  LinkWidth;                   // Negotiated port link width
+    U8  MaxLinkWidth;                // Max link width device is capable of
+    U8  LinkSpeed;                   // Negotiated link speed
+    U8  MaxLinkSpeed;                // Max link speed device is capable of
+    U16 MaxReadReqSize;              // Max read request size allowed
+    U16 MaxPayloadSize;              // Max payload size setting
+    U16 MaxPayloadSupported;         // Max payload size supported by device
+    U8  bNonPcieDevice;              // Flag whether device is a PCIe device
 } PLX_PORT_PROP;
 
 
 // Used for getting the multi-host switch properties
 typedef struct _PLX_MULTI_HOST_PROP
 {
-    U8      SwitchMode;              // Current switch mode
-    U16     VS_EnabledMask;          // Bit for each enabled Virtual Switch
-    U8      VS_UpstreamPortNum[8];   // Upstream port number of each Virtual Switch
-    U32     VS_DownstreamPorts[8];   // Downstream ports associated with a Virtual Switch
-    BOOLEAN bIsMgmtPort;             // Is selected device management port
-    BOOLEAN bMgmtPortActiveEn;       // Is active management port enabled
-    U8      MgmtPortNumActive;       // Active management port
-    BOOLEAN bMgmtPortRedundantEn;    // Is redundant management port enabled
-    U8      MgmtPortNumRedundant;    // Redundant management port
+    U8  SwitchMode;                  // Current switch mode
+    U16 VS_EnabledMask;              // Bit for each enabled Virtual Switch
+    U8  VS_UpstreamPortNum[8];       // Upstream port number of each Virtual Switch
+    U32 VS_DownstreamPorts[8];       // Downstream ports associated with a Virtual Switch
+    U8  bIsMgmtPort;                 // Is selected device management port
+    U8  bMgmtPortActiveEn;           // Is active management port enabled
+    U8  MgmtPortNumActive;           // Active management port
+    U8  bMgmtPortRedundantEn;        // Is redundant management port enabled
+    U8  MgmtPortNumRedundant;        // Redundant management port
 } PLX_MULTI_HOST_PROP;
 
 
@@ -539,8 +604,8 @@ typedef struct _PLX_EEPROM_ENTRY
 typedef struct _PLX_EEPROM_PROP
 {
     U8               Signature;      // EEPROM signature (5Ah = Valid)
-    BOOLEAN          bLoadRegs;      // Load registers from EEPROM? (8111/8112)
-    BOOLEAN          bLoadSharedMem; // Load shared mem from EEPROM? (8111/8112)
+    U8               bLoadRegs;      // Load registers from EEPROM? (8111/8112)
+    U8               bLoadSharedMem; // Load shared mem from EEPROM? (8111/8112)
     char             Comment[200];   // User comments about the EEPROM
     U16              RegCount;       // Number of register entries
     PLX_EEPROM_ENTRY RegEntry[1];    // EEPROM register entries
@@ -551,7 +616,8 @@ typedef struct _PLX_EEPROM_PROP
 typedef struct _PLX_DEVICE_KEY
 {
     U32 IsValidTag;                  // Magic number to determine validity
-    U8  bus;                         // Physical device location
+    U8  domain;                      // Physical device location
+    U8  bus;
     U8  slot;
     U8  function;
     U16 VendorId;                    // Device Identifier
@@ -563,11 +629,12 @@ typedef struct _PLX_DEVICE_KEY
     U8  PlxRevision;                 // PLX chip revision
     U8  PlxFamily;                   // PLX chip family
     U8  ApiIndex;                    // Used internally by the API
-    U8  DeviceNumber;                // Used internally by device drivers
+    U16 DeviceNumber;                // Used internally by device drivers
     U8  ApiMode;                     // Mode API uses to access device
     U8  PlxPort;                     // PLX port number of device
     U8  NTPortType;                  // If NT port, stores NT port type
     U8  NTPortNum;                   // If NT port exists, store NT port number
+    U8  DeviceMode;                  // Device mode used internally by API
     U32 ApiInternal[2];              // Reserved for internal PLX API use
 } PLX_DEVICE_KEY;
 
@@ -582,7 +649,7 @@ typedef struct _PLX_DEVICE_OBJECT
     U64               PciBarVa[6];   // For PCI BAR user-mode BAR mappings
     U8                BarMapRef[6];  // BAR map count used by API
     PLX_PHYSICAL_MEM  CommonBuffer;  // Used to store common buffer information
-    VOID             *pPrivateData;  // Pointer storage for a user private buffer
+    U64               PrivateData[4];// Private storage for user application
 } PLX_DEVICE_OBJECT;
 
 
@@ -602,7 +669,7 @@ typedef struct _PLX_INTERRUPT
     U8  PciMain                :1;
     U8  PciAbort               :1;
     U8  LocalToPci             :2;   // Local->PCI interrupts 1 & 2
-    U8  DmaDone                :4;   // DMA channel 0-3 interrrupts
+    U8  DmaDone                :4;   // DMA channel 0-3 interrupts
     U8  DmaPauseDone           :4;
     U8  DmaAbortDone           :4;
     U8  DmaImmedStopDone       :4;
@@ -616,9 +683,9 @@ typedef struct _PLX_INTERRUPT
     U8  SwInterrupt            :1;
     U8  ResetDeassert          :1;
     U8  PmeDeassert            :1;
-    U8  GPIO_4_5               :1;
-    U8  GPIO_14_15             :1;
-    U8  NTV_LE_Correctable     :1;   // NT Virtual - Link-side error interrupts
+    U8  GPIO_4_5               :1;   // 6000 NT GPIO 4/5 interrupt
+    U8  GPIO_14_15             :1;   // 6000 NT GPIO 14/15 interrupt
+    U8  NTV_LE_Correctable     :1;   // 8000 NT Virtual - Link-side error interrupts
     U8  NTV_LE_Uncorrectable   :1;
     U8  NTV_LE_LinkStateChange :1;
     U8  NTV_LE_UncorrErrorMsg  :1;
@@ -680,17 +747,17 @@ typedef struct _PLX_DMA_PROP
 // DMA Transfer Parameters
 typedef struct _PLX_DMA_PARAMS
 {
-    U64         UserVa;             // User buffer virtual address
-    U64         AddrSource;         // Source address      (8000 DMA)
-    U64         AddrDest;           // Destination address (8000 DMA)
-    U64         PciAddr;            // PCI address         (9000 DMA)
-    U32         LocalAddr;          // Local bus address   (9000 DMA)
-    U32         ByteCount;          // Number of bytes to transfer
-    PLX_DMA_DIR Direction;          // Direction of transfer (Local<->PCI, User<->PCI) (9000 DMA)
-    U8          bConstAddrSrc   :1; // Constant source PCI address?      (8000 DMA)
-    U8          bConstAddrDest  :1; // Constant destination PCI address? (8000 DMA)
-    U8          bForceFlush     :1; // Force DMA to flush write on final descriptor (8000 DMA)
-    U8          bIgnoreBlockInt :1; // For block mode only, do not enable DMA done interrupt
+    U64 UserVa;                     // User buffer virtual address
+    U64 AddrSource;                 // Source address      (8000 DMA)
+    U64 AddrDest;                   // Destination address (8000 DMA)
+    U64 PciAddr;                    // PCI address         (9000 DMA)
+    U32 LocalAddr;                  // Local bus address   (9000 DMA)
+    U32 ByteCount;                  // Number of bytes to transfer
+    U8  Direction;                  // Direction of transfer (Local<->PCI, User<->PCI) (9000 DMA)
+    U8  bConstAddrSrc   :1;         // Constant source PCI address?      (8000 DMA)
+    U8  bConstAddrDest  :1;         // Constant destination PCI address? (8000 DMA)
+    U8  bForceFlush     :1;         // Force DMA to flush write on final descriptor (8000 DMA)
+    U8  bIgnoreBlockInt :1;         // For block mode only, do not enable DMA done interrupt
 } PLX_DMA_PARAMS;
 
 

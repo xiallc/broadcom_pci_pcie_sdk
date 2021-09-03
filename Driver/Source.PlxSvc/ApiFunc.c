@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      12-01-10 : PLX SDK v6.40
+ *      02-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -58,14 +58,14 @@ PLX_STATUS
 PlxDeviceFind(
     DEVICE_EXTENSION *pdx,
     PLX_DEVICE_KEY   *pKey,
-    U8               *pDeviceNumber
+    U16              *pDeviceNumber
     )
 {
-    U8                DeviceCount;
+    U16               DeviceCount;
     U32               RegValue;
     BOOLEAN           bMatchId;
     BOOLEAN           bMatchLoc;
-    PLX_DEVICE_NODE  *pNode;
+    PLX_DEVICE_NODE  *pDevice;
     struct list_head *pEntry;
 
 
@@ -77,7 +77,7 @@ PlxDeviceFind(
     while (pEntry != &(pdx->List_Devices))
     {
         // Get the object
-        pNode =
+        pDevice =
             list_entry(
                 pEntry,
                 PLX_DEVICE_NODE,
@@ -95,7 +95,7 @@ PlxDeviceFind(
         // Compare Bus number
         if (pKey->bus != (U8)PCI_FIELD_IGNORE)
         {
-            if (pKey->bus != pNode->Key.bus)
+            if (pKey->bus != pDevice->Key.bus)
             {
                 bMatchLoc = FALSE;
             }
@@ -104,7 +104,7 @@ PlxDeviceFind(
         // Compare Slot number
         if (pKey->slot != (U8)PCI_FIELD_IGNORE)
         {
-            if (pKey->slot != pNode->Key.slot)
+            if (pKey->slot != pDevice->Key.slot)
             {
                 bMatchLoc = FALSE;
             }
@@ -113,7 +113,7 @@ PlxDeviceFind(
         // Compare Function number
         if (pKey->function != (U8)PCI_FIELD_IGNORE)
         {
-            if (pKey->function != pNode->Key.function)
+            if (pKey->function != pDevice->Key.function)
             {
                 bMatchLoc = FALSE;
             }
@@ -126,7 +126,7 @@ PlxDeviceFind(
         // Compare Vendor ID
         if (pKey->VendorId != (U16)PCI_FIELD_IGNORE)
         {
-            if (pKey->VendorId != pNode->Key.VendorId)
+            if (pKey->VendorId != pDevice->Key.VendorId)
             {
                 bMatchId = FALSE;
             }
@@ -135,32 +135,32 @@ PlxDeviceFind(
         // Compare Device ID
         if (pKey->DeviceId != (U16)PCI_FIELD_IGNORE)
         {
-            if (pKey->DeviceId != pNode->Key.DeviceId)
+            if (pKey->DeviceId != pDevice->Key.DeviceId)
             {
                 bMatchId = FALSE;
             }
         }
 
         // Subsystem ID only valid in PCI header 0 type
-        if (pNode->PciHeaderType == 0)
+        if (pDevice->PciHeaderType == 0)
         {
             // Get the Subsystem Device/Vendor ID
-            if (pNode->Key.SubVendorId == 0)
+            if (pDevice->Key.SubVendorId == 0)
             {
                 PLX_PCI_REG_READ(
-                    pNode,
+                    pDevice,
                     0x2c,        // PCI Subsystem ID
                     &RegValue
                     );
 
-                pNode->Key.SubVendorId = (U16)(RegValue & 0xffff);
-                pNode->Key.SubDeviceId = (U16)(RegValue >> 16);
+                pDevice->Key.SubVendorId = (U16)(RegValue & 0xffff);
+                pDevice->Key.SubDeviceId = (U16)(RegValue >> 16);
             }
 
             // Compare Subsystem Vendor ID
             if (pKey->SubVendorId != (U16)PCI_FIELD_IGNORE)
             {
-                if (pKey->SubVendorId != pNode->Key.SubVendorId)
+                if (pKey->SubVendorId != pDevice->Key.SubVendorId)
                 {
                     bMatchId = FALSE;
                 }
@@ -169,7 +169,7 @@ PlxDeviceFind(
             // Compare Subsystem Device ID
             if (pKey->SubDeviceId != (U16)PCI_FIELD_IGNORE)
             {
-                if (pKey->SubDeviceId != pNode->Key.SubDeviceId)
+                if (pKey->SubDeviceId != pDevice->Key.SubDeviceId)
                 {
                     bMatchId = FALSE;
                 }
@@ -177,21 +177,21 @@ PlxDeviceFind(
         }
 
         // Get the Revision ID if haven't yet
-        if (pNode->Key.Revision == 0)
+        if (pDevice->Key.Revision == 0)
         {
             PLX_PCI_REG_READ(
-                pNode,
+                pDevice,
                 0x08,        // PCI Revision ID
                 &RegValue
                 );
 
-            pNode->Key.Revision = (U8)(RegValue & 0xFF);
+            pDevice->Key.Revision = (U8)(RegValue & 0xFF);
         }
 
         // Compare Revision
         if (pKey->Revision != (U8)PCI_FIELD_IGNORE)
         {
-            if (pKey->Revision != pNode->Key.Revision)
+            if (pKey->Revision != pDevice->Key.Revision)
             {
                 bMatchId = FALSE;
             }
@@ -204,12 +204,12 @@ PlxDeviceFind(
             if (DeviceCount == *pDeviceNumber)
             {
                 // Copy the device information
-                *pKey = pNode->Key;
+                *pKey = pDevice->Key;
 
                 DebugPrintf((
-                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%02x]\n",
-                    pNode->Key.DeviceId, pNode->Key.VendorId,
-                    pNode->Key.bus, pNode->Key.slot, pNode->Key.function
+                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%x]\n",
+                    pDevice->Key.DeviceId, pDevice->Key.VendorId,
+                    pDevice->Key.bus, pDevice->Key.slot, pDevice->Key.function
                     ));
 
                 return ApiSuccess;
@@ -243,17 +243,17 @@ PlxDeviceFind(
  ******************************************************************************/
 PLX_STATUS
 PlxChipTypeGet(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U16             *pChipType,
     U8              *pRevision
     )
 {
-    *pChipType = pNode->Key.PlxChip;
-    *pRevision = pNode->Key.PlxRevision;
+    *pChipType = pdx->Key.PlxChip;
+    *pRevision = pdx->Key.PlxRevision;
 
     DebugPrintf((
         "Device %04X_%04X = %04X rev %02X\n",
-        pNode->Key.DeviceId, pNode->Key.VendorId,
+        pdx->Key.DeviceId, pdx->Key.VendorId,
         *pChipType, *pRevision
         ));
 
@@ -272,9 +272,10 @@ PlxChipTypeGet(
  ******************************************************************************/
 PLX_STATUS
 PlxChipTypeSet(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U16              ChipType,
-    U8               Revision
+    U8              *pRevision,
+    U8              *pFamily
     )
 {
     U16           TempChip;
@@ -285,27 +286,30 @@ PlxChipTypeSet(
     // Default to non-upstream node
     bSetUptreamNode = FALSE;
 
+    // Default family to current value
+    *pFamily = pdx->Key.PlxFamily;
+
     // Attempt auto-detection if requested
     if (ChipType == 0)
     {
-        PlxChipTypeDetect(
-            pNode
-            );
-
-        ChipType = pNode->Key.PlxChip;
+        PlxChipTypeDetect( pdx, FALSE );
+        ChipType = pdx->Key.PlxChip;
     }
 
     // Generalize by device type
-    if (((ChipType & 0xFF00) == 0x8400) ||
-        ((ChipType & 0xFF00) == 0x8500) ||
-        ((ChipType & 0xFF00) == 0x8600) ||
-        ((ChipType & 0xFF00) == 0x8700))
+    switch (ChipType & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = ChipType;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = ChipType;
+            break;
     }
 
     // Verify chip type
@@ -333,7 +337,7 @@ PlxChipTypeSet(
         case 0x8000:
             // Get port properties to ensure upstream node
             PlxGetPortProperties(
-                pNode,
+                pdx,
                 &PortProp
                 );
 
@@ -356,35 +360,42 @@ PlxChipTypeSet(
     }
 
     // Set the new chip type
-    pNode->Key.PlxChip = ChipType;
+    pdx->Key.PlxChip = ChipType;
 
     // Check if we should update the revision or use the default
-    if ((Revision == (U8)-1) || (Revision == 0))
+    if ((*pRevision == (U8)-1) || (*pRevision == 0))
     {
         // Attempt to detect Revision ID
-        PlxChipRevisionDetect(
-            pNode
-            );
+        PlxChipRevisionDetect( pdx );
     }
     else
     {
-        pNode->Key.PlxRevision = Revision;
+        pdx->Key.PlxRevision = *pRevision;
     }
+
+    // Update the PLX family
+    PlxChipTypeDetect(
+        pdx,
+        TRUE            // Only update PLX family
+        );
+
+    // Provide the updated family
+    *pFamily = pdx->Key.PlxFamily;
 
     if (bSetUptreamNode)
     {
         DebugPrintf(("Set register access node to itself\n"));
-        pNode->pRegNode = pNode;
+        pdx->pRegNode = pdx;
     }
     else
     {
-        pNode->pRegNode = NULL;
+        pdx->pRegNode = NULL;
     }
 
     DebugPrintf((
         "Set device (%04X_%04X) type to %04X rev %02X\n",
-        pNode->Key.DeviceId, pNode->Key.VendorId,
-        pNode->Key.PlxChip, pNode->Key.PlxRevision
+        pdx->Key.DeviceId, pdx->Key.VendorId,
+        pdx->Key.PlxChip, pdx->Key.PlxRevision
         ));
 
     return ApiSuccess;
@@ -402,7 +413,7 @@ PlxChipTypeSet(
  ******************************************************************************/
 PLX_STATUS
 PlxGetPortProperties(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     PLX_PORT_PROP   *pPortProp
     )
 {
@@ -417,7 +428,7 @@ PlxGetPortProperties(
     // Get the offset of the PCI Express capability 
     Offset_PcieCap =
         PlxGetExtendedCapabilityOffset(
-            pNode,
+            pdx,
             0x10       // CAP_ID_PCI_EXPRESS
             );
 
@@ -429,7 +440,7 @@ PlxGetPortProperties(
         pPortProp->bNonPcieDevice = TRUE;
 
         // Default to a legacy endpoint
-        if (pNode->PciHeaderType == 0)
+        if (pdx->PciHeaderType == 0)
             pPortProp->PortType = PLX_PORT_LEGACY_ENDPOINT;
         else
             pPortProp->PortType = PLX_PORT_UNKNOWN;
@@ -439,7 +450,7 @@ PlxGetPortProperties(
 
     // Get PCIe Capability
     PLX_PCI_REG_READ(
-        pNode,
+        pdx,
         Offset_PcieCap,
         &RegValue
         );
@@ -449,7 +460,7 @@ PlxGetPortProperties(
 
     // Get PCIe Device Capabilities
     PLX_PCI_REG_READ(
-        pNode,
+        pdx,
         Offset_PcieCap + 0x04,
         &RegValue
         );
@@ -463,7 +474,7 @@ PlxGetPortProperties(
 
     // Get PCIe Device Control
     PLX_PCI_REG_READ(
-        pNode,
+        pdx,
         Offset_PcieCap + 0x08,
         &RegValue
         );
@@ -484,7 +495,7 @@ PlxGetPortProperties(
 
     // Get PCIe Link Capabilities
     PLX_PCI_REG_READ(
-        pNode,
+        pdx,
         Offset_PcieCap + 0x0C,
         &RegValue
         );
@@ -500,7 +511,7 @@ PlxGetPortProperties(
 
     // Get PCIe Link Status/Control
     PLX_PCI_REG_READ(
-        pNode,
+        pdx,
         Offset_PcieCap + 0x10,
         &RegValue
         );
@@ -511,8 +522,39 @@ PlxGetPortProperties(
     // Get link speed
     pPortProp->LinkSpeed = (U8)((RegValue >> 16) & 0xF);
 
+    /**********************************************************
+     * In MIRA 3300 Enhanced mode, link width for the DS port & USB EP
+     * is incorrectly reported as x0. Override with Max Width.
+     *********************************************************/
+    if ((pdx->Key.PlxFamily == PLX_FAMILY_MIRA) &&
+        ((pdx->Key.PlxChip & 0xFF00) == 0x3300) &&
+        (pdx->Key.DeviceMode == PLX_PORT_ENDPOINT) &&
+        (pPortProp->LinkWidth == 0))
+    {
+        DebugPrintf((
+            "NOTE - Override reported link width (x%d) with Max width (x%d)\n",
+            pPortProp->LinkWidth, pPortProp->MaxLinkWidth
+            ));
+        pPortProp->LinkWidth = pPortProp->MaxLinkWidth;
+    }
+
+    /**********************************************************
+     * If using port bifurication, Draco 2 DS ports may report
+     * incorrect port numbers. Override with slot number.
+     *********************************************************/
+    if ((pdx->Key.PlxFamily == PLX_FAMILY_DRACO_2) &&
+        (pPortProp->PortType == PLX_PORT_DOWNSTREAM) &&
+        (pPortProp->PortNumber != pdx->Key.slot))
+    {
+        DebugPrintf((
+            "NOTE - Override reported port num (%d) with slot num (%d)\n",
+            pPortProp->PortNumber, pdx->Key.slot
+            ));
+        pPortProp->PortNumber = pdx->Key.slot;
+    }
+
     // Store the port number in the device properties
-    pNode->PortNumber = pPortProp->PortNumber;
+    pdx->PortNumber = pPortProp->PortNumber;
 
     DebugPrintf((
         "Type=%d Num=%d MaxPd=%d/%d MaxRdReq=%d LW=x%d/x%d LS=%d/%d\n",
@@ -538,7 +580,7 @@ PlxGetPortProperties(
  ******************************************************************************/
 PLX_STATUS
 PlxPciDeviceReset(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     )
 {
     // Device reset not implemented
@@ -557,7 +599,7 @@ PlxPciDeviceReset(
  ******************************************************************************/
 U32
 PlxRegisterRead(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32              offset,
     PLX_STATUS      *pStatus,
     BOOLEAN          bAdjustForPort
@@ -567,16 +609,19 @@ PlxRegisterRead(
 
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     // Verify device is supported
@@ -584,21 +629,17 @@ PlxRegisterRead(
     {
         case 0x8111:
         case 0x8112:
-            // Driver does not support 8111/8112 memory mapped register access
-            if (bAdjustForPort)
-            {
-                return PlxRegisterRead_8111(
-                    pNode,
-                    offset,
-                    pStatus
-                    );
-            }
+            return PlxRegisterRead_8111(
+                pdx,
+                offset,
+                pStatus
+                );
             break;
 
         case 0x8114:
         case 0x8000:
             return PlxRegisterRead_8000(
-                pNode,
+                pdx,
                 offset,
                 pStatus,
                 bAdjustForPort
@@ -623,7 +664,7 @@ PlxRegisterRead(
  ******************************************************************************/
 PLX_STATUS
 PlxRegisterWrite(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32              offset,
     U32              value,
     BOOLEAN          bAdjustForPort
@@ -633,16 +674,19 @@ PlxRegisterWrite(
 
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     // Verify device is supported
@@ -650,21 +694,17 @@ PlxRegisterWrite(
     {
         case 0x8111:
         case 0x8112:
-            // Driver does not support 8111/8112 memory mapped register access
-            if (bAdjustForPort)
-            {
-                return PlxRegisterWrite_8111(
-                    pNode,
-                    offset,
-                    value
-                    );
-            }
+            return PlxRegisterWrite_8111(
+                pdx,
+                offset,
+                value
+                );
             break;
 
         case 0x8114:
         case 0x8000:
             return PlxRegisterWrite_8000(
-                pNode,
+                pdx,
                 offset,
                 value,
                 bAdjustForPort
@@ -686,18 +726,13 @@ PlxRegisterWrite(
  ******************************************************************************/
 PLX_STATUS
 PlxPciBarProperties(
-    PLX_DEVICE_NODE  *pNode,
+    PLX_DEVICE_NODE  *pdx,
     U8                BarIndex,
     PLX_PCI_BAR_PROP *pBarProperties
     )
 {
-    U32 Size;
-    U32 PciBar;
-    U64 PciBarLogical;
-
-
     // Verify BAR index
-    switch (pNode->PciHeaderType)
+    switch (pdx->PciHeaderType)
     {
         case 0:
             if ((BarIndex != 0) && (BarIndex > 5))
@@ -716,72 +751,55 @@ PlxPciBarProperties(
             return ApiInvalidIndex;
     }
 
-    // Get BAR properties if not probed yet
-    if (pNode->PciBar[BarIndex].Properties.BarValue == 0)
+    // Return BAR properties
+    *pBarProperties = pdx->PciBar[BarIndex].Properties;
+
+    // Do nothing if upper 32-bits of 64-bit BAR
+    if (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_UPPER_32)
     {
-        // Read PCI BAR
-        PLX_PCI_REG_READ(
-            pNode,
-            0x10 + (BarIndex * sizeof(U32)),
-            &PciBar
-            );
-
-        // Get BAR logical address
-        PciBarLogical = pci_resource_start( pNode->pPciDevice, BarIndex );
-
-        // Get BAR size
-        Size = pci_resource_len( pNode->pPciDevice, BarIndex );
-
-        // Store BAR properties
-        pNode->PciBar[BarIndex].Properties.BarValue      = PciBar;
-        pNode->PciBar[BarIndex].Properties.Physical      = PciBarLogical;
-        pNode->PciBar[BarIndex].Properties.Size          = Size;
-        pNode->PciBar[BarIndex].Properties.bIoSpace      = (BOOLEAN)((PciBar >> 0) & (1 << 0));
-        pNode->PciBar[BarIndex].Properties.bPrefetchable = (BOOLEAN)((PciBar >> 3) & (1 << 0));
-        pNode->PciBar[BarIndex].Properties.b64bit        = (BOOLEAN)((PciBar >> 2) & (1 << 0));
+        DebugPrintf(("BAR %d is upper address of 64-bit BAR %d\n", BarIndex, BarIndex-1));
+        return ApiSuccess;
     }
 
-    // Return BAR properties
-    *pBarProperties = pNode->PciBar[BarIndex].Properties;
-
     // Display BAR properties if enabled
-    if (pNode->PciBar[BarIndex].Properties.Size == 0)
+    if (pdx->PciBar[BarIndex].Properties.Size == 0)
     {
         DebugPrintf(("BAR %d is disabled\n", BarIndex));
         return ApiSuccess;
     }
 
     DebugPrintf((
-        "    PCI BAR %d: %08lX\n",
-        BarIndex, (PLX_UINT_PTR)pNode->PciBar[BarIndex].Properties.BarValue
+        "    Type     : %s\n",
+        (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_IO) ? "I/O" : "Memory"
         ));
 
     DebugPrintf((
-        "    Phys Addr: %08lX\n",
-        (PLX_UINT_PTR)pNode->PciBar[BarIndex].Properties.Physical
+        "    PCI BAR %d: %08llX\n",
+        BarIndex, pdx->PciBar[BarIndex].Properties.BarValue
         ));
-
-    if (pNode->PciBar[BarIndex].Properties.Size >= (1 << 10))
-    {
-        DebugPrintf((
-            "    Size     : %08lx  (%ld Kb)\n",
-            (PLX_UINT_PTR)pNode->PciBar[BarIndex].Properties.Size,
-            (PLX_UINT_PTR)pNode->PciBar[BarIndex].Properties.Size >> 10
-            ));
-    }
-    else
-    {
-        DebugPrintf((
-            "    Size     : %08lx  (%ld bytes)\n",
-            (PLX_UINT_PTR)pNode->PciBar[BarIndex].Properties.Size,
-            (PLX_UINT_PTR)pNode->PciBar[BarIndex].Properties.Size
-            ));
-    }
 
     DebugPrintf((
-        "    Prefetch?: %s\n",
-        (pNode->PciBar[BarIndex].Properties.bPrefetchable) ? "Yes" : "No"
+        "    Phys Addr: %08llX\n",
+        pdx->PciBar[BarIndex].Properties.Physical
         ));
+
+    DebugPrintf((
+        "    Size     : %08llX (%lld %s)\n",
+        pdx->PciBar[BarIndex].Properties.Size,
+        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ?
+            pdx->PciBar[BarIndex].Properties.Size :
+            pdx->PciBar[BarIndex].Properties.Size >> 10,
+        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ? "Bytes" : "KB"
+        ));
+
+    if (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_MEM)
+    {
+        DebugPrintf((
+            "    Property : %sPrefetchable %d-bit\n",
+            (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE) ? "" : "Non-",
+            (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_64_BIT) ? 64 : 32
+            ));
+    }
 
     return ApiSuccess;
 }
@@ -798,7 +816,7 @@ PlxPciBarProperties(
  ******************************************************************************/
 PLX_STATUS
 PlxPciBarMap(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8               BarIndex,
     VOID            *pUserVa
     )
@@ -825,31 +843,31 @@ PlxPciBarMap(
     }
 
     // Save the intended device node
-    pObject->pNode = pNode;
+    pObject->pDevice = pdx;
 
     // Record the desired BAR index
     pObject->BarIndex = BarIndex;
 
     // Increment request counter
-    pNode->MapRequestPending++;
+    pdx->MapRequestPending++;
 
     // Add to list of map objects
     spin_lock(
-        &(pNode->pdx->Lock_MapParamsList)
+        &(pdx->pdx->Lock_MapParamsList)
         );
 
     list_add_tail(
         &(pObject->ListEntry),
-        &(pNode->pdx->List_MapParams)
+        &(pdx->pdx->List_MapParams)
         );
 
     spin_unlock(
-        &(pNode->pdx->Lock_MapParamsList)
+        &(pdx->pdx->Lock_MapParamsList)
         );
 
     DebugPrintf((
         "Added map object (%p) to list (node=%p)\n",
-        pObject, pNode
+        pObject, pdx
         ));
 
     return ApiSuccess;
@@ -867,7 +885,7 @@ PlxPciBarMap(
  ******************************************************************************/
 PLX_STATUS
 PlxPciBarUnmap(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     VOID            *UserVa
     )
 {
@@ -887,7 +905,7 @@ PlxPciBarUnmap(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromPresent(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8              *pStatus
     )
 {
@@ -899,16 +917,19 @@ PlxEepromPresent(
     *pStatus = PLX_EEPROM_STATUS_NONE;
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     switch (TempChip)
@@ -923,7 +944,7 @@ PlxEepromPresent(
         case 0x6540:
             // 6000 series doesn't report EEPROM presence, so probe for it
             PlxEepromProbe(
-                pNode,
+                pdx,
                 &bFlag
                 );
 
@@ -937,14 +958,14 @@ PlxEepromPresent(
         case 0x8111:
         case 0x8112:
             return Plx8111_EepromPresent(
-                pNode,
+                pdx,
                 pStatus
                 );
 
         case 0x8114:
         case 0x8000:
             return Plx8000_EepromPresent(
-                pNode,
+                pdx,
                 pStatus
                 );
     }
@@ -964,7 +985,7 @@ PlxEepromPresent(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromProbe(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8              *pFlag
     )
 {
@@ -980,11 +1001,18 @@ PlxEepromProbe(
     *pFlag = FALSE;
 
     // Generalize by device type
-    TempChip = pNode->Key.PlxChip & 0xFF00;
-
-    if ((TempChip != 0x8400) && (TempChip != 0x8600) && (TempChip != 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8600:
+        case 0x8700:
+            TempChip = pdx->Key.PlxChip & 0xFF00;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     // Determine EEPROM offset to use for probe (e.g. after CRC)
@@ -1002,7 +1030,7 @@ PlxEepromProbe(
             break;
 
         case 0x8114:
-            if (pNode->Key.PlxRevision >= 0xBA)
+            if (pdx->Key.PlxRevision >= 0xBA)
                 OffsetProbe = 0x3EC + sizeof(U32);
             else
                 OffsetProbe = 0x378 + sizeof(U32);
@@ -1021,9 +1049,10 @@ PlxEepromProbe(
             OffsetProbe = (0xBE4 * sizeof(U32)) + sizeof(U32);
             break;
 
+        case 0x2300:
+        case 0x3300:
         case 0x8111:
         case 0x8112:
-        case 0x8400:
         case 0x8505:
         case 0x8509:
         case 0x8525:
@@ -1039,17 +1068,17 @@ PlxEepromProbe(
         default:
             DebugPrintf((
                 "ERROR - Not a supported PLX device (%04X)\n",
-                pNode->Key.PlxChip
+                pdx->Key.PlxChip
                 ));
             return ApiUnsupportedFunction;
     }
 
-    DebugPrintf(("Probing EEPROM at offset %02xh\n", OffsetProbe));
+    DebugPrintf(("Probe EEPROM at offset %02xh\n", OffsetProbe));
 
     // Get the current value
     status =
         PlxEepromReadByOffset(
-            pNode,
+            pdx,
             OffsetProbe,
             &ValueOriginal
             );
@@ -1063,7 +1092,7 @@ PlxEepromProbe(
     // Write inverse of original value
     status =
         PlxEepromWriteByOffset(
-            pNode,
+            pdx,
             OffsetProbe,
             ValueWrite
             );
@@ -1074,7 +1103,7 @@ PlxEepromProbe(
     // Read updated value
     status =
         PlxEepromReadByOffset(
-            pNode,
+            pdx,
             OffsetProbe,
             &ValueRead
             );
@@ -1091,7 +1120,7 @@ PlxEepromProbe(
 
         // Restore the original value
         PlxEepromWriteByOffset(
-            pNode,
+            pdx,
             OffsetProbe,
             ValueOriginal
             );
@@ -1109,6 +1138,59 @@ PlxEepromProbe(
 
 /*******************************************************************************
  *
+ * Function   :  PlxEepromGetAddressWidth
+ *
+ * Description:  Returns the current EEPROM address width
+ *
+ ******************************************************************************/
+PLX_STATUS
+PlxEepromGetAddressWidth(
+    PLX_DEVICE_NODE *pdx,
+    U8              *pWidth
+    )
+{
+    PLX_STATUS status;
+
+
+    switch (pdx->Key.PlxChip & 0xFF00)
+    {
+        case 0x8100:
+            status =
+                Plx8111_EepromGetAddressWidth(
+                    pdx,
+                    pWidth
+                    );
+            break;
+
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            status =
+                Plx8000_EepromGetAddressWidth(
+                    pdx,
+                    pWidth
+                    );
+            break;
+
+        default:
+            DebugPrintf((
+                "ERROR - Chip (%04X) does not support address width\n",
+                pdx->Key.PlxChip
+                ));
+            return ApiUnsupportedFunction;
+    }
+
+    DebugPrintf(("EEPROM address width = %dB\n", *pWidth));
+    return status;
+}
+
+
+
+
+/*******************************************************************************
+ *
  * Function   :  PlxEepromSetAddressWidth
  *
  * Description:  Sets a new EEPROM address width
@@ -1116,11 +1198,10 @@ PlxEepromProbe(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromSetAddressWidth(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8               width
     )
 {
-    U32        ChipType;
     PLX_STATUS status;
 
 
@@ -1133,36 +1214,27 @@ PlxEepromSetAddressWidth(
             break;
 
         default:
-            DebugPrintf((
-                "ERROR - Invalid address width (%d)\n",
-                width
-                ));
+            DebugPrintf(("ERROR - Invalid address width (%d)\n", width));
             return ApiInvalidData;
     }
 
-    // Get chip type
-    ChipType = pNode->Key.PlxChip;
-
-    // Generalize by device type
-    if (((ChipType & 0xFF00) == 0x8400) ||
-        ((ChipType & 0xFF00) == 0x8500) ||
-        ((ChipType & 0xFF00) == 0x8600) ||
-        ((ChipType & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        ChipType = 0x8000;
-    }
-
-    switch (ChipType)
-    {
-        case 0x8111:
-        case 0x8112:
-            status = ApiSuccess;
+        case 0x8100:
+            status =
+                Plx8111_EepromSetAddressWidth(
+                    pdx,
+                    width
+                    );
             break;
 
-        case 0x8000:
+        case 0x2300:
+        case 0x3300:
+        case 0x8600:
+        case 0x8700:
             status =
                 Plx8000_EepromSetAddressWidth(
-                    pNode,
+                    pdx,
                     width
                     );
             break;
@@ -1170,21 +1242,16 @@ PlxEepromSetAddressWidth(
         default:
             DebugPrintf((
                 "ERROR - Chip (%04X) does not support address width override\n",
-                pNode->Key.PlxChip
+                pdx->Key.PlxChip
                 ));
             return ApiUnsupportedFunction;
     }
 
-    if (status == ApiSuccess)
-    {
-        // Update the width
-        pNode->Default_EepWidth = width;
-
-        DebugPrintf((
-            "Set EEPROM address width to %d bytes\n",
-            width
-            ));
-    }
+    DebugPrintf((
+       "%s EEPROM address width to %dB\n",
+       (status == ApiSuccess) ? "Set" : "ERROR - Unable to set",
+       width
+       ));
 
     return status;
 }
@@ -1201,35 +1268,26 @@ PlxEepromSetAddressWidth(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromCrcGet(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32             *pCrc,
     U8              *pCrcStatus
     )
 {
     // Clear return value
-    *pCrc = 0;
+    *pCrc       = 0;
+    *pCrcStatus = PLX_CRC_UNSUPPORTED;
 
-    switch (pNode->Key.PlxChip)
+    switch (pdx->Key.PlxChip & 0xF000)
     {
-        case 0x8114:
-        case 0x8508:
-        case 0x8512:
-        case 0x8516:
-        case 0x8517:
-        case 0x8518:
-        case 0x8524:
-        case 0x8532:
+        case 0x8000:
             return Plx8000_EepromCrcGet(
-                pNode,
+                pdx,
                 pCrc,
                 pCrcStatus
                 );
-
-        default:
-            // Devices don't support CRC
-            break;
     }
 
+    // CRC not supported
     return ApiUnsupportedFunction;
 }
 
@@ -1245,7 +1303,7 @@ PlxEepromCrcGet(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromCrcUpdate(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U32             *pCrc,
     BOOLEAN          bUpdateEeprom
     )
@@ -1253,27 +1311,17 @@ PlxEepromCrcUpdate(
     // Clear return value
     *pCrc = 0;
 
-    switch (pNode->Key.PlxChip)
+    switch (pdx->Key.PlxChip & 0xF000)
     {
-        case 0x8114:
-        case 0x8508:
-        case 0x8512:
-        case 0x8516:
-        case 0x8517:
-        case 0x8518:
-        case 0x8524:
-        case 0x8532:
+        case 0x8000:
             return Plx8000_EepromCrcUpdate(
-                pNode,
+                pdx,
                 pCrc,
                 bUpdateEeprom
                 );
-
-        default:
-            // Devices don't support CRC
-            break;
     }
 
+    // CRC not supported
     return ApiUnsupportedFunction;
 }
 
@@ -1289,8 +1337,8 @@ PlxEepromCrcUpdate(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromReadByOffset(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U32             *pValue
     )
 {
@@ -1302,21 +1350,22 @@ PlxEepromReadByOffset(
 
     // Make sure offset is aligned on 32-bit boundary
     if (offset & (3 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     switch (TempChip)
@@ -1336,13 +1385,13 @@ PlxEepromReadByOffset(
              * EEPROM accesses, use 2 16-bit accesses
              *****************************************/
             PlxEepromReadByOffset_16(
-                pNode,
+                pdx,
                 offset,
                 (U16*)pValue
                 );
 
             PlxEepromReadByOffset_16(
-                pNode,
+                pdx,
                 offset + sizeof(U16),
                 (U16*)((U8*)pValue + sizeof(U16))
                 );
@@ -1351,7 +1400,7 @@ PlxEepromReadByOffset(
         case 0x8114:
         case 0x8000:
             return Plx8000_EepromReadByOffset(
-                pNode,
+                pdx,
                 offset,
                 pValue
                 );
@@ -1376,8 +1425,8 @@ PlxEepromReadByOffset(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromWriteByOffset(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U32              value
     )
 {
@@ -1386,21 +1435,22 @@ PlxEepromWriteByOffset(
 
     // Make sure offset is aligned on 32-bit boundary
     if (offset & (3 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     switch (TempChip)
@@ -1420,13 +1470,13 @@ PlxEepromWriteByOffset(
              * EEPROM accesses, use 2 16-bit accesses
              *****************************************/
             PlxEepromWriteByOffset_16(
-                pNode,
+                pdx,
                 offset,
                 (U16)value
                 );
 
             PlxEepromWriteByOffset_16(
-                pNode,
+                pdx,
                 offset + sizeof(U16),
                 (U16)(value >> 16)
                 );
@@ -1435,7 +1485,7 @@ PlxEepromWriteByOffset(
         case 0x8114:
         case 0x8000:
             return Plx8000_EepromWriteByOffset(
-                pNode,
+                pdx,
                 offset,
                 value
                 );
@@ -1460,8 +1510,8 @@ PlxEepromWriteByOffset(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromReadByOffset_16(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U16             *pValue
     )
 {
@@ -1475,21 +1525,22 @@ PlxEepromReadByOffset_16(
 
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     switch (TempChip)
@@ -1503,7 +1554,7 @@ PlxEepromReadByOffset_16(
         case 0x6520:
         case 0x6540:
             return Plx6000_EepromReadByOffset_16(
-                pNode,
+                pdx,
                 offset,
                 pValue
                 );
@@ -1511,7 +1562,7 @@ PlxEepromReadByOffset_16(
         case 0x8111:
         case 0x8112:
             return Plx8111_EepromReadByOffset_16(
-                pNode,
+                pdx,
                 offset,
                 pValue
                 );
@@ -1523,10 +1574,10 @@ PlxEepromReadByOffset_16(
              * EEPROM accesses, use 32-bit access
              *****************************************/
 
-            // Get current 32-bit value
+            // Get 32-bit value
             status =
                 PlxEepromReadByOffset(
-                    pNode,
+                    pdx,
                     (offset & ~0x3),
                     &Value_32
                     );
@@ -1535,13 +1586,13 @@ PlxEepromReadByOffset_16(
                 return status;
 
             // Return desired 16-bit portion
-            if ((offset & 0x3) == 2)
+            if (offset & 0x3)
             {
                 *pValue = (U16)(Value_32 >> 16);
             }
             else
             {
-                *pValue = (U16)(Value_32);
+                *pValue = (U16)Value_32;
             }
             break;
 
@@ -1549,7 +1600,7 @@ PlxEepromReadByOffset_16(
         default:
             DebugPrintf((
                 "ERROR - Device (%04X) does not support 16-bit EEPROM access\n",
-                pNode->Key.PlxChip
+                pdx->Key.PlxChip
                 ));
             return ApiUnsupportedFunction;
     }
@@ -1569,8 +1620,8 @@ PlxEepromReadByOffset_16(
  ******************************************************************************/
 PLX_STATUS
 PlxEepromWriteByOffset_16(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U16              value
     )
 {
@@ -1581,21 +1632,22 @@ PlxEepromWriteByOffset_16(
 
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     // Generalize by device type
-    if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-        ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+    switch (pdx->Key.PlxChip & 0xFF00)
     {
-        TempChip = 0x8000;
-    }
-    else
-    {
-        TempChip = pNode->Key.PlxChip;
+        case 0x2300:
+        case 0x3300:
+        case 0x8500:
+        case 0x8600:
+        case 0x8700:
+            TempChip = 0x8000;
+            break;
+
+        default:
+            TempChip = pdx->Key.PlxChip;
+            break;
     }
 
     switch (TempChip)
@@ -1609,7 +1661,7 @@ PlxEepromWriteByOffset_16(
         case 0x6520:
         case 0x6540:
             return Plx6000_EepromWriteByOffset_16(
-                pNode,
+                pdx,
                 offset,
                 value
                 );
@@ -1617,7 +1669,7 @@ PlxEepromWriteByOffset_16(
         case 0x8111:
         case 0x8112:
             return Plx8111_EepromWriteByOffset_16(
-                pNode,
+                pdx,
                 offset,
                 value
                 );
@@ -1632,7 +1684,7 @@ PlxEepromWriteByOffset_16(
             // Get current 32-bit value
             status =
                 PlxEepromReadByOffset(
-                    pNode,
+                    pdx,
                     (offset & ~0x3),
                     &Value_32
                     );
@@ -1641,7 +1693,7 @@ PlxEepromWriteByOffset_16(
                 return status;
 
             // Insert new 16-bit value in correct location
-            if ((offset & 0x3) == 2)
+            if (offset & 0x3)
             {
                 Value_32 = ((U32)value << 16) | (Value_32 & 0xFFFF);
             }
@@ -1652,7 +1704,7 @@ PlxEepromWriteByOffset_16(
 
             // Update EEPROM
             return PlxEepromWriteByOffset(
-                pNode,
+                pdx,
                 (offset & ~0x3),
                 Value_32
                 );
@@ -1661,7 +1713,7 @@ PlxEepromWriteByOffset_16(
         default:
             DebugPrintf((
                 "ERROR - Device (%04X) does not support 16-bit EEPROM access\n",
-                pNode->Key.PlxChip
+                pdx->Key.PlxChip
                 ));
             return ApiUnsupportedFunction;
     }
@@ -1809,7 +1861,7 @@ PlxPciIoPortTransfer(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPhysicalMemoryAllocate(
-    PLX_DEVICE_NODE  *pNode,
+    PLX_DEVICE_NODE  *pdx,
     PLX_PHYSICAL_MEM *pPciMem,
     BOOLEAN           bSmallerOk
     )
@@ -1829,7 +1881,7 @@ PlxPciPhysicalMemoryAllocate(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPhysicalMemoryFree(
-    PLX_DEVICE_NODE  *pNode,
+    PLX_DEVICE_NODE  *pdx,
     PLX_PHYSICAL_MEM *pPciMem
     )
 {
@@ -1848,7 +1900,7 @@ PlxPciPhysicalMemoryFree(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPhysicalMemoryMap(
-    PLX_DEVICE_NODE  *pNode,
+    PLX_DEVICE_NODE  *pdx,
     PLX_PHYSICAL_MEM *pPciMem
     )
 {
@@ -1867,7 +1919,7 @@ PlxPciPhysicalMemoryMap(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPhysicalMemoryUnmap(
-    PLX_DEVICE_NODE  *pNode,
+    PLX_DEVICE_NODE  *pdx,
     PLX_PHYSICAL_MEM *pPciMem
     )
 {
@@ -1886,7 +1938,7 @@ PlxPciPhysicalMemoryUnmap(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPerformanceInitializeProperties(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     PLX_PERF_PROP   *pPerfProp
     )
 {
@@ -1898,7 +1950,7 @@ PlxPciPerformanceInitializeProperties(
     RtlZeroMemory( pPerfProp, sizeof(PLX_PERF_PROP) );
 
     // Verify supported device & set number of ports per station
-    switch (pNode->Key.PlxFamily)
+    switch (pdx->Key.PlxFamily)
     {
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_CYGNUS:
@@ -1914,14 +1966,25 @@ PlxPciPerformanceInitializeProperties(
             PortsPerStation = 8;    // Device actually only uses 6 ports out of 8
             break;
 
+        case PLX_FAMILY_CAPELLA_1:
+            if ((pdx->Key.PlxChip == 0x8714) || (pdx->Key.PlxChip == 0x8718))
+                PortsPerStation = 5;
+            else
+                PortsPerStation = 4;
+            break;
+
+        case PLX_FAMILY_MIRA:
+            PortsPerStation = 4;
+            break;
+
         default:
-            DebugPrintf(("Error: Unsupported PLX chip (%04X)\n", pNode->Key.PlxChip));
+            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return ApiUnsupportedFunction;
     }
 
     // Get port properties
     PlxGetPortProperties(
-        pNode,
+        pdx,
         &PortProp
         );
 
@@ -1955,7 +2018,7 @@ PlxPciPerformanceInitializeProperties(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPerformanceMonitorControl(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     PLX_PERF_CMD     command
     )
 {
@@ -1969,7 +2032,7 @@ PlxPciPerformanceMonitorControl(
 
 
     // Verify supported device
-    switch (pNode->Key.PlxFamily)
+    switch (pdx->Key.PlxFamily)
     {
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_SIRIUS:
@@ -1979,11 +2042,19 @@ PlxPciPerformanceMonitorControl(
         case PLX_FAMILY_CYGNUS:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
+        case PLX_FAMILY_CAPELLA_1:
             Offset_Control = 0x3E0;
             break;
 
+        case PLX_FAMILY_MIRA:
+            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+                Offset_Control = 0x1568;
+            else
+                Offset_Control = 0x568;
+            break;
+
         default:
-            DebugPrintf(("Error: Unsupported PLX chip (%04X)\n", pNode->Key.PlxChip));
+            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return ApiUnsupportedFunction;
     }
 
@@ -2009,20 +2080,50 @@ PlxPciPerformanceMonitorControl(
     PortsPerStation = 0;
 
     // Set control offset & enable/disable counters in stations
-    switch (pNode->Key.PlxFamily)
+    switch (pdx->Key.PlxFamily)
     {
+        case PLX_FAMILY_MIRA:
+            /*************************************************************
+             * For MIRA, there are filters available to control counting
+             * of different packet types. The PLX API doesn't currently
+             * support this filtering so all are enabled.
+             *
+             * PCIe filters in 664h[29:20] of P0
+             *   20: Disable MWr 32 TLP counter
+             *   21: Disable MWr 64 TLP counter
+             *   22: Disable Msg TLP counter
+             *   23: Disable MRd 32 TLP counter
+             *   24: Disable MRd 64 TLP counter
+             *   25: Disable other NP TLP counter
+             *   26: Disable ACK DLLP counting
+             *   27: Disable Update-FC P DLLP counter
+             *   28: Disable Update-FC NP DLLP counter
+             *   29: Disable Update-FC CPL DLLP counter
+             ************************************************************/
+            // In MIRA legacy EP mode, PCIe registers start at 1000h
+            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+                offset = 0x1664;
+            else
+                offset = 0x664;
+
+            // Clear 664[29:20] to enable all counters
+            RegValue = PLX_8000_REG_READ( pdx, offset );
+            PLX_8000_REG_WRITE( pdx, offset, RegValue & ~(0x3FF << 20) );
+            break;
+
         case PLX_FAMILY_CYGNUS:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
+        case PLX_FAMILY_CAPELLA_1:
             // Set device configuration
-            if (pNode->Key.PlxFamily == PLX_FAMILY_CYGNUS)
+            if (pdx->Key.PlxFamily == PLX_FAMILY_CYGNUS)
             {
                 Bit_EgressEn    = 7;
                 NumStations     = 6;
                 PortsPerStation = 4;
             }
-            else if ((pNode->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
-                     (pNode->Key.PlxFamily == PLX_FAMILY_DRACO_2))
+            else if ((pdx->Key.PlxFamily == PLX_FAMILY_DRACO_1) ||
+                     (pdx->Key.PlxFamily == PLX_FAMILY_DRACO_2))
             {
                 Bit_EgressEn    = 6;
                 NumStations     = 3;
@@ -2032,36 +2133,45 @@ PlxPciPerformanceMonitorControl(
                 // & avoid RAM pointer corruption
                 if (command == PLX_PERF_CMD_START)
                 {
-                    RegValue = PLX_8000_REG_READ( pNode, 0x3F0 );
-                    PLX_8000_REG_WRITE( pNode, 0x3F0, RegValue | (3 << 8) );
+                    RegValue = PLX_8000_REG_READ( pdx, 0x3F0 );
+                    PLX_8000_REG_WRITE( pdx, 0x3F0, RegValue | (3 << 8) );
                 }
+            }
+            else if (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1)
+            {
+                Bit_EgressEn = 6;
+                NumStations  = 6;
+                if ((pdx->Key.PlxChip == 0x8714) || (pdx->Key.PlxChip == 0x8718))
+                    PortsPerStation = 5;
+                else
+                    PortsPerStation = 4;
             }
 
             // Enable/Disable Performance Counter in each station
             for (offset = 0; offset < (NumStations * (PortsPerStation * 0x1000)); offset += (PortsPerStation * 0x1000))
             {
                 // Ingress ports
-                RegValue = PLX_8000_REG_READ( pNode, offset + 0x768 );
+                RegValue = PLX_8000_REG_READ( pdx, offset + 0x768 );
 
                 if (command == PLX_PERF_CMD_START)
-                    PLX_8000_REG_WRITE( pNode, offset + 0x768, RegValue | (1 << 29) );
+                    PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue | (1 << 29) );
                 else
-                    PLX_8000_REG_WRITE( pNode, offset + 0x768, RegValue & ~(1 << 29) );
+                    PLX_8000_REG_WRITE( pdx, offset + 0x768, RegValue & ~(1 << 29) );
 
                 // Egress ports
-                RegValue = PLX_8000_REG_READ( pNode, offset + 0xF30 );
+                RegValue = PLX_8000_REG_READ( pdx, offset + 0xF30 );
 
                 if (command == PLX_PERF_CMD_START)
-                    PLX_8000_REG_WRITE( pNode, offset + 0xF30, RegValue | (1 << Bit_EgressEn) );
+                    PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue | (1 << Bit_EgressEn) );
                 else
-                    PLX_8000_REG_WRITE( pNode, offset + 0xF30, RegValue & ~(1 << Bit_EgressEn) );
+                    PLX_8000_REG_WRITE( pdx, offset + 0xF30, RegValue & ~(1 << Bit_EgressEn) );
             }
             break;
     }
 
     // Update monitor
     PLX_8000_REG_WRITE(
-        pNode,
+        pdx,
         Offset_Control,
         RegCommand
         );
@@ -2081,14 +2191,14 @@ PlxPciPerformanceMonitorControl(
  ******************************************************************************/
 PLX_STATUS
 PlxPciPerformanceResetCounters(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     )
 {
     U16 Offset_Control;
 
 
     // Verify supported device
-    switch (pNode->Key.PlxFamily)
+    switch (pdx->Key.PlxFamily)
     {
         case PLX_FAMILY_DENEB:
         case PLX_FAMILY_SIRIUS:
@@ -2098,17 +2208,25 @@ PlxPciPerformanceResetCounters(
         case PLX_FAMILY_CYGNUS:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
+        case PLX_FAMILY_CAPELLA_1:
             Offset_Control = 0x3E0;
             break;
 
+        case PLX_FAMILY_MIRA:
+            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+                Offset_Control = 0x1568;
+            else
+                Offset_Control = 0x568;
+            break;
+
         default:
-            DebugPrintf(("Error: Unsupported PLX chip (%04X)\n", pNode->Key.PlxChip));
+            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return ApiUnsupportedFunction;
     }
 
     // Reset (30) & enable monitor (31) & infinite sampling (28) & start (27)
     PLX_8000_REG_WRITE(
-        pNode,
+        pdx,
         Offset_Control,
         (1 << 31) | (1 << 30) | (1 << 28) | (1 << 27)
         );
@@ -2138,6 +2256,9 @@ PlxPciPerformanceResetCounters(
  *   CPLDW = Number of Completion DWords
  *   DLLP  = Number of DLLPs
  *   PHY   = PHY Layer (always 0)
+ *   PLD   = USB endpoint payload count
+ *   RAW   = USB endpoint raw byte count
+ *   PKT   = USB endpoint packet count
  *
  *          Deneb & Cygnus                  Draco                     Sirius
  *     --------------------------   -----------------------   -------------------------
@@ -2215,36 +2336,116 @@ PlxPciPerformanceResetCounters(
  *           -----------------         |-----------------|        |------------------|
  *                                   F0| Port 0 IN DLLP  |     2C0| Port  1 IN DLLP  |
  *                                   F4| Port 1 IN DLLP  |     2C4| Port  3 IN DLLP  |
- *                                   F8| Port 2 IN DLLP  |     2C8| Port  5 IN DLLP  |
- *                                   FC| Port 3 IN DLLP  |     2CC| Port  7 IN DLLP  |
- *                                  100| Port 4 IN DLLP  |     2D0| Port  9 IN DLLP  |
- *                                  104| Port 5 IN DLLP  |     2D4| Port 11 IN DLLP  |
- *                                     |-----------------|     2D8| Port 13 IN DLLP  |
+ *             Mira                  F8| Port 2 IN DLLP  |     2C8| Port  5 IN DLLP  |
+ *     --------------------------    FC| Port 3 IN DLLP  |     2CC| Port  7 IN DLLP  |
+ *        14 PCIe counters/port     100| Port 4 IN DLLP  |     2D0| Port  9 IN DLLP  |
+ *         4 ports/station          104| Port 5 IN DLLP  |     2D4| Port 11 IN DLLP  |
+ *         1 stations (4 ports)        |-----------------|     2D8| Port 13 IN DLLP  |
  *                                  108| Port 0 EG DLLP  |     2DC| Port 15 IN DLLP  |
- *                                  10C| Port 1 EG DLLP  |        |------------------|
- *                                  110| Port 2 EG DLLP  |     2E0| Port  1 EG DLLP  |
+ *        86 counters/station       10C| Port 1 EG DLLP  |        |------------------|
+ *        86 counters (86 * 1)      110| Port 2 EG DLLP  |     2E0| Port  1 EG DLLP  |
  *                                  114| Port 3 EG DLLP  |     2E4| Port  3 EG DLLP  |
- *                                  118| Port 4 EG DLLP  |     2E8| Port  5 EG DLLP  |
- *                                  11C| Port 5 EG DLLP  |     2EC| Port  7 EG DLLP  |
- *                                     |-----------------|     2F0| Port  9 EG DLLP  |
- *                                  120| Port 0 IN PHY   |     2F4| Port 11 EG DLLP  |
- *                                  124| Port 1 IN PHY   |     2F8| Port 13 EG DLLP  |
- *                                  128| Port 2 IN PHY   |     2FC| Port 15 EG DLLP  |
- *                                  12C| Port 3 IN PHY   |        |------------------|
- *                                  130| Port 4 IN PHY   |     300| Port 0 PHY       |
- *                                  134| Port 5 IN PHY   |        |       :          |
- *                                     |-----------------|        |       :          |
- *                                  138| Port 0 EG PHY   |        |       :          |
- *                                  13C| Port 1 EG PHY   |     33C| Port 15 PHY      |
- *                                  140| Port 2 EG PHY   |         ------------------
- *                                  144| Port 3 EG PHY   |
- *                                  148| Port 4 EG PHY   |
- *                                  14C| Port 5 EG PHY   |
- *                                      ----------------- 
+ *       off     Counter            118| Port 4 EG DLLP  |     2E8| Port  5 EG DLLP  |
+ *           -----------------      11C| Port 5 EG DLLP  |     2EC| Port  7 EG DLLP  |
+ *         0| Port 0 IN PH    |        |-----------------|     2F0| Port  9 EG DLLP  |
+ *         4| Port 0 IN PDW   |     120| Port 0 IN PHY   |     2F4| Port 11 EG DLLP  |
+ *         8| Port 0 IN NPDW  |     124| Port 1 IN PHY   |     2F8| Port 13 EG DLLP  |
+ *         C| Port 0 IN CPLH  |     128| Port 2 IN PHY   |     2FC| Port 15 EG DLLP  |
+ *        10| Port 0 IN CPLDW |     12C| Port 3 IN PHY   |        |------------------|
+ *          |-----------------|     130| Port 4 IN PHY   |     300| Port 0 PHY       |
+ *        14| Port 1 IN PH    |     134| Port 5 IN PHY   |        |       :          |
+ *          |       :         |        |-----------------|        |       :          |
+ *          |       :         |     138| Port 0 EG PHY   |     33C| Port 15 PHY      |
+ *        24| Port 1 IN CPLDW |     13C| Port 1 EG PHY   |         ------------------
+ *          |-----------------|     140| Port 2 EG PHY   |
+ *        28| Port 2 IN PH    |     144| Port 3 EG PHY   |
+ *          |       :         |     148| Port 4 EG PHY   |
+ *          |       :         |     14C| Port 5 EG PHY   |
+ *        38| Port 2 IN CPLDW |         ----------------- 
+ *          |-----------------|
+ *        3C| Port 3 IN PH    |
+ *          |       :         |
+ *          |       :         |
+ *        4C| Port 3 IN CPLDW |
+ *          |-----------------|
+ *        50| Port 0 EG PH    |
+ *        54| Port 0 EG PDW   |
+ *        58| Port 0 EG NPDW  |
+ *        5C| Port 0 EG CPLH  |
+ *        60| Port 0 EG CPLDW |
+ *          |-----------------|
+ *        64| Port 1 EG PH    |
+ *          |       :         |
+ *          |       :         |
+ *        74| Port 1 EG CPLDW |
+ *          |-----------------|
+ *        78| Port 2 EG PH    |
+ *          |       :         |
+ *          |       :         |
+ *        88| Port 2 EG CPLDW |
+ *          |-----------------|
+ *        8C| Port 3 EG PH    |
+ *          |       :         |
+ *          |       :         |
+ *        9C| Port 3 EG CPLDW |
+ *          |-----------------|
+ *        A0| Port 0 IN DLLP  |
+ *        A4| Port 1 IN DLLP  |
+ *        A8| Port 2 IN DLLP  |
+ *        AC| Port 3 IN DLLP  |
+ *          |-----------------|
+ *        B0| Port 0 EG DLLP  |
+ *        B4| Port 1 EG DLLP  |
+ *        B8| Port 2 EG DLLP  |
+ *        BC| Port 3 EG DLLP  |
+ *          |-----------------|
+ *        C0| GPEP_0 IN PLD   |
+ *        C4| GPEP_0 IN RAW   |
+ *        C8| GPEP_0 IN PKT   |
+ *          |-----------------|
+ *        CC| GPEP_1 IN PLD   |
+ *        D0| GPEP_1 IN RAW   |
+ *        D4| GPEP_1 IN PKT   |
+ *          |-----------------|
+ *        D8| GPEP_2 IN PLD   |
+ *        DC| GPEP_2 IN RAW   |
+ *        E0| GPEP_2 IN PKT   |
+ *          |-----------------|
+ *        E4| GPEP_3 IN PLD   |
+ *        E8| GPEP_3 IN RAW   |
+ *        EC| GPEP_3 IN PKT   |
+ *          |-----------------|
+ *        F0| GPEP_0 OUT PLD  |
+ *        F4| GPEP_0 OUT RAW  |
+ *        F8| GPEP_0 OUT PKT  |
+ *          |-----------------|
+ *        FC| GPEP_1 OUT PLD  |
+ *       100| GPEP_1 OUT RAW  |
+ *       104| GPEP_1 OUT PKT  |
+ *          |-----------------|
+ *       108| GPEP_2 OUT PLD  |
+ *       10C| GPEP_2 OUT RAW  |
+ *       110| GPEP_2 OUT PKT  |
+ *          |-----------------|
+ *       114| GPEP_3 OUT PLD  |
+ *       118| GPEP_3 OUT RAW  |
+ *       11C| GPEP_3 OUT PKT  |
+ *          |-----------------|
+ *       120| EP_0 IN PLD     |
+ *       124| EP_0 IN RAW     |
+ *       128| EP_0 IN PKT     |
+ *          |-----------------|
+ *       12C| EP_0 OUT PLD    |
+ *       130| EP_0 OUT RAW    |
+ *       134| EP_0 OUT PKT    |
+ *          |-----------------|
+ *       138| PHY (always 0)  |
+ *       13C| PHY (always 0)  |
+ *           -----------------
  ******************************************************************************/
 PLX_STATUS
 PlxPciPerformanceGetCounters(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     PLX_PERF_PROP   *pPerfProps,
     U8               NumOfObjects
     )
@@ -2266,7 +2467,7 @@ PlxPciPerformanceGetCounters(
 
 
     // Setup parameters for reading counters
-    switch (pNode->Key.PlxFamily)
+    switch (pdx->Key.PlxFamily)
     {
         case PLX_FAMILY_DENEB:
             Offset_RamCtrl  = 0x618;
@@ -2292,6 +2493,21 @@ PlxPciPerformanceGetCounters(
             PortsPerStation = 4;
             break;
 
+        case PLX_FAMILY_MIRA:
+            Offset_RamCtrl  = 0x618;
+            Offset_Fifo     = 0x628;
+            NumPorts        = 4;
+            NumCounters     = 12;
+            PortsPerStation = 4;
+
+            // In MIRA legacy EP mode, PCIe registers start at 1000h
+            if (pdx->Key.DeviceMode == PLX_PORT_LEGACY_ENDPOINT)
+            {
+                Offset_RamCtrl += 0x1000;
+                Offset_Fifo    += 0x1000;
+            }
+            break;
+
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
             Offset_RamCtrl  = 0x3F0;
@@ -2301,8 +2517,19 @@ PlxPciPerformanceGetCounters(
             PortsPerStation = 6;
             break;
 
+        case PLX_FAMILY_CAPELLA_1:
+            Offset_RamCtrl  = 0x3F0;
+            Offset_Fifo     = 0x3E4;
+            NumPorts        = 24;
+            NumCounters     = 14;
+            if ((pdx->Key.PlxChip == 0x8714) || (pdx->Key.PlxChip == 0x8718))
+                PortsPerStation = 5;
+            else
+                PortsPerStation = 4;
+            break;
+
         default:
-            DebugPrintf(("Error: Unsupported PLX chip (%04X)\n", pNode->Key.PlxChip));
+            DebugPrintf(("ERROR - Unsupported PLX chip (%04X)\n", pdx->Key.PlxChip));
             return ApiUnsupportedFunction;
     }
 
@@ -2311,7 +2538,7 @@ PlxPciPerformanceGetCounters(
 
     // Reset RAM read pointer (bit 2)
     PLX_8000_REG_WRITE(
-        pNode,
+        pdx,
         Offset_RamCtrl,
         RegValue | (1 << 2)
         );
@@ -2323,7 +2550,7 @@ PlxPciPerformanceGetCounters(
         // Get next counter
         Counters[i] =
             PLX_8000_REG_READ(
-                pNode,
+                pdx,
                 Offset_Fifo
                 );
 
@@ -2376,7 +2603,7 @@ PlxPciPerformanceGetCounters(
         index = IndexBase + (10 * PortsPerStation);
 
         // DLLP counter location depends upon chip
-        if (pNode->Key.PlxFamily == PLX_FAMILY_SIRIUS)
+        if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
         {
             // Even port number DLLP counters are first
             index += (pPerfProps[i].StationPort / 2);
@@ -2394,7 +2621,7 @@ PlxPciPerformanceGetCounters(
         pPerfProps[i].IngressDllp = Counters[index];
 
         // Egress DLLP counters follow Ingress
-        if (pNode->Key.PlxFamily == PLX_FAMILY_SIRIUS)
+        if (pdx->Key.PlxFamily == PLX_FAMILY_SIRIUS)
         {
             // Even ports are grouped together
             index += (PortsPerStation / 2);
@@ -2418,7 +2645,7 @@ PlxPciPerformanceGetCounters(
          * issue is present, the previous value is used instead to
          * minimize data reporting errors.
          *********************************************************/
-        if ((pNode->Key.PlxFamily == PLX_FAMILY_DRACO_1) &&
+        if ((pdx->Key.PlxFamily == PLX_FAMILY_DRACO_1) &&
             (pPerfProps[i].LinkWidth != 0))
         {
             // Setup initial pointers to stored counters
@@ -2428,7 +2655,7 @@ PlxPciPerformanceGetCounters(
             // Verify each counter & use previous on error
             for (index = 0; index < 14; index++)
             {
-                if ((*pCounter == 0) && (*pCounter_Prev != 0))
+                if (((*pCounter == 0) && (*pCounter_Prev != 0)) || (*pCounter == 0x4C041301))
                 {
                     // Store 64-bit counter in case of wrapping
                     TmpValue = *pCounter_Prev;
@@ -2464,7 +2691,7 @@ PlxPciPerformanceGetCounters(
  ******************************************************************************/
 PLX_STATUS
 PlxMH_GetProperties(
-    PLX_DEVICE_NODE     *pNode,
+    PLX_DEVICE_NODE     *pdx,
     PLX_MULTI_HOST_PROP *pMHProp
     )
 {
@@ -2481,22 +2708,23 @@ PlxMH_GetProperties(
     pMHProp->SwitchMode = PLX_SWITCH_MODE_STANDARD;
 
     // Verify supported device
-    switch (pNode->Key.PlxFamily)
+    switch (pdx->Key.PlxFamily)
     {
         case PLX_FAMILY_CYGNUS:
         case PLX_FAMILY_DRACO_1:
         case PLX_FAMILY_DRACO_2:
+        case PLX_FAMILY_CAPELLA_1:
             break;
 
         default:
-            DebugPrintf(("ERROR - Device (%04X) doesn't support multi-host\n", pNode->Key.PlxChip));
+            DebugPrintf(("ERROR - Device (%04X) doesn't support multi-host\n", pdx->Key.PlxChip));
             return ApiUnsupportedFunction;
     }
 
     // Attempt to read management port configuration
     RegValue =
         PLX_8000_REG_READ(
-            pNode,
+            pdx,
             0x354
             );
 
@@ -2525,7 +2753,7 @@ PlxMH_GetProperties(
     // Get active VS mask
     RegVSEnable =
         PLX_8000_REG_READ(
-            pNode,
+            pdx,
             0x358
             );
 
@@ -2546,7 +2774,7 @@ PlxMH_GetProperties(
             // Get VS upstream port ([4:0])
             RegValue =
                 PLX_8000_REG_READ(
-                    pNode,
+                    pdx,
                     0x360 + (i * sizeof(U32))
                     );
 
@@ -2555,7 +2783,7 @@ PlxMH_GetProperties(
             // Get VS downstream port vector ([23:0])
             RegValue =
                 PLX_8000_REG_READ(
-                    pNode,
+                    pdx,
                     0x380 + (i * sizeof(U32))
                     );
 
@@ -2613,7 +2841,7 @@ PlxMH_GetProperties(
  ******************************************************************************/
 PLX_STATUS
 PlxMH_MigrateDsPorts(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U16              VS_Source,
     U16              VS_Dest,
     U32              DsPortMask,
@@ -2629,7 +2857,7 @@ PlxMH_MigrateDsPorts(
     // Get current MH properties
     status =
         PlxMH_GetProperties(
-            pNode,
+            pdx,
             &MHProp
             );
 
@@ -2641,7 +2869,7 @@ PlxMH_MigrateDsPorts(
         return ApiUnsupportedFunction;
 
     DebugPrintf((
-        "Migrating DS ports (%08X) from VS%d ==> VS%d %s\n",
+        "Migrate DS ports (%08X) from VS%d ==> VS%d %s\n",
         (int)DsPortMask, VS_Source, VS_Dest,
         (bResetSrc) ? "& reset source port" : ""
         ));
@@ -2682,13 +2910,13 @@ PlxMH_MigrateDsPorts(
 
     // Update source & destination ports
     PLX_8000_REG_WRITE(
-        pNode,
+        pdx,
         0x380 + (VS_Source * sizeof(U32)),
         MHProp.VS_DownstreamPorts[VS_Source]
         );
 
     PLX_8000_REG_WRITE(
-        pNode,
+        pdx,
         0x380 + (VS_Dest * sizeof(U32)),
         MHProp.VS_DownstreamPorts[VS_Dest]
         );
@@ -2696,10 +2924,10 @@ PlxMH_MigrateDsPorts(
     // Make sure destination VS is enabled
     if ((MHProp.VS_EnabledMask & (1 << VS_Dest)) == 0)
     {
-        DebugPrintf(("Enabling destination VS%d\n", VS_Dest));
+        DebugPrintf(("Enable destination VS%d\n", VS_Dest));
 
         PLX_8000_REG_WRITE(
-            pNode,
+            pdx,
             0x358,
             MHProp.VS_EnabledMask | (1 << VS_Dest)
             );
@@ -2710,13 +2938,13 @@ PlxMH_MigrateDsPorts(
     {
         RegValue =
             PLX_8000_REG_READ(
-                pNode,
+                pdx,
                 0x3A0
                 );
 
         // Put VS into reset
         PLX_8000_REG_WRITE(
-            pNode,
+            pdx,
             0x3A0,
             RegValue | (1 << VS_Source)
             );
@@ -2726,7 +2954,7 @@ PlxMH_MigrateDsPorts(
 
         // Take VS out of reset
         PLX_8000_REG_WRITE(
-            pNode,
+            pdx,
             0x3A0,
             RegValue & ~((U32)1 << VS_Source)
             );

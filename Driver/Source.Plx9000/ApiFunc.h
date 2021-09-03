@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      02-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -51,7 +51,7 @@ PLX_STATUS
 PlxDeviceFind(
     DEVICE_EXTENSION *pdx,
     PLX_DEVICE_KEY   *pKey,
-    U8               *pDeviceNumber
+    U16              *pDeviceNumber
     );
 
 PLX_STATUS

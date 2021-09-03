@@ -34,13 +34,13 @@
  *
  * Revision History:
  *
- *      12-01-07 : PLX SDK v5.20
+ *      11-01-11 : PLX SDK v7.00
  *
  ******************************************************************************/
 
 
 #include <linux/interrupt.h>
-#include "DrvDefs.h"
+#include "Plx_sysdep.h"
 
 
 

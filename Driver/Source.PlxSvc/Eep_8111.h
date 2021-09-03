@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      12-01-07 : PLX SDK v5.20
+ *      08-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -67,43 +67,55 @@ extern "C" {
 **********************************************/
 PLX_STATUS
 Plx8111_EepromPresent(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8              *pStatus
     );
 
 PLX_STATUS
+Plx8111_EepromGetAddressWidth(
+    PLX_DEVICE_NODE *pdx,
+    U8              *pWidth
+    );
+
+PLX_STATUS
+Plx8111_EepromSetAddressWidth(
+    PLX_DEVICE_NODE *pdx,
+    U8               width
+    );
+
+PLX_STATUS
 Plx8111_EepromReadByOffset_16(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U16             *pValue
     );
 
 PLX_STATUS
 Plx8111_EepromWriteByOffset_16(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U16              value
     );
 
 BOOLEAN
 Plx8111_EepromWaitIdle(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     );
 
 BOOLEAN
 Plx8111_EepromWaitUntilReady(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     );
 
 BOOLEAN
 Plx8111_EepromDataRead(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8              *pData
     );
 
 BOOLEAN
 Plx8111_EepromDataWrite(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8               data
     );
 

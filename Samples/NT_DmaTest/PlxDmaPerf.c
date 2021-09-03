@@ -10,7 +10,7 @@
  *
  * Revision History:
  *
- *      12-01-09 : PLX SDK v6.40
+ *      03-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -69,9 +69,9 @@ PerformDma_8000(
  *****************************************************************************/
 int
 Do_DMA_Test(
-    U32 NTSrcAddr,
-	U32 NTDestAddr,
-	U32 NTSize,
+    U32                NTSrcAddr,
+    U32                NTDestAddr,
+    U32                NTSize,
     PLX_DEVICE_OBJECT *pNTDevice
     )
 {
@@ -86,8 +86,8 @@ Do_DMA_Test(
 
 
     /************************************
-    *         Select Device
-    ************************************/
+     *         Select Device
+     ***********************************/
     DeviceSelected =
         SelectDevice_DMA(
             &DeviceKey
@@ -115,38 +115,36 @@ Do_DMA_Test(
     }
 
     Cons_printf(
-        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%02x]\n\n",
+        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
 
+    // Must add the DMA device ReqID to the NT LUT
     ReqId = ((U16)DeviceKey.bus << 8) | (DeviceKey.slot << 3) | (DeviceKey.function & 0x03);
 
-	PlxPci_Nt_LutAdd(
-		pNTDevice,
-		&LutIndex,
-		ReqId,
-		flags
-		);
+    PlxPci_Nt_LutAdd(
+        pNTDevice,
+        &LutIndex,
+        ReqId,
+        flags
+        );
 
     /************************************
      *        Perform the DMA
      ************************************/
-    switch (DeviceKey.PlxChip)
+    if (((DeviceKey.PlxChip & 0xF000) == 0x8000) &&
+         (DeviceKey.PlxChip != 0x8311))
     {
-        case 0x8609:
-        case 0x8615:
-        case 0x8619:
-        case 0x8716:
-            PerformDma_8000( &Device, NTSrcAddr, NTDestAddr, NTSize );
-            break;
-
-        default:
-            Cons_printf(
-                "ERROR: DMA not supported by the selected device (%04X)\n",
-                DeviceKey.PlxChip
-                );
-            goto _Exit_App;
+        PerformDma_8000( &Device, NTSrcAddr, NTDestAddr, NTSize );
+    }
+    else
+    {
+        Cons_printf(
+            "ERROR: DMA not supported by the selected device (%04X)\n",
+            DeviceKey.PlxChip
+            );
+        goto _Exit_App;
     }
 
 
@@ -207,7 +205,7 @@ SelectDevice_DMA(
         status =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (status == ApiSuccess)
@@ -269,7 +267,7 @@ SelectDevice_DMA(
                 DevKey_DMA[NumDevices] = DevKey;
 
                 Cons_printf(
-                    "\t\t  %2d. %04x [b:%02x s:%02x f:%02x]\n",
+                    "\t\t  %2d. %04x [b:%02x s:%02x f:%x]\n",
                     (NumDevices + 1), DevKey.PlxChip,
                     DevKey.bus, DevKey.slot, DevKey.function
                     );
@@ -294,7 +292,6 @@ SelectDevice_DMA(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-
         Cons_scanf("%d", &i);
     }
     while (i > NumDevices);

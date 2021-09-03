@@ -34,11 +34,12 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
 
+#include <asm/io.h>
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
@@ -73,8 +74,8 @@
     #define DebugPrintf(arg)                _Debug_Print_Macro      arg
     #define DebugPrintf_Cont(arg)           _Debug_Print_Cont_Macro arg
 #else
-    #define DebugPrintf(arg)
-    #define DebugPrintf_Cont(arg)
+    #define DebugPrintf(arg)                do { } while(0)
+    #define DebugPrintf_Cont(arg)           do { } while(0)
 #endif
 #define ErrorPrintf(arg)                    _Error_Print_Macro      arg
 #define ErrorPrintf_Cont(arg)               _Error_Print_Cont_Macro arg
@@ -117,11 +118,9 @@
     #define PHYS_MEM_READ_8                         readb
     #define PHYS_MEM_READ_16                        readw
     #define PHYS_MEM_READ_32                        readl
-    #define PHYS_MEM_READ_64                        readq
     #define PHYS_MEM_WRITE_8(addr, data)            writeb( (data), (addr) )
     #define PHYS_MEM_WRITE_16(addr, data)           writew( (data), (addr) )
     #define PHYS_MEM_WRITE_32(addr, data)           writel( (data), (addr) )
-    #define PHYS_MEM_WRITE_64(addr, data)           writeq( (data), (addr) )
 #endif
 
 
@@ -139,7 +138,7 @@
 typedef struct _PLX_USER_MAPPING
 {
     struct list_head         ListEntry;
-    struct _PLX_DEVICE_NODE *pNode;
+    struct _PLX_DEVICE_NODE *pDevice;
     U8                       BarIndex;
 } PLX_USER_MAPPING;
 
@@ -162,8 +161,9 @@ typedef struct _PLX_DEVICE_NODE
     struct _PLX_DEVICE_NODE  *pRegNode;                     // The device to use for register access
     PLX_DEVICE_KEY            Key;                          // Device location & identification
     U8                        PciHeaderType;                // PCI header type
+    U32                       PciClass;                     // PCI class code
     PLX_PCI_BAR_INFO          PciBar[PCI_NUM_BARS_TYPE_00]; // PCI BARs information
-    BOOLEAN                   bBarKernelMap;                // Flag whether BARs have been mapped to kernel
+    U8                        bBarKernelMap;                // Flag whether BARs have been mapped to kernel
     U8                        PortNumber;                   // PCIe Port number of device
     U8                        Default_EepWidth;             // Default width for EEPROM access
     U32                       Offset_NtRegBase;             // The NT register base offset

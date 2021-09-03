@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      02-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -74,7 +74,7 @@ Dispatch_open(
     }
 
     DebugPrintf((
-        "Opening device interface (owner=%p)...\n",
+        "Open device interface (owner=%p)...\n",
         filp
         ));
 
@@ -129,7 +129,7 @@ Dispatch_release(
     }
 
     DebugPrintf((
-        "Closing device interface (owner=%p)...\n",
+        "Close device interface (owner=%p)...\n",
         filp
         ));
 
@@ -180,8 +180,8 @@ Dispatch_mmap(
 {
     int               rc;
     off_t             offset;
-    PLX_UINT_PTR      AddressToMap;
-    PLX_DEVICE_NODE  *pNode;
+    U64               AddressToMap;
+    PLX_DEVICE_NODE  *pDevice;
     PLX_USER_MAPPING *pMapObject;
     DEVICE_EXTENSION *pdx;
     struct list_head *pEntry;
@@ -216,7 +216,7 @@ Dispatch_mmap(
      * for additional information.
      *****************************************/
 
-    pNode = NULL;
+    pDevice = NULL;
 
     spin_lock(
         &(pdx->Lock_MapParamsList)
@@ -226,7 +226,7 @@ Dispatch_mmap(
     pEntry = pdx->List_MapParams.next;
 
     // Find the object and remove it
-    while ((pNode == NULL) && (pEntry != &(pdx->List_MapParams)))
+    while ((pDevice == NULL) && (pEntry != &(pdx->List_MapParams)))
     {
         // Get the object
         pMapObject =
@@ -244,10 +244,10 @@ Dispatch_mmap(
                 );
 
             // Get the desired node
-            pNode = pMapObject->pNode;
+            pDevice = pMapObject->pDevice;
 
             // Decrement request counter
-            pNode->MapRequestPending--;
+            pDevice->MapRequestPending--;
 
             DebugPrintf((
                 "Found and removed map object (%p) from list\n",
@@ -265,14 +265,14 @@ Dispatch_mmap(
         &(pdx->Lock_MapParamsList)
         );
 
-    if (pNode == NULL)
+    if (pDevice == NULL)
     {
         DebugPrintf(("ERROR - Map parameters object not found in list\n"));
         return -ENODEV;
     }
 
     // Verify space is not I/O
-    if (pNode->PciBar[offset].Properties.bIoSpace)
+    if (pDevice->PciBar[offset].Properties.Flags & PLX_BAR_FLAG_IO)
     {
         DebugPrintf((
             "ERROR - PCI BAR %d is an I/O space, cannot map to user space\n",
@@ -283,18 +283,18 @@ Dispatch_mmap(
     }
 
     DebugPrintf((
-        "Mapping PCI BAR %d...\n",
+        "Map PCI BAR %d...\n",
         (U8)offset
         ));
 
     // Use the BAR physical address for the mapping
-    AddressToMap = (PLX_UINT_PTR)pNode->PciBar[offset].Properties.Physical;
+    AddressToMap = pDevice->PciBar[offset].Properties.Physical;
 
     // Verify physical address
     if (AddressToMap == 0)
     {
         DebugPrintf((
-            "ERROR - Invalid physical (%08lx), cannot map to user space\n",
+            "ERROR - Invalid physical (%08llx), cannot map to user space\n",
             AddressToMap
             ));
 
@@ -346,14 +346,14 @@ Dispatch_mmap(
     if (rc != 0)
     {
         DebugPrintf((
-            "ERROR - Unable to map Physical (%08lx) ==> User space\n",
+            "ERROR - Unable to map Physical (%08llx) ==> User space\n",
             AddressToMap
             ));
     }
     else
     {
         DebugPrintf((
-            "Mapped Phys (%08lx) ==> User VA (%08lx)\n",
+            "Mapped Phys (%08llx) ==> User VA (%08lx)\n",
             AddressToMap, vma->vm_start
             ));
     }
@@ -373,30 +373,32 @@ Dispatch_mmap(
  * Description:  Processes the IOCTL messages sent to this device
  *
  ******************************************************************************/
-int 
+PLX_RET_IOCTL
 Dispatch_IoControl(
+  #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
     struct inode  *inode,
+  #endif
     struct file   *filp,
     unsigned int   cmd,
     unsigned long  args
     )
 {
-    int                status;
-    PLX_PARAMS         IoBuffer;
-    PLX_PARAMS        *pIoBuffer;
-    PLX_DEVICE_NODE   *pNode;
-    DEVICE_EXTENSION  *pdx;
+    int              status;
+    PLX_PARAMS       IoBuffer;
+    PLX_PARAMS      *pIoBuffer;
+    DEVICE_OBJECT   *fdo;
+    PLX_DEVICE_NODE *pdx;
 
 
     // Verify interface
-    if (iminor(inode) != PLX_MNGMT_INTERFACE)
+    if (iminor(filp->f_dentry->d_inode) != PLX_MNGMT_INTERFACE)
     {
         ErrorPrintf(("ERROR - Device interface does not exist\n"));
         return (-ENODEV);
     }
 
-    // Get the device extension
-    pdx = ((DEVICE_OBJECT*)(filp->private_data))->DeviceExtension;
+    // Get the device object
+    fdo = (DEVICE_OBJECT*)filp->private_data;
 
     // Copy the I/O Control message from user space
     status =
@@ -427,11 +429,11 @@ Dispatch_IoControl(
         case PLX_IOCTL_IO_PORT_READ:
         case PLX_IOCTL_IO_PORT_WRITE:
         case PLX_IOCTL_COMMON_BUFFER_PROPERTIES:
-            pNode = NULL;
+            pdx = NULL;
             break;
 
         default:
-            pNode = GetDeviceNodeFromKey( pdx, &(pIoBuffer->Key) );
+            pdx = GetDeviceNodeFromKey( fdo->DeviceExtension, &(pIoBuffer->Key) );
             break;
     }
 
@@ -449,9 +451,9 @@ Dispatch_IoControl(
 
             pIoBuffer->ReturnCode =
                 PlxDeviceFind(
-                    pdx,
+                    fdo->DeviceExtension,
                     &(pIoBuffer->Key),
-                    PLX_CAST_64_TO_8_PTR( &(pIoBuffer->value[0]) )
+                    PLX_CAST_64_TO_16_PTR( &(pIoBuffer->value[0]) )
                     );
             break;
 
@@ -476,7 +478,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxChipTypeGet(
-                    pNode,
+                    pdx,
                     PLX_CAST_64_TO_16_PTR( &(pIoBuffer->value[0]) ),
                     PLX_CAST_64_TO_8_PTR ( &(pIoBuffer->value[1]) )
                     );
@@ -487,9 +489,10 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxChipTypeSet(
-                    pNode,
+                    pdx,
                     (U16)pIoBuffer->value[0],
-                    (U8)pIoBuffer->value[1]
+                    PLX_CAST_64_TO_8_PTR ( &(pIoBuffer->value[1]) ),
+                    PLX_CAST_64_TO_8_PTR ( &(pIoBuffer->value[2]) )
                     );
             break;
 
@@ -498,7 +501,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxGetPortProperties(
-                    pNode,
+                    pdx,
                     &(pIoBuffer->u.PortProp)
                     );
             break;
@@ -512,7 +515,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciDeviceReset(
-                    pNode
+                    pdx
                     );
             break;
 
@@ -589,7 +592,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->value[1] =
                 PlxRegisterRead(
-                    pNode,
+                    pdx,
                     (U32)pIoBuffer->value[0],
                     &(pIoBuffer->ReturnCode),
                     TRUE        // Adjust offset based on port
@@ -607,7 +610,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxRegisterWrite(
-                    pNode,
+                    pdx,
                     (U32)pIoBuffer->value[0],
                     (U32)pIoBuffer->value[1],
                     TRUE        // Adjust offset based on port
@@ -625,7 +628,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->value[1] =
                 PlxRegisterRead(
-                    pNode,
+                    pdx,
                     (U32)pIoBuffer->value[0],
                     &(pIoBuffer->ReturnCode),
                     FALSE       // Don't adjust offset based on port
@@ -643,7 +646,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxRegisterWrite(
-                    pNode,
+                    pdx,
                     (U32)pIoBuffer->value[0],
                     (U32)pIoBuffer->value[1],
                     FALSE       // Don't adjust offset based on port
@@ -665,7 +668,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciBarProperties(
-                    pNode,
+                    pdx,
                     (U8)(pIoBuffer->value[0]),
                     &(pIoBuffer->u.BarProp)
                     );
@@ -676,7 +679,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciBarMap(
-                    pNode,
+                    pdx,
                     (U8)(pIoBuffer->value[0]),
                     &(pIoBuffer->value[1])
                     );
@@ -687,7 +690,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciBarUnmap(
-                    pNode,
+                    pdx,
                     PLX_INT_TO_PTR(pIoBuffer->value[1])
                     );
             break;
@@ -701,7 +704,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromPresent(
-                    pNode,
+                    pdx,
                     PLX_CAST_64_TO_8_PTR( &(pIoBuffer->value[0]) )
                     );
             break;
@@ -711,7 +714,17 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromProbe(
-                    pNode,
+                    pdx,
+                    PLX_CAST_64_TO_8_PTR( &(pIoBuffer->value[0]) )
+                    );
+            break;
+
+        case PLX_IOCTL_EEPROM_GET_ADDRESS_WIDTH:
+            DebugPrintf_Cont(("PLX_IOCTL_EEPROM_GET_ADDRESS_WIDTH\n"));
+
+            pIoBuffer->ReturnCode =
+                PlxEepromGetAddressWidth(
+                    pdx,
                     PLX_CAST_64_TO_8_PTR( &(pIoBuffer->value[0]) )
                     );
             break;
@@ -721,7 +734,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromSetAddressWidth(
-                    pNode,
+                    pdx,
                     (U8)pIoBuffer->value[0]
                     );
             break;
@@ -731,7 +744,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromCrcGet(
-                    pNode,
+                    pdx,
                     PLX_CAST_64_TO_32_PTR( &(pIoBuffer->value[0]) ),
                     PLX_CAST_64_TO_8_PTR ( &(pIoBuffer->value[1]) )
                     );
@@ -742,7 +755,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromCrcUpdate(
-                    pNode,
+                    pdx,
                     PLX_CAST_64_TO_32_PTR( &(pIoBuffer->value[0]) ),
                     (BOOLEAN)pIoBuffer->value[1]
                     );
@@ -753,14 +766,14 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromReadByOffset(
-                    pNode,
-                    (U16)pIoBuffer->value[0],
+                    pdx,
+                    (U32)pIoBuffer->value[0],
                     PLX_CAST_64_TO_32_PTR( &(pIoBuffer->value[1]) )
                     );
 
             DebugPrintf((
                 "EEPROM Offset %02X = %08X\n",
-                (U16)pIoBuffer->value[0],
+                (U32)pIoBuffer->value[0],
                 (U32)pIoBuffer->value[1]
                 ));
             break;
@@ -770,15 +783,15 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromWriteByOffset(
-                    pNode,
-                    (U16)pIoBuffer->value[0],
+                    pdx,
+                    (U32)pIoBuffer->value[0],
                     (U32)pIoBuffer->value[1]
                     );
 
             DebugPrintf((
                 "Wrote %08X to EEPROM Offset %02X\n",
                 (U32)pIoBuffer->value[1],
-                (U16)pIoBuffer->value[0]
+                (U32)pIoBuffer->value[0]
                 ));
             break;
 
@@ -787,14 +800,14 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromReadByOffset_16(
-                    pNode,
-                    (U16)pIoBuffer->value[0],
+                    pdx,
+                    (U32)pIoBuffer->value[0],
                     PLX_CAST_64_TO_16_PTR( &(pIoBuffer->value[1]) )
                     );
 
             DebugPrintf((
                 "EEPROM Offset %02X = %04X\n",
-                (U16)pIoBuffer->value[0],
+                (U32)pIoBuffer->value[0],
                 (U16)pIoBuffer->value[1]
                 ));
             break;
@@ -804,15 +817,15 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxEepromWriteByOffset_16(
-                    pNode,
-                    (U16)pIoBuffer->value[0],
+                    pdx,
+                    (U32)pIoBuffer->value[0],
                     (U16)pIoBuffer->value[1]
                     );
 
             DebugPrintf((
                 "Wrote %04X to EEPROM Offset %02X\n",
                 (U16)pIoBuffer->value[1],
-                (U16)pIoBuffer->value[0]
+                (U32)pIoBuffer->value[0]
                 ));
             break;
 
@@ -855,7 +868,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPhysicalMemoryAllocate(
-                    pNode,
+                    pdx,
                     &(pIoBuffer->u.PciMemory),
                     (BOOLEAN)(pIoBuffer->value[0])
                     );
@@ -866,7 +879,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPhysicalMemoryFree(
-                    pNode,
+                    pdx,
                     &(pIoBuffer->u.PciMemory)
                     );
             break;
@@ -876,7 +889,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPhysicalMemoryMap(
-                    pNode,
+                    pdx,
                     &(pIoBuffer->u.PciMemory)
                     );
             break;
@@ -886,7 +899,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPhysicalMemoryUnmap(
-                    pNode,
+                    pdx,
                     &(pIoBuffer->u.PciMemory)
                     );
             break;
@@ -911,7 +924,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPerformanceInitializeProperties(
-                    pNode,
+                    pdx,
                     PLX_INT_TO_PTR(pIoBuffer->value[0])
                     );
             break;
@@ -921,7 +934,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPerformanceMonitorControl(
-                    pNode,
+                    pdx,
                     (PLX_PERF_CMD)pIoBuffer->value[0]
                     );
             break;
@@ -931,7 +944,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPerformanceResetCounters(
-                    pNode
+                    pdx
                     );
             break;
 
@@ -940,7 +953,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxPciPerformanceGetCounters(
-                    pNode,
+                    pdx,
                     PLX_INT_TO_PTR(pIoBuffer->value[0]),
                     (U8)pIoBuffer->value[1]
                     );
@@ -955,7 +968,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxMH_GetProperties(
-                    pNode,
+                    pdx,
                     &pIoBuffer->u.MH_Prop
                     );
             break;
@@ -965,7 +978,7 @@ pIoBuffer->ReturnCode = ApiUnsupportedFunction;
 
             pIoBuffer->ReturnCode =
                 PlxMH_MigrateDsPorts(
-                    pNode,
+                    pdx,
                     (U16)(pIoBuffer->value[0] >> 16),
                     (U16)(pIoBuffer->value[0] & 0xFFFF),
                     (U32)pIoBuffer->value[1],

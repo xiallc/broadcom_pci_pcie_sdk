@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      02-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -65,10 +65,10 @@ PlxChip_BoardReset(
     // Added to avoid compiler warnings
     RegIntCtrlStatus = 0;
 
-    // Clear any PCI errors
+    // Clear any PCI errors (04[31:27])
     PLX_PCI_REG_READ(
         pdx,
-        CFG_COMMAND,
+        0x04,
         &RegValue
         );
 
@@ -77,7 +77,7 @@ PlxChip_BoardReset(
         // Write value back to clear aborts
         PLX_PCI_REG_WRITE(
             pdx,
-            CFG_COMMAND,
+            0x04,
             RegValue
             );
     }
@@ -98,7 +98,7 @@ PlxChip_BoardReset(
     // Save interrupt line
     PLX_PCI_REG_READ(
         pdx,
-        CFG_INT_LINE,
+        0x3C,
         &RegInterrupt
         );
 
@@ -149,7 +149,7 @@ PlxChip_BoardReset(
     // Restore interrupt line
     PLX_PCI_REG_WRITE(
         pdx,
-        CFG_INT_LINE,
+        0x3C,
         RegInterrupt
         );
 

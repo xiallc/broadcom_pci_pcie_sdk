@@ -131,10 +131,13 @@ struct _PCI_CLASS_CODES
             {0x08, 0x02, 0x00, "Generic 8254 system timer"},
             {0x08, 0x02, 0x01, "ISA system timer"},
             {0x08, 0x02, 0x02, "EISA system timers (two timers)"},
+            {0x08, 0x02, 0x03, "High Performance Event Timer"},
             {0x08, 0x03, 0x00, "Generic RTC controller"},
             {0x08, 0x03, 0x01, "ISA RTC controller"},
             {0x08, 0x04, 0x00, "Generic PCI Hot-Plug controller"},
             {0x08, 0x05, 0x00, "SD Host Controller"},
+            {0x08, 0x06, 0x00, "IOMMU"},
+            {0x08, 0x07, 0x00, "Root Complex Event Collector"},
             {0x08, 0x80, 0x00, "Other system peripheral"},
 
         {0x09, 0xFF, 0xFF, "Input device"},
@@ -223,14 +226,14 @@ struct _PCI_CLASS_CODES
  * Description:  
  *
  ********************************************************************/
-U8
+U16
 DeviceListCreate(
     PLX_API_MODE   ApiMode,
     PLX_MODE_PROP *pModeProp
     )
 {
-    U8                 DevNum;
-    U8                 DevCount;
+    U16                DevNum;
+    U16                DevCount;
     U32                RegValue;
     char               DeviceText[100];
     PLX_STATUS         status;
@@ -246,6 +249,16 @@ DeviceListCreate(
 
     do
     {
+        // For I2C mode, allow user to cancel with 'ESC' key
+        if (ApiMode == PLX_API_MODE_I2C_AARDVARK)
+        {
+            if (Cons_kbhit())
+            {
+                if (Cons_getch() == 27)
+                    return DevCount | (U8)(1 << 7);
+            }
+        }
+
         // Clear device key
         memset(&Key, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY));
 
@@ -353,10 +366,14 @@ DeviceListCreate(
                         );
 
                     Cons_printf(
-                        " Added: %04X %04X [b:%02x s:%02x f:%02x] @ %02X - %s\n",
-                        pNode->Key.DeviceId, pNode->Key.VendorId,
+                        " Add: %04X @%d-%02X (P%d %sG%d x%d%s) [b:%02x s:%02x f:%x] - %s\n",
+                        pNode->Key.PlxChip, pNode->Key.ApiIndex, pNode->Key.DeviceNumber,
+                        pNode->PortProp.PortNumber,
+                        (pNode->PortProp.PortNumber < 10) ? " " : "",
+                        pNode->PortProp.LinkSpeed, pNode->PortProp.LinkWidth,
+                        (pNode->PortProp.LinkWidth < 10) ? " " : "",
                         pNode->Key.bus, pNode->Key.slot, pNode->Key.function,
-                        pNode->Key.DeviceNumber, DeviceText
+                        DeviceText
                         );
                 }
             }
@@ -393,13 +410,13 @@ DeviceListDisplay(
 
     Cons_printf(
         "\n"
-        "    # Bs Sl Fn Pt Dev  Ven  Chip Rv I2C Description\n"
+        "    # Bs Sl Fn Pt Dev  Ven  Chip Rv I2C  Description\n"
         "   ---------------------------------------------------------------------------\n"
         );
 
     if (pDeviceList == NULL)
     {
-        Cons_printf("               ***** No devices detected *****\n\n");
+        Cons_printf("               ***** No devices detected *****\n");
         return;
     }
 
@@ -475,9 +492,9 @@ DeviceListDisplay(
 
         // Display I2C address
         if (pNode->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK)
-            Cons_printf(" %02X ", pNode->Key.DeviceNumber);
+            Cons_printf(" %d-%02X", pNode->Key.ApiIndex, pNode->Key.DeviceNumber);
         else
-            Cons_printf(" -- ");
+            Cons_printf("  -- ");
 
         Device_GetClassString(
             pNode,
@@ -549,12 +566,8 @@ DeviceNodeAdd(
 
 
     // Check if node already exists
-    if (DeviceNodeExist(
-            pKey
-            ))
-    {
+    if (DeviceNodeExist( pKey ))
         return NULL;
-    }
 
     // Allocate a new node for the device list
     pNode = (DEVICE_NODE*)malloc(sizeof(DEVICE_NODE));
@@ -598,25 +611,27 @@ DeviceNodeAdd(
             // Add for PCI mode
             if (pKey->ApiMode == pNodeCurr->Key.ApiMode)
             {
-                if ((pKey->ApiMode == PLX_API_MODE_PCI) ||
-                    ((pNodeCurr->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK) &&
-                     (pKey->DeviceNumber <= pNodeCurr->Key.DeviceNumber)))
+                if ((pNodeCurr->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK) &&
+                    ((pKey->ApiIndex > pNodeCurr->Key.ApiIndex) ||
+                     (pKey->DeviceNumber > pNodeCurr->Key.DeviceNumber)))
                 {
-                    // Compare bus numbers
+                    // I2C device at higher port/address, add lower in list
+                }
+                else
+                {
+                    // Compare bus, slot, function numbers
                     if (pKey->bus < pNodeCurr->Key.bus)
                     {
                         bAddDevice = TRUE;
                     }
                     else if (pKey->bus == pNodeCurr->Key.bus)
                     {
-                        // Compare slot number
                         if (pKey->slot < pNodeCurr->Key.slot)
                         {
                             bAddDevice = TRUE;
                         }
                         else if (pKey->slot == pNodeCurr->Key.slot)
                         {
-                            // Compare function number
                             if (pKey->function <= pNodeCurr->Key.function)
                             {
                                 bAddDevice = TRUE;
@@ -672,7 +687,7 @@ DeviceNodeExist(
 
     pNode = pDeviceList;
 
-    // Traverse list and free all nodes
+    // Traverse list and compare with existing devices
     while (pNode != NULL)
     {
         // Check for a match by location and method accessed
@@ -681,18 +696,20 @@ DeviceNodeExist(
             (pKey->function == pNode->Key.function) &&
             (pKey->ApiMode  == pNode->Key.ApiMode))
         {
-            // For I2C, compare I2C addresses & PLX port
-            if (pKey->ApiMode == PLX_API_MODE_I2C_AARDVARK)
+            if (pKey->ApiMode == PLX_API_MODE_PCI)
             {
-                if ((pKey->ApiIndex     != pNode->Key.ApiIndex) ||
-                    (pKey->PlxPort      != pNode->Key.PlxPort)  ||
-                    (pKey->DeviceNumber != pNode->Key.DeviceNumber))
+                return TRUE;
+            }
+            else if (pKey->ApiMode == PLX_API_MODE_I2C_AARDVARK)
+            {
+                // For I2C, also compare I2C USB device, I2C address, & PLX port
+                if ((pKey->ApiIndex     == pNode->Key.ApiIndex) &&
+                    (pKey->PlxPort      == pNode->Key.PlxPort)  &&
+                    (pKey->DeviceNumber == pNode->Key.DeviceNumber))
                 {
-                    return FALSE;
+                    return TRUE;
                 }
             }
-
-            return TRUE;
         }
 
         // Go to next device
@@ -773,12 +790,10 @@ DeviceNodeGetByKey(
     PLX_DEVICE_KEY *pKey
     )
 {
-    U8           count;
     DEVICE_NODE *pNode;
 
 
     // Traverse the list to return desired node
-    count = 0;
     pNode = pDeviceList;
 
     while (pNode != NULL)
@@ -788,6 +803,7 @@ DeviceNodeGetByKey(
             (pKey->slot         == pNode->Key.slot)     &&
             (pKey->function     == pNode->Key.function) &&
             (pKey->ApiMode      == pNode->Key.ApiMode)  &&
+            (pKey->ApiIndex     == pNode->Key.ApiIndex) &&
             (pKey->DeviceNumber == pNode->Key.DeviceNumber))
         {
             return pNode;
@@ -829,7 +845,9 @@ Device_GetClassString(
 
     PlxChip = pNode->Key.PlxChip;
 
-    if (((PlxChip & 0xFF00) == 0x8500) ||
+    if (((PlxChip & 0xFF00) == 0x2300) ||
+        ((PlxChip & 0xFF00) == 0x3300) ||
+        ((PlxChip & 0xFF00) == 0x8500) ||
         ((PlxChip & 0xFF00) == 0x8600) ||
         ((PlxChip & 0xFF00) == 0x8700))
     {
@@ -845,8 +863,11 @@ Device_GetClassString(
         case 0x9054:
         case 0x9056:
         case 0x9656:
-        case 0x8311:
             strcpy( pClassText, "PLX PCI <==> Local Bus bridge" );
+            return;
+
+        case 0x8311:
+            strcpy( pClassText, "PLX PCIe <==> Local Bus bridge" );
             return;
 
         case 0x6140:
@@ -883,39 +904,72 @@ Device_GetClassString(
             return;
 
         case 0x8000:
-            if (pNode->Key.NTPortType == PLX_NT_PORT_VIRTUAL)
+            // Default to unknown EP
+            strcpy( pClassText, "* PLX Unknown Endpoint *" );
+
+            if (pNode->PortProp.PortType == PLX_PORT_UPSTREAM)
             {
-                strcpy( pClassText, "PLX PCIe NT Virtual port" );
+                if (pNode->Key.SubDeviceId == 0x100B)
+                    strcpy( pClassText, "PLX PCIe Synthetic Upstream port" );
+                else
+                    strcpy( pClassText, "PLX PCIe Upstream port" );
             }
-            else if (pNode->Key.NTPortType == PLX_NT_PORT_LINK)
+            else if (pNode->PortProp.PortType == PLX_PORT_DOWNSTREAM)
             {
-                strcpy( pClassText, "PLX PCIe NT Link port" );
+                if (pNode->Key.SubDeviceId == 0x100B)
+                    strcpy( pClassText, "PLX PCIe Synthetic Downstream port" );
+                else
+                    strcpy( pClassText, "PLX PCIe Downstream port" );
+            }
+            else if (pNode->PortProp.PortType == PLX_PORT_ENDPOINT)
+            {
+                // Bridge devices
+                if (pNode->PciClass == 0x068000)
+                {
+                    if (pNode->Key.SubDeviceId == 0x1004)
+                        strcpy( pClassText, "PLX PCIe Synthetic NT Link port" );
+                    else if (pNode->Key.NTPortType == PLX_NT_PORT_VIRTUAL)
+                        strcpy( pClassText, "PLX PCIe NT Virtual port" );
+                    else if (pNode->Key.NTPortType == PLX_NT_PORT_LINK)
+                        strcpy( pClassText, "PLX PCIe NT Link port" );
+                }
+
+                // Peripheral devices
+                if (pNode->PciClass == 0x088000)
+                {
+                    if (pNode->Key.DeviceId == 0x1009)
+                        strcpy( pClassText, "PLX Global Endpoint" );
+                    else if (pNode->Key.DeviceId == 0x1008)
+                        strcpy( pClassText, "PLX PCIe Synthetic Enabler Endpoint" );
+                    else
+                        strcpy( pClassText, "PLX PCIe DMA Controller" );
+                }
+
+                // Network controllers
+                if (pNode->PciClass == 0x028000)
+                {
+                    if (pNode->Key.SubDeviceId == 0x1005)
+                        strcpy( pClassText, "PLX PCIe Network Controller" );
+                    else if (pNode->Key.DeviceId == 0x1006)
+                        strcpy( pClassText, "PLX PCIe SRIOV Network Controller PF" );
+                    else if (pNode->Key.DeviceId == 0x1007)
+                        strcpy( pClassText, "PLX PCIe SRIOV Network Controller VF" );
+                }
+                else if (pNode->PciClass == 0x020000)
+                {
+                    strcpy( pClassText, "PLX PCIe ExpressNIC Controller" );
+                }
+            }
+            else if (pNode->PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT)
+            {
+                if (pNode->PciClass == 0x0C03FE)
+                    strcpy( pClassText, "PLX USB Controller" );
+                else
+                    strcpy( pClassText, "* PLX Unknown Legacy Endpoint *" );
             }
             else
             {
-                if (pNode->PortProp.PortType == PLX_PORT_UPSTREAM)
-                {
-                    strcpy( pClassText, "PLX PCIe Upstream port" );
-                }
-                else if (pNode->PortProp.PortType == PLX_PORT_DOWNSTREAM)
-                {
-                    strcpy( pClassText, "PLX PCIe Downstream port" );
-                }
-                else if (pNode->PortProp.PortType == PLX_PORT_ENDPOINT)
-                {
-                    if (pNode->PciClass == 0x088000)
-                    {
-                        strcpy( pClassText, "PLX PCIe DMA Controller" );
-                    }
-                    else
-                    {
-                        strcpy( pClassText, "* PLX Unknown Endpoint *" );
-                    }
-                }
-                else
-                {
-                    strcpy( pClassText, "* PLX PCIe Unknown port type *" );
-                }
+                strcpy( pClassText, "* PLX PCIe Unknown port type *" );
             }
             return;
 
@@ -1029,11 +1083,12 @@ Plx_EepromFileLoad(
     U16                EepSize,
     U8                 EepPortSize,
     BOOLEAN            bCrc,
+    BOOLEAN            bBypassVerify,
     BOOLEAN            bEndianSwap
     )
 {
     S8       rc;
-    U16      offset;
+    U32      offset;
     U32      Crc;
     U32      value;
     U32      Verify_Value;
@@ -1104,6 +1159,12 @@ Plx_EepromFileLoad(
     // Default to successful operation
     rc = TRUE;
 
+    Cons_printf(
+        "Verify option.............%s\n",
+        bBypassVerify ? "DISABLED (Errors won't be detected)"
+          : "ENABLED (Use '/b' to disable)"
+        );
+
     Cons_printf("Program EEPROM............");
 
     // Write buffer into EEPROM
@@ -1127,13 +1188,9 @@ Plx_EepromFileLoad(
         {
             // Endian swap based on port size
             if (EepPortSize == sizeof(U16))
-            {
                 value = EndianSwap16(value);
-            }
             else
-            {
                 value = EndianSwap32(value);
-            }
         }
 
         // Store next value
@@ -1143,12 +1200,15 @@ Plx_EepromFileLoad(
             value
             );
 
-        // Re-read to verify
-        PlxPci_EepromReadByOffset(
-            pDevice,
-            offset,
-            &Verify_Value
-            );
+        // Verify value unless ignore option enabled
+        if (bBypassVerify)
+            Verify_Value = value;
+        else
+            PlxPci_EepromReadByOffset(
+                pDevice,
+                offset,
+                &Verify_Value
+                );
 
         if (Verify_Value != value)
         {
@@ -1176,7 +1236,6 @@ Plx_EepromFileLoad(
             &Crc,
             TRUE
             );
-
         Cons_printf("Ok (CRC=%08X)\n", (int)Crc);
     }
 
@@ -1216,7 +1275,7 @@ Plx_EepromFileSave(
     BOOLEAN            bEndianSwap
     )
 {
-    U16      offset;
+    U32      offset;
     U32      value;
     FILE    *pFile;
     clock_t  start;
@@ -1285,7 +1344,7 @@ Plx_EepromFileSave(
     }
 
     // In case of 8114 revision, some versions require an
-    // extra 32-bit '0' after CRC due to an errata.
+    // extra 32-bit '0' after CRC due to an erratum
     if (pDevice->Key.PlxChip == 0x8114)
     {
         value = 0;
@@ -1331,13 +1390,17 @@ Plx_EepromFileSave(
 BOOLEAN
 Plx8000_EepromFileLoad(
     PLX_DEVICE_OBJECT *pDevice,
-    char              *pFileName
+    char              *pFileName,
+    BOOLEAN            bCrc,
+    BOOLEAN            bBypassVerify
     )
 {
     U8      *pBuffer;
-    U16      offset;
-    U16      value;
-    U16      Verify_Value;
+    U16      Verify_Value_16;
+    U32      value;
+    U32      Verify_Value;
+    U32      Crc;
+    U32      offset;
     U32      FileSize;
     FILE    *pFile;
     clock_t  start;
@@ -1349,7 +1412,7 @@ Plx8000_EepromFileLoad(
 
     pBuffer = NULL;
 
-    Cons_printf( "Load EEPROM file......" );
+    Cons_printf( "Load EEPROM file.........." );
     Cons_fflush( stdout );
 
     // Open the file to read
@@ -1361,7 +1424,6 @@ Plx8000_EepromFileLoad(
             "ERROR: Unable to load file \"%s\"\n",
             pFileName
             );
-
         return FALSE;
     }
 
@@ -1391,15 +1453,20 @@ Plx8000_EepromFileLoad(
     // Close the file
     fclose( pFile );
 
-    Cons_printf( "Ok (%d B)\n", (int)FileSize );
+    Cons_printf( "Ok (%dB)\n", (int)FileSize );
+    Cons_printf(
+        "Verify option.............%s\n",
+        bBypassVerify ? "DISABLED (Errors won't be detected)"
+          : "ENABLED (Use '/b' to disable)"
+        );
 
-    Cons_printf( "Program EEPROM........" );
+    Cons_printf( "Program EEPROM............" );
 
-    // Write buffer into EEPROM
-    for (offset=0; offset < FileSize; offset += sizeof(U16))
+    // Write 32-bit aligned buffer into EEPROM
+    for (offset=0; offset < (FileSize & ~0x3); offset += sizeof(U32))
     {
         // Periodically update status
-        if ((offset & 0xF) == 0)
+        if ((offset & 0x7) == 0)
         {
             // Display current status
             Cons_printf(
@@ -1409,40 +1476,78 @@ Plx8000_EepromFileLoad(
             Cons_fflush( stdout );
         }
 
-        // Store second 8-bit data
-        value = pBuffer[offset + sizeof(U8)];
+        // Get next value
+        value = *(U32*)(pBuffer + offset);
 
-        // Shift second data
-        value <<= 8;
-
-        // Store first 8-bit data
-        value |= pBuffer[offset];
-
-        PlxPci_EepromWriteByOffset_16(
+        // Write value & read back to verify
+        PlxPci_EepromWriteByOffset(
             pDevice,
             offset,
             value
             );
 
-        PlxPci_EepromReadByOffset_16(
-            pDevice,
-            offset,
-            &Verify_Value
-            );
+        // Verify value unless ignore option enabled
+        if (bBypassVerify)
+            Verify_Value = value;
+        else
+            PlxPci_EepromReadByOffset(
+                pDevice,
+                offset,
+                &Verify_Value
+                );
 
         if (Verify_Value != value)
         {
             Cons_printf(
-                "ERROR: offset:%02X  wrote:%04X  read:%04X\n",
-                offset,
-                value,
-                Verify_Value
+                "ERROR: offset:%02X  wrote:%08X  read:%08X\n",
+                offset, value, Verify_Value
                 );
             goto _Exit_File_Load_8000;
         }
     }
 
+    // Write any remaing 16-bit unaligned value
+    if (offset < FileSize)
+    {
+        // Get next value
+        value = *(U16*)(pBuffer + offset);
+
+        // Write value & read back to verify
+        PlxPci_EepromWriteByOffset_16(
+            pDevice,
+            offset,
+            (U16)value
+            );
+
+        PlxPci_EepromReadByOffset_16(
+            pDevice,
+            offset,
+            &Verify_Value_16
+            );
+
+        if (Verify_Value_16 != (U16)value)
+        {
+            Cons_printf(
+                "ERROR: offset:%02X  wrote:%04X  read:%04X\n",
+                offset, value, Verify_Value_16
+                );
+            goto _Exit_File_Load_8000;
+        }
+    }
     Cons_printf( "Ok \n" );
+
+    // Update CRC if requested
+    if (bCrc)
+    {
+        Cons_printf("Calculate & update CRC....");
+        Cons_fflush( stdout );
+        PlxPci_EepromCrcUpdate(
+            pDevice,
+            &Crc,
+            TRUE
+            );
+        Cons_printf("Ok (CRC=%08X)\n", (int)Crc);
+    }
 
 _Exit_File_Load_8000:
     // Release the buffer
@@ -1474,12 +1579,13 @@ BOOLEAN
 Plx8000_EepromFileSave(
     PLX_DEVICE_OBJECT *pDevice,
     char              *pFileName,
-    U32                ByteCount
+    U32                ByteCount,
+    BOOLEAN            bCrc
     )
 {
     U8      *pBuffer;
-    U16      offset;
     U16      value;
+    U32      offset;
     U32      EepSize;
     FILE    *pFile;
     clock_t  start;
@@ -1500,7 +1606,7 @@ Plx8000_EepromFileSave(
     else
     {
         // Start with EEPROM header size
-        EepSize = sizeof(U16);
+        EepSize = sizeof(U32);
 
         // Get EEPROM register count
         PlxPci_EepromReadByOffset_16(
@@ -1509,62 +1615,80 @@ Plx8000_EepromFileSave(
             &value
             );
 
-        // Get byte count
-        value = value & 0xFF;
-
         // Add register byte count
-        EepSize += sizeof(U16);
-
-        // Add register data
         EepSize += (U16)value;
 
-        if ((pDevice->Key.PlxChip & 0xFF00) == 0x8100)
+        // Get Shared(811x)/8051(MIRA) memory count
+        if ((pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCIE_P2P) ||
+            (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA))
         {
-            // Get Shared memory count
             PlxPci_EepromReadByOffset_16(
                 pDevice,
-                (U16)EepSize,
+                EepSize,
                 &value
                 );
 
             // Get byte count
             value = value & 0xFF;
 
-            // Add shared mem byte count
+            // Add mem byte count
             EepSize += sizeof(U16);
 
-            // Add shared mem data
+            // Add mem data
             EepSize += (U16)value;
         }
+
+        // Add CRC count if supported
+        if (bCrc)
+            EepSize += sizeof(U32);
     }
 
-    Cons_printf( "Ok (%d B)\n", EepSize );
+    Cons_printf(
+        "Ok (%dB%s)\n",
+        EepSize,
+        (bCrc) ? " inc 32-bit CRC" : ""
+        );
 
     Cons_printf( "Read EEPROM data.............." );
     Cons_fflush( stdout );
 
     // Allocate a buffer for the EEPROM data
-    pBuffer = malloc(EepSize);
+    pBuffer = malloc( EepSize );
 
     if (pBuffer == NULL)
         return FALSE;
 
-    // Read EEPROM into buffer
-    for (offset=0; offset < EepSize; offset += sizeof(U16))
+    // Read 32-bit aligned EEPROM data into buffer
+    for (offset=0; offset < (EepSize & ~0x3); offset += sizeof(U32))
+    {
+        // Periodically update status
+        if ((offset & 0x7) == 0)
+        {
+            // Display current status
+            Cons_printf(
+                "%02ld%%\b\b\b",
+                ((offset * 100) / EepSize)
+                );
+            Cons_fflush( stdout );
+        }
+
+        PlxPci_EepromReadByOffset(
+            pDevice,
+            offset,
+            (U32*)(pBuffer + offset)
+            );
+    }
+
+    // Read any remaining 16-bit aligned byte
+    if (offset < EepSize)
     {
         PlxPci_EepromReadByOffset_16(
             pDevice,
             offset,
-            &value
+            (U16*)(pBuffer + offset)
             );
-
-        // Store first 8-bit data
-        pBuffer[offset] = (U8)value;
-
-        // Store second 8-bit data
-        pBuffer[offset + sizeof(U8)] = (U8)(value >> 8);
     }
-    Cons_printf( "Ok\n" );
+    Cons_printf( "Ok \n" );
 
     Cons_printf( "Write EEPROM data to file....." );
     Cons_fflush( stdout );
@@ -1586,14 +1710,11 @@ Plx8000_EepromFileSave(
     // Close the file
     fclose( pFile );
 
-    Cons_printf(
-        "Ok (\"%s\")\n",
-        pFileName
-        );
-
     // Release the buffer
     if (pBuffer != NULL)
         free( pBuffer );
+
+    Cons_printf( "Ok (\"%s\")\n", pFileName );
 
     // Note completion time
     end = clock();

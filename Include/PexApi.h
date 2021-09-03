@@ -34,7 +34,7 @@
  *
  * Revision:
  *
- *     11-01-10 : PLX SDK v6.40
+ *     02-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -79,13 +79,13 @@ PlxPci_DeviceClose(
 PLX_STATUS EXPORT
 PlxPci_DeviceFind(
     PLX_DEVICE_KEY *pKey,
-    U8              DeviceNumber
+    U16             DeviceNumber
     );
 
 PLX_STATUS EXPORT
 PlxPci_DeviceFindEx(
     PLX_DEVICE_KEY *pKey,
-    U8              DeviceNumber,
+    U16             DeviceNumber,
     PLX_API_MODE    ApiMode,
     PLX_MODE_PROP  *pModeProp
     );
@@ -144,6 +144,13 @@ PlxPci_ChipTypeSet(
     PLX_DEVICE_OBJECT *pDevice,
     U16                ChipType,
     U8                 Revision
+    );
+
+PLX_STATUS EXPORT
+PlxPci_ChipGetPortMask(
+    U16  PlxChip,
+    U8   PlxRevision,
+    U64 *pPortMask
     );
 
 PLX_STATUS EXPORT
@@ -436,6 +443,12 @@ PlxPci_EepromProbe(
     );
 
 PLX_STATUS EXPORT
+PlxPci_EepromGetAddressWidth(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pWidth
+    );
+
+PLX_STATUS EXPORT
 PlxPci_EepromSetAddressWidth(
     PLX_DEVICE_OBJECT *pDevice,
     U8                 width
@@ -458,28 +471,28 @@ PlxPci_EepromCrcGet(
 PLX_STATUS EXPORT
 PlxPci_EepromReadByOffset(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U32               *pValue
     );
 
 PLX_STATUS EXPORT
 PlxPci_EepromWriteByOffset(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U32                value
     );
 
 PLX_STATUS EXPORT
 PlxPci_EepromReadByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U16               *pValue
     );
 
 PLX_STATUS EXPORT
 PlxPci_EepromWriteByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U16                value
     );
 

@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -44,11 +44,7 @@
 #include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-    #include <linux/tqueue.h>
-#else
-    #include <linux/workqueue.h>
-#endif
+#include <linux/workqueue.h>
 #include "Plx.h"
 #include "PlxChip.h"
 #include "PlxTypes.h"
@@ -87,19 +83,19 @@
  * conflict in the global kernel namespace if multiple PLX
  * drivers are loaded, but still allows a common codebase.
  **********************************************************/
-#if defined(PCI9050)
+#if (PLX_CHIP == 9050)
     #define pGbl_DriverObject               pGbl_DriverObject_9050
-#elif defined(PCI9030)
+#elif (PLX_CHIP == 9030)
     #define pGbl_DriverObject               pGbl_DriverObject_9030
-#elif defined(PCI9080)
+#elif (PLX_CHIP == 9080)
     #define pGbl_DriverObject               pGbl_DriverObject_9080
-#elif defined(PCI9054)
+#elif (PLX_CHIP == 9054)
     #define pGbl_DriverObject               pGbl_DriverObject_9054
-#elif defined(PCI9056)
+#elif (PLX_CHIP == 9056)
     #define pGbl_DriverObject               pGbl_DriverObject_9056
-#elif defined(PCI9656)
+#elif (PLX_CHIP == 9656)
     #define pGbl_DriverObject               pGbl_DriverObject_9656
-#elif defined(PCI8311)
+#elif (PLX_CHIP == 8311)
     #define pGbl_DriverObject               pGbl_DriverObject_8311
 #endif
 
@@ -111,8 +107,8 @@
     #define DebugPrintf(arg)                _Debug_Print_Macro      arg
     #define DebugPrintf_Cont(arg)           _Debug_Print_Cont_Macro arg
 #else
-    #define DebugPrintf(arg)
-    #define DebugPrintf_Cont(arg)
+    #define DebugPrintf(arg)                do { } while(0)
+    #define DebugPrintf_Cont(arg)           do { } while(0)
 #endif
 #define ErrorPrintf(arg)                    _Error_Print_Macro      arg
 #define ErrorPrintf_Cont(arg)               _Error_Print_Cont_Macro arg
@@ -166,24 +162,22 @@
     #define PHYS_MEM_READ_8                         readb
     #define PHYS_MEM_READ_16                        readw
     #define PHYS_MEM_READ_32                        readl
-    #define PHYS_MEM_READ_64                        readq
     #define PHYS_MEM_WRITE_8(addr, data)            writeb( (data), (addr) )
     #define PHYS_MEM_WRITE_16(addr, data)           writew( (data), (addr) )
     #define PHYS_MEM_WRITE_32(addr, data)           writel( (data), (addr) )
-    #define PHYS_MEM_WRITE_64(addr, data)           writeq( (data), (addr) )
 #endif
 
 
 
 // Macros for PLX chip register access
-#define PLX_9000_REG_READ(pdx, offset)     \
-    PHYS_MEM_READ_32(                      \
-        (U32*)(((pdx)->pRegVa) + (offset)) \
+#define PLX_9000_REG_READ(pdx, offset)   \
+    PHYS_MEM_READ_32(                    \
+        (U32*)((pdx)->pRegVa + (offset)) \
         )
 
 #define PLX_9000_REG_WRITE(pdx, offset, value) \
     PHYS_MEM_WRITE_32(                         \
-        (U32*)(((pdx)->pRegVa) + (offset)),    \
+        (U32*)((pdx)->pRegVa + (offset)),      \
         (value)                                \
         )
 
@@ -218,7 +212,7 @@ typedef struct _PLX_PHYS_MEM_OBJECT
 {
     struct list_head  ListEntry;
     VOID             *pOwner;
-    VOID             *pKernelVa;
+    U8               *pKernelVa;
     U64               CpuPhysical;              // CPU Physical Address
     U64               BusPhysical;              // Bus Physical Address
     U32               Size;                     // Buffer size
@@ -266,26 +260,19 @@ typedef struct _DEVICE_EXTENSION
     struct _DEVICE_OBJECT *pDeviceObject;                 // Pointer to parent device object
     struct pci_dev        *pPciDevice;                    // Pointer to OS-supplied PCI device information
     PLX_STATE              State;                         // Start/Stop state of the device
-    BOOLEAN                Flag_Interrupt;                // Keeps track whether device has claimed an IRQ
-    U8                     OpenCount;                     // Count of open connections to the device
-    struct semaphore       Mutex_DeviceOpen;              // Mutex for opening/closing the device
-
     PLX_DEVICE_KEY         Key;                           // Device location & identification
     char                   LinkName[PLX_MAX_NAME_LENGTH];
     PLX_PCI_BAR_INFO       PciBar[PCI_NUM_BARS_TYPE_00];
-    U8                    *pRegVa;                        // Virtual address to registers
-
     DEVICE_POWER_STATE     PowerState;                    // Power management information
 
     spinlock_t             Lock_Isr;                      // Spinlock used to sync with ISR
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-    struct tq_struct       Task_DpcForIsr;                // Task queue used by ISR to queue DPC
-#else
     struct work_struct     Task_DpcForIsr;                // Task queue used by ISR to queue DPC
-#endif
+    BOOLEAN                bDpcPending;                   // Flag whether a DPC task is scheduled
+    PLX_IRQ_TYPE           IrqType;                       // Type of interrupt used
+    U8                     IrqPci;                        // Original PCI IRQ Line assigned to device
     U32                    Source_Ints;                   // Interrupts detected by ISR
     U32                    Source_Doorbell;               // Doorbell interrupts detected by ISR
-    BOOLEAN                bDpcPending;                   // Flag whether a DPC task is scheduled
+    U8                    *pRegVa;                        // Virtual address to registers
 
     struct list_head       List_WaitObjects;              // List of registered notification objects
     spinlock_t             Lock_WaitObjectsList;          // Spinlock for notification objects list
@@ -294,8 +281,8 @@ typedef struct _DEVICE_EXTENSION
     spinlock_t             Lock_PhysicalMemList;          // Spinlock for physical memory list
 
 #if defined(PLX_DMA_SUPPORT)
-    PLX_DMA_INFO           DmaInfo[NUM_DMA_CHANNELS];     // DMA channel information
-    spinlock_t             Lock_Dma[NUM_DMA_CHANNELS];    // Spinlock for DMA channel access
+    PLX_DMA_INFO           DmaInfo[NUM_DMA_CHANNELS];     // DMA properties and lock
+    spinlock_t             Lock_Dma[NUM_DMA_CHANNELS];
 #endif
 
 } DEVICE_EXTENSION; 
@@ -308,8 +295,8 @@ typedef struct _DRIVER_OBJECT
     U8                      DeviceCount;      // Number of devices in list
     spinlock_t              Lock_DeviceList;  // Spinlock for device list
     int                     MajorID;          // The OS-assigned driver Major ID
+    BOOLEAN                 bPciDriverReg;    // Flag whether the driver was registered as PCI
     PLX_PHYS_MEM_OBJECT     CommonBuffer;     // Contiguous memory to be shared by all processes
-    char                   *SupportedIDs;     // Dev/Ven IDs of devices supported
     struct file_operations  DispatchTable;    // Driver dispatch table
 } DRIVER_OBJECT;
 

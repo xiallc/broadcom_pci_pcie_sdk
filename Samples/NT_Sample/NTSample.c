@@ -11,7 +11,7 @@
  *
  * Revision History:
  *
- *      11-01-10 : PLX SDK v6.40
+ *      10-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -39,6 +39,13 @@
 #define NT_MSG_SYSTEM_READY                 0xFEEDFACE      // Code passed between systems to signal ready
 #define NT_REQID_NO_SNOOP                   FALSE           // Determine enable of No_Snoop bit
 
+#define NT_CONNECT_UNKNOWN                  0               // NT standard connection (NT-Virtual <--> NT-Link)
+#define NT_CONNECT_STANDARD                 1               // NT standard connection (NT-Virtual <--> NT-Link)
+#define NT_CONNECT_BACK_TO_BACK             2               // NT backj-to-back connection (NTV | NTL <--> NTL | NTV)
+
+#define NT_B2B_BAR_BASE                     0x10000000      // Back-to-back NT Link side BARs base address
+
+
 ////////////// Direct Address Translation ////////////
 #define PLX_8000_BAR_2_TRAN_LOWER           0xC3C           // BAR 2 lower 32-address translation reg.
 #define PLX_8000_BAR_2_TRAN_UPPER           0xC40           // BAR 2 upper 32-address translation reg.
@@ -56,6 +63,15 @@
  *              Definitions
  *********************************************/
 #define PlxBarMem_32(Va, offset)               *(VU32*)((U8*)Va + offset)
+
+
+typedef struct _PLX_NT_HOST
+{
+    U8  NtConnectType;
+    U8  bInitialized;
+    U16 PlxChip;
+
+} PLX_NT_HOST;
 
 
 // PLX Direct Address Translation Strture
@@ -79,6 +95,24 @@ SelectDevice_NT(
 S8
 WaitForConnection(
     PLX_DEVICE_OBJECT *pDevice
+    );
+
+PLX_STATUS
+PlxNT_DetermineConnectType(
+    PLX_DEVICE_OBJECT *pDevice,
+    PLX_NT_HOST       *pRemHost
+    );
+
+PLX_STATUS
+PlxNT_B2B_Initialize(
+    PLX_DEVICE_OBJECT *pDevice,
+    PLX_NT_HOST       *pRemHost
+    );
+
+PLX_STATUS
+PlxNT_B2B_Cleanup(
+    PLX_DEVICE_OBJECT *pDevice,
+    PLX_NT_HOST       *pRemHost
     );
 
 PLX_STATUS
@@ -106,7 +140,7 @@ main(
     char                CharRead;
     S8                  DeviceSelected;
     U8                  BarNum;
-    U16                 ReqId;
+    U16                 ReqId_Write;
     U16                 LutIndex;
     U32                 size;
     U32                 value;
@@ -116,6 +150,7 @@ main(
     VU32               *pSysMem;
     VOID               *BarVa;
     PLX_STATUS          status;
+    PLX_NT_HOST         RemoteHost;
     PLX_DEVICE_KEY      DeviceKey;
     PLX_PHYSICAL_MEM    PhysBuffer;
     PLX_PCI_BAR_PROP    BarProp;
@@ -138,13 +173,9 @@ main(
 
 
     /************************************
-     *         Select Device
+     * Select Device
      ***********************************/
-    DeviceSelected =
-        SelectDevice_NT(
-            &DeviceKey
-            );
-
+    DeviceSelected =  SelectDevice_NT( &DeviceKey );
     if (DeviceSelected == -1)
     {
         ConsoleEnd();
@@ -163,7 +194,6 @@ main(
             "\n"
             "    ERROR: Unable to find or select a PLX device\n"
             );
-
         goto _ExitApp;
     }
 
@@ -175,19 +205,51 @@ main(
         );
 
     Cons_printf(
-        "\nSelected: %.4x %.4x [b:%02x s:%02x f:%02x]\n\n",
+        "\nSelected: %.4x %.4x [b:%02x s:%02x f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
 
 
     /************************************
-     *     Display the NT side
+     * Display the NT side
      ***********************************/
     Cons_printf(
-        "Communicating from: %s side\n\n",
+        "Communicating from          : %s side\n",
         (DeviceKey.NTPortType == PLX_NT_PORT_LINK) ? "LINK" : "VIRTUAL"
         );
+
+
+    /************************************
+     * Identify connection type
+     ***********************************/
+    Cons_printf("Determine NT connect type   : ");
+    status = PlxNT_DetermineConnectType( &Device, &RemoteHost );
+    if ((status != ApiSuccess) || (RemoteHost.NtConnectType == NT_CONNECT_UNKNOWN))
+    {
+        Cons_printf("ERROR: Unable to determine NT connect type\n");
+        goto _ExitApp;
+    }
+    Cons_printf(
+        "%s\n",
+        (RemoteHost.NtConnectType == NT_CONNECT_STANDARD) ?
+            "Standard (NTV <---> NTL)" :
+            "Back-to-Back (NTV-NTL <---> NTL-NTV)"
+        );
+
+
+
+    /************************************
+     * Initialize back-to-back
+     ***********************************/
+    if (RemoteHost.NtConnectType == NT_CONNECT_BACK_TO_BACK)
+    {
+        Cons_printf("Setup NT Back-to-Back       : ");
+        status = PlxNT_B2B_Initialize( &Device, &RemoteHost );
+        if (status != ApiSuccess)
+            goto _ExitApp;
+        Cons_printf("Ok\n");
+    }
 
 
     /*************************************************************
@@ -233,47 +295,50 @@ main(
      ************************************************************/
     Cons_printf("Probe for write ReqID      : ");
 
-    if (PlxPci_Nt_ReqIdProbe(
+    status =
+        PlxPci_Nt_ReqIdProbe(
             &Device,
             FALSE,          // Probe for writes
-            &ReqId
-            ) != ApiSuccess)
+            &ReqId_Write
+            );
+
+    if (status != ApiSuccess)
     {
-        Cons_printf("ERROR: Unable to probe ReqID\n");
+        Cons_printf("ERROR: Unable to probe ReqID, auto-add 0,0,0\n");
+        ReqId_Write = 0;
     }
     else
     {
         Cons_printf(
             "Ok (ReqID=%04X [b:%02X s:%02X f:%01X])\n",
-            ReqId,
-            (ReqId >> 8) & 0xFF,
-            (ReqId >> 3) & 0x1F,
-            (ReqId >> 0) & 0x03
+            ReqId_Write,
+            (ReqId_Write >> 8) & 0xFF,
+            (ReqId_Write >> 3) & 0x1F,
+            (ReqId_Write >> 0) & 0x03
             );
+    }
 
-        Cons_printf("Add Req ID entry in LUT    : ");
+    Cons_printf("Add write Req ID to LUT    : ");
 
-        // Default to auto-selected LUT index
-        LutIndex = (U16)-1;
+    // Default to auto-selected LUT index
+    LutIndex = (U16)-1;
 
-        // Add ReqID to LUT
-        if (PlxPci_Nt_LutAdd(
-                &Device,
-                &LutIndex,
-                ReqId,
-                (NT_REQID_NO_SNOOP) ? PLX_NT_LUT_FLAG_NO_SNOOP : PLX_NT_LUT_FLAG_NONE
-                ) != ApiSuccess)
-        {
-            Cons_printf("ERROR: Unable to add LUT entry\n");
-        }
-        else
-        {
-            Cons_printf(
-                "Ok (LUT_Index=%d No_Snoop=%s)\n",
-                LutIndex,
-                (NT_REQID_NO_SNOOP) ? "ON" : "OFF"
-                );
-        }
+    if (PlxPci_Nt_LutAdd(
+            &Device,
+            &LutIndex,
+            ReqId_Write,
+            FALSE       // Snoop must be disabled
+            ) != ApiSuccess)
+    {
+        Cons_printf("ERROR: Unable to add LUT entry\n");
+    }
+    else
+    {
+        Cons_printf(
+            "Ok (LUT_Index=%d No_Snoop=%s)\n",
+            LutIndex,
+            (NT_REQID_NO_SNOOP) ? "ON" : "OFF"
+            );
     }
 
 
@@ -393,7 +458,7 @@ main(
             NULL
             );
 
-    Cons_printf("Ok (Addr:%08X  Size:%dKB)\n", PhysAddr, (RemoteBuffSize >> 10));
+    Cons_printf("Ok (Addr:%08X Size:%dB)\n", PhysAddr, RemoteBuffSize);
 
 
 
@@ -512,6 +577,20 @@ main(
 
 
 _ExitApp:
+
+    // Cleanup back-to-back
+    if ((RemoteHost.NtConnectType == NT_CONNECT_BACK_TO_BACK) &&
+        (RemoteHost.bInitialized == TRUE))
+    {
+        Cons_printf("Cleanup NT Back-to-Back     : ");
+        status = PlxNT_B2B_Cleanup( &Device, &RemoteHost );
+        if (status != ApiSuccess)
+        {
+            Cons_printf("ERROR: Unable to cleanup Back-to-Back\n");
+            goto _ExitApp;
+        }
+        Cons_printf("Ok\n");
+    }
 
     if (PhysBuffer.PhysicalAddr != 0)
     {
@@ -736,10 +815,7 @@ WaitForConnection(
     // Wait for other side to respond
     do
     {
-        Cons_printf(
-            "%c\b",
-            DispStat[(LoopCount % 4)]
-            );
+        Cons_printf("%c\b", DispStat[(LoopCount % 4)]);
         Cons_fflush( stdout );
 
         LoopCount--;
@@ -799,6 +875,140 @@ WaitForConnection(
     Cons_printf("\n    -- Connection established! --\n\n");
 
     return 0;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  PlxNT_DetermineConnectType
+ *
+ * Description:  Attempts to detect the type of NT connection
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxNT_DetermineConnectType(
+    PLX_DEVICE_OBJECT *pDevice,
+    PLX_NT_HOST       *pRemHost
+    )
+{
+    U32 RegValue;
+
+
+    // Default to standard NT connection
+    pRemHost->NtConnectType = NT_CONNECT_STANDARD;
+
+    // NT-Virtual could be either type of connection
+    if (pDevice->Key.NTPortType == PLX_NT_PORT_VIRTUAL)
+    {
+        // Probe some NT-Link registers to try & determine type
+
+        // Check if BAR 0 assigned system address
+        RegValue  = PlxPci_PlxRegisterRead( pDevice, 0x1000 + 0x10, NULL );
+        RegValue &= ~0xF;
+
+        if ((RegValue != 0) && ((RegValue & 0xF0000000) != NT_B2B_BAR_BASE))
+            goto _Exit_PlxNT_DetermineConnectType;
+
+        // Check if BAR 2 assigned system address
+        RegValue  = PlxPci_PlxRegisterRead( pDevice, 0x1000 + 0x18, NULL );
+        RegValue &= ~0xF;
+        if ((RegValue != 0) && ((RegValue & 0xF0000000) != NT_B2B_BAR_BASE))
+            goto _Exit_PlxNT_DetermineConnectType;
+
+        // Check if assigned system interrupt
+        RegValue  = PlxPci_PlxRegisterRead( pDevice, 0x1000 + 0x3C, NULL );
+        RegValue &= 0xFF;
+        if ((RegValue != 0) && (RegValue != 0xFF))
+            goto _Exit_PlxNT_DetermineConnectType;
+
+        // Passed all tests so likely Back-to-Back
+        pRemHost->NtConnectType = NT_CONNECT_BACK_TO_BACK;
+    }
+
+_Exit_PlxNT_DetermineConnectType:
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  PlxNT_B2B_Initialize
+ *
+ * Description:  Initializes 'hidden' resources for NT Back-to-Back connection
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxNT_B2B_Initialize(
+    PLX_DEVICE_OBJECT *pDevice,
+    PLX_NT_HOST       *pRemHost
+    )
+{
+    U32 BarMask;
+
+
+    if (pRemHost->NtConnectType != NT_CONNECT_BACK_TO_BACK)
+        return ApiInvalidState;
+
+    // Verify BAR 2 is enabled
+    BarMask  = PlxPci_PlxRegisterRead( pDevice, 0x1000 + 0xE8, NULL );
+    BarMask &= ~0xF;
+    if (BarMask == 0)
+    {
+        Cons_printf("ERROR - NT-Link BAR 2 not enabled\n");
+        return ApiInsufficientResources;
+    }
+
+    // Set NT-Link side BAR 0
+    PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0x10, NT_B2B_BAR_BASE );
+
+    // Set NT-Link side BAR 2
+    PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0x18, NT_B2B_BAR_BASE + 0x10000000 );
+
+    // Enable entry 0 for 0:0.0 in the NTL LUT
+    PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0xDB4, Plx_PciToReqId(0,0,0) | (1 << 0) );
+
+    // Enable device
+    PlxPci_PlxRegisterWrite( pDevice, 0x1000 + 0x04, (0x7 << 0) );
+
+    // Mark connection initialized
+    pRemHost->bInitialized = TRUE;
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  PlxNT_B2B_Cleanup
+ *
+ * Description:  Cleans up NT Back-to-Back connection
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxNT_B2B_Cleanup(
+    PLX_DEVICE_OBJECT *pDevice,
+    PLX_NT_HOST       *pRemHost
+    )
+{
+    if (pRemHost->NtConnectType != NT_CONNECT_BACK_TO_BACK)
+        return ApiInvalidState;
+
+    // Do nothing if not initialized
+    if (pRemHost->bInitialized == FALSE)
+        return ApiSuccess;
+
+    //
+
+    pRemHost->bInitialized = FALSE;
+
+    return ApiSuccess;
 }
 
 

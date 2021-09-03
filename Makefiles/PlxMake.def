@@ -2,28 +2,31 @@
 #
 #      File         :  PlxMake.def
 #      Abstract     :  Include makefile components to build any target
-#      Last Revision:  02-01-07
 #
 #-----------------------------------------------------------------------------
+
+
+#=============================================================================
+# Set PLX folder
+#=============================================================================
+ifndef PLX_DIR
+    PLX_DIR=$(PLX_SDK_DIR)
+endif
 
 
 
 #=============================================================================
 # Include standard common definitions
 #=============================================================================
-include $(PLX_SDK_DIR)/Linux/Makefiles/Common.def
+include $(PLX_DIR)/Makefiles/Common.def
 
 
 
 #=============================================================================
-# Include definitions for the tools (For driver, only needed for kernel 2.4)
+# Include definitions for the tools
 #=============================================================================
-ifeq ($(TGT_TYPE), Driver)
-    ifeq ($(KERNEL_VER), 2.4)
-        include $(PLX_SDK_DIR)/Linux/Makefiles/Gcc.def
-    endif
-else
-    include $(PLX_SDK_DIR)/Linux/Makefiles/Gcc.def
+ifneq ($(TGT_TYPE), Driver)
+    include $(PLX_DIR)/Makefiles/Gcc.def
 endif
 
 
@@ -32,5 +35,5 @@ endif
 # Include definitions for building targets
 #=============================================================================
 ifeq ($(KERNELRELEASE),)
-    include $(PLX_SDK_DIR)/Linux/Makefiles/Targets.def
+    include $(PLX_DIR)/Makefiles/Targets.def
 endif

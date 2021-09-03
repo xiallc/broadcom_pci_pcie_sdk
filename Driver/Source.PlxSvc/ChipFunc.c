@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      10-01-10 : PLX SDK v6.40
+ *      09-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -265,6 +265,15 @@ PlxRegisterRead_8000(
             OffsetAdjustment = pNode->Offset_NtRegBase;
         }
 
+        // For MIRA enhanced mode, USB EP regs start at 0 instead of port 3
+        if ((pNode->Key.PlxFamily == PLX_FAMILY_MIRA) &&
+            (pNode->PciHeaderType == 0) &&
+            (pNode->PortNumber == 3))
+        {
+            DebugPrintf(("Override offset adjust for MIRA USB EP (3000 ==> 0)\n"));
+            OffsetAdjustment = 0;
+        }
+
         DebugPrintf((
             "Adjusting offset by %02X for port %d\n",
             (int)OffsetAdjustment, pNode->PortNumber
@@ -394,6 +403,15 @@ PlxRegisterWrite_8000(
         {
             // Add base for NT port
             OffsetAdjustment = pNode->Offset_NtRegBase;
+        }
+
+        // For MIRA enhanced mode, USB EP regs start at 0 instead of port 3
+        if ((pNode->Key.PlxFamily == PLX_FAMILY_MIRA) &&
+            (pNode->PciHeaderType == 0) &&
+            (pNode->PortNumber == 3))
+        {
+            DebugPrintf(("Override offset adjust for MIRA USB EP (3000 ==> 0)\n"));
+            OffsetAdjustment = 0;
         }
 
         DebugPrintf((

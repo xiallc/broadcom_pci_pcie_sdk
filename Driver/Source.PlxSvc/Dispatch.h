@@ -34,12 +34,25 @@
  *
  * Revision History:
  *
- *      06-01-06 : PEX SDK v2.00
+ *      04-01-11 : PLX SDK v6.42
  *
  ******************************************************************************/
 
 
 #include <linux/fs.h>
+
+
+
+
+/**********************************************
+ *               Definitions
+ *********************************************/
+// ioctl() replaced with unlocked_ioctl() in 2.6.36 & return type changed
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
+    typedef int             PLX_RET_IOCTL;
+#else
+    typedef long            PLX_RET_IOCTL;
+#endif
 
 
 
@@ -65,9 +78,11 @@ Dispatch_mmap(
     struct vm_area_struct *vma
     );
 
-int 
+PLX_RET_IOCTL
 Dispatch_IoControl(
+  #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
     struct inode  *inode,
+  #endif
     struct file   *filp,
     unsigned int   cmd,
     unsigned long  args

@@ -31,7 +31,7 @@
  *
  * Revision:
  *
- *     11-01-10: PLX SDK v6.40
+ *     08-01-13: PLX SDK v7.10
  *
  *****************************************************************************/
 
@@ -121,8 +121,8 @@
 // List of PLX drivers to search for
 static char *PlxDrivers[] = 
 {
-    "Plx8000",
-    "Plx6000",
+    "Plx8000_NT",
+    "Plx8000_DMA",
     "Plx9050",
     "Plx9030",
     "Plx9080",
@@ -130,7 +130,8 @@ static char *PlxDrivers[] =
     "Plx9056",
     "Plx9656",
     "Plx8311",
-    "PlxDma",
+    "Plx6000_NT",
+    "Plx8000_ND",
     PLX_SVC_DRIVER_NAME,    // PLX PCI service must be last driver
     "0"                     // Must be last item to mark end of list
 };
@@ -145,7 +146,7 @@ static BOOLEAN
 Driver_Connect(
     PLX_DRIVER_HANDLE *pHandle,
     U8                 ApiIndex,
-    U8                 DeviceNumber
+    U16                DeviceNumber
     );
 
 static S32
@@ -378,11 +379,11 @@ PlxPci_DeviceClose(
 PLX_STATUS
 PlxPci_DeviceFind(
     PLX_DEVICE_KEY *pKey,
-    U8              DeviceNumber
+    U16             DeviceNumber
     )
 {
     U8                i;
-    U8                TotalMatches;
+    U16               TotalMatches;
     BOOLEAN           bConnect;
     BOOLEAN           bDriverOpened;
     PLX_PARAMS        IoBuffer;
@@ -447,9 +448,6 @@ PlxPci_DeviceFind(
                 // Store driver name index
                 pKey->ApiIndex = (U8)i;
 
-                // Store API mode
-                pKey->ApiMode = PLX_API_MODE_PCI;
-
                 // Validate key
                 ObjectValidate( pKey );
 
@@ -457,7 +455,7 @@ PlxPci_DeviceFind(
             }
 
             // Add number of matches to total
-            TotalMatches += (U8)IoBuffer.value[0];
+            TotalMatches += (U16)IoBuffer.value[0];
         }
 
         // Increment to next driver
@@ -485,7 +483,7 @@ PlxPci_DeviceFind(
 PLX_STATUS
 PlxPci_DeviceFindEx(
     PLX_DEVICE_KEY *pKey,
-    U8              DeviceNumber,
+    U16             DeviceNumber,
     PLX_API_MODE    ApiMode,
     PLX_MODE_PROP  *pModeProp
     )
@@ -863,10 +861,430 @@ PlxPci_ChipTypeSet(
     // If successful, update device properties
     if (IoBuffer.ReturnCode == ApiSuccess)
     {
-        pDevice->Key.PlxChip = ChipType;
+        pDevice->Key.PlxChip     = ChipType;
+        pDevice->Key.PlxRevision = (U8)IoBuffer.value[1];
+        pDevice->Key.PlxFamily   = (U8)IoBuffer.value[2];
     }
 
     return IoBuffer.ReturnCode;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  PlxPci_ChipGetPortMask
+ *
+ * Description:  Returns the PLX chip port mask
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_ChipGetPortMask(
+    U16  PlxChip,
+    U8   PlxRevision,
+    U64 *pPortMask
+    )
+{
+    if (pPortMask == NULL)
+        return ApiNullParam;
+
+    switch (PlxChip)
+    {
+        case 0x2380:
+        case 0x3380:
+        case 0x3382:
+            *pPortMask  = 0x00000007;  // 0-2,PCEI2USB,USB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_PCIE_TO_USB) |
+                          ((U64)1 << PLX_FLAG_PORT_USB);
+            break;
+
+        case 0x8505:
+            *pPortMask  = 0x0000001F;  // 0-4
+            break;
+
+        case 0x8509:
+            *pPortMask  = 0x000000FF;  // 0-7
+            break;
+
+        case 0x8508:
+        case 0x8512:
+        case 0x8517:
+        case 0x8518:
+            *pPortMask  = 0x0000001F;  // 0-4,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8516:
+            *pPortMask  = 0x0000000F;  // 0-3,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8524:
+            *pPortMask  = 0x00000F03;  // 0,1,8-11,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8525:
+            *pPortMask  = 0x00000706;  // 1,2,8-10
+            break;
+
+        case 0x8532:
+            *pPortMask  = 0x00000F0F;  // 0-3,8-11,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8533:
+            *pPortMask  = 0x00000707;  // 0-2,8-10
+            break;
+
+        case 0x8547:
+            *pPortMask  = 0x00001101;  // 0,8,12
+            break;
+
+        case 0x8548:
+            *pPortMask  = 0x00007707;  // 0-2,8-10,12-14
+            break;
+
+        case 0x8603:
+            *pPortMask  = 0x00000007;  // 0-2
+            break;
+
+        case 0x8605:
+            *pPortMask  = 0x0000000F;  // 0-3
+            break;
+
+        case 0x8604:
+            *pPortMask  = 0x00000033;  // 0,1,4,5,NT,NTB(BA)
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            if (PlxRevision != 0xAA)
+                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8606:
+            *pPortMask  = 0x000002B3;  // 0,1,4,5,7,9,NT,NTB(BA)
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            if (PlxRevision != 0xAA)
+                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8608:
+            *pPortMask  = 0x000003F3;  // 0,1,4-9,NT,NTB(BA)
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            if (PlxRevision != 0xAA)
+                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8609:
+            *pPortMask  = 0x000003F3;  // 0,1,4-9,DMA,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0);
+            break;
+
+        case 0x8612:
+            *pPortMask  = 0x00000033;  // 0,1,4,5,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8613:
+            *pPortMask  = 0x00000007;  // 0-2,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8614:
+            *pPortMask  = 0x000057F7;  // 0-2,4-10,12,14,NT,NTB(BA)
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            if (PlxRevision != 0xAA)
+                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8615:
+            *pPortMask  = 0x000057F7;  // 0-2,4-10,12,14,DMA,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0);
+            break;
+
+        case 0x8616:
+            *pPortMask  = 0x00000073;  // 0,1,4-6,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8617:
+            *pPortMask  = 0x0000000F;  // 0-3,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8618:
+            *pPortMask  = 0x0000FFFF;  // 0-15,NT,NTB(BA)
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            if (PlxRevision != 0xAA)
+                *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8619:
+            *pPortMask  = 0x0000FFFF;  // 0-15,DMA,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0);
+            break;
+
+        case 0x8624:
+            *pPortMask  = 0x00000373;  // 0,1,4-6,8,9,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8632:
+            *pPortMask  = 0x00000FFF;  // 0-11
+            break;
+
+        case 0x8647:
+            *pPortMask  = 0x00000111;  // 0,4,8
+            break;
+
+        case 0x8648:
+            *pPortMask  = 0x00000FFF;  // 0-11,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0);
+            break;
+
+        case 0x8649:
+            *pPortMask  = 0x00FF000F;  // 0-3,16-23,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8664:
+            *pPortMask  = 0x00FF00FF;  // 0-7,16-23,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_DS_P2P);
+            break;
+
+        case 0x8680:
+            *pPortMask  = 0x00FF0FFF;  // 0-11,16-23,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8625:
+        case 0x8636:
+        case 0x8696:
+            *pPortMask  = 0x00FFFFFF;  // 0-23,NT,NTB
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8700:
+            *pPortMask  = 0x0000000F;  // 0-3
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8712:
+            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8713:
+            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT 0/1,DMA 0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8716:
+            *pPortMask  = 0x0000000F;  // 0-3,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8717:
+            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT 0/1,DMA 0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8714:
+        case 0x8718:
+            *pPortMask  = 0x0000001F;  // 0-4,NT 0,ALUT 0-3
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8723:
+        case 0x8724:
+            *pPortMask  = 0x0000070F;  // 0-3,8-10,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8725:
+            *pPortMask  = 0x00003F3F;  // 0-5,8-13,NT 0/1,DMA 0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8732:
+            *pPortMask  = 0x00000F0F;  // 0-3,8-11,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8733:
+            *pPortMask  = 0x003F3F3F;  // 0-5,8-13,16-21,NT 0/1,DMA 0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8734:
+            *pPortMask  = 0x000000FF;  // 0-7,NT 0/1,ALUT 0-3,VS_S0-1
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8747:
+            *pPortMask  = 0x00030303;  // 0,1,8,9,16,17
+            break;
+
+        case 0x8748:
+            *pPortMask  = 0x000F0F0F;  // 0-3,8-11,16-19,NT
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0);
+            break;
+
+        case 0x8749:
+            *pPortMask  = 0x003F3F3F;  // 0-5,8-13,16-21,NT 0/1,DMA 0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_0) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_1) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_2) |
+                          ((U64)1 << PLX_FLAG_PORT_DMA_3) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8750:
+            *pPortMask  = 0x00000FFF;  // 0-11,NT 0/1,ALUT 0-3,VS_S0-2
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8764:
+            *pPortMask  = 0x0000FFFF;  // 0-15,NT 0/1,ALUT 0-3,VS_S0-3
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8780:
+            *pPortMask  = 0x000FFFFF;  // 0-19,NT 0/1,ALUT 0-3,VS_S0-4
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8796:
+            *pPortMask  = 0x00FFFFFF;  // 0-23,NT 0/1,ALUT 0-3,VS_S0-5
+            *pPortMask |= ((U64)1 << PLX_FLAG_PORT_NT_LINK_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_LINK_1) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_0) |
+                          ((U64)1 << PLX_FLAG_PORT_NT_VIRTUAL_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_0) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_1) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_2) |
+                          ((U64)1 << PLX_FLAG_PORT_ALUT_3);
+            break;
+
+        case 0x8715:
+        case 0x8719:
+        case 0x8735:
+        case 0x8751:
+        case 0x8765:
+        case 0x8781:
+        case 0x8797:
+            *pPortMask  = 0x0000000F;
+            break;
+
+        default:
+            // For unsupported chips, set default
+            *pPortMask = 0x00000001;  // 0
+            return ApiUnsupportedFunction;
+    }
+
+    return ApiSuccess;
 }
 
 
@@ -1035,7 +1453,11 @@ PlxPci_PciRegisterReadFast(
 
     // Verify device object
     if (!IsObjectValid(pDevice))
-        return ApiInvalidDeviceInfo;
+    {
+        if (pStatus != NULL)
+            *pStatus = ApiInvalidDeviceInfo;
+        return (U32)-1;
+    }
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1120,6 +1542,7 @@ PlxPci_PciRegisterRead_BypassOS(
 
     // Setup to select any device
     memset( &IoBuffer.Key, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY) );
+    RtlZeroMemory( &Device, sizeof(PLX_DEVICE_OBJECT) );
 
     rc =
         PlxPci_DeviceOpen(
@@ -1185,6 +1608,7 @@ PlxPci_PciRegisterWrite_BypassOS(
 
     // Setup to select any device
     memset( &IoBuffer.Key, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY) );
+    RtlZeroMemory( &Device, sizeof(PLX_DEVICE_OBJECT) );
 
     rc =
         PlxPci_DeviceOpen(
@@ -1193,9 +1617,7 @@ PlxPci_PciRegisterWrite_BypassOS(
             );
 
     if (rc != ApiSuccess)
-    {
         return rc;
-    }
 
     RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
 
@@ -1602,7 +2024,7 @@ PlxPci_PciBarMap(
         return rc;
 
     // Verify BAR exists and is memory type
-    if ((BarProp.Physical == 0) || (BarProp.Size == 0) || (BarProp.bIoSpace))
+    if ((BarProp.Physical == 0) || (BarProp.Size == 0) || (BarProp.Flags & PLX_BAR_FLAG_IO))
     {
         return ApiInvalidPciSpace;
     }
@@ -1923,6 +2345,47 @@ PlxPci_EepromCrcUpdate(
 
 /******************************************************************************
  *
+ * Function   :  PlxPci_EepromGetAddressWidth
+ *
+ * Description:  Gets the current EEPROM address width
+ *
+ *****************************************************************************/
+PLX_STATUS
+PlxPci_EepromGetAddressWidth(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pWidth
+    )
+{
+    PLX_PARAMS IoBuffer;
+
+
+    // Verify device object
+    if (!IsObjectValid(pDevice))
+        return ApiInvalidDeviceInfo;
+
+    if (pWidth == NULL)
+        return ApiNullParam;
+
+    RtlZeroMemory( &IoBuffer, sizeof(PLX_PARAMS) );
+
+    IoBuffer.Key = pDevice->Key;
+
+    PlxIoMessage(
+        pDevice,
+        PLX_IOCTL_EEPROM_GET_ADDRESS_WIDTH,
+        &IoBuffer
+        );
+
+    *pWidth = (U8)IoBuffer.value[0];
+
+    return IoBuffer.ReturnCode;
+}
+
+
+
+
+/******************************************************************************
+ *
  * Function   :  PlxPci_EepromSetAddressWidth
  *
  * Description:  Sets the EEPROM address width
@@ -1968,7 +2431,7 @@ PlxPci_EepromSetAddressWidth(
 PLX_STATUS
 PlxPci_EepromReadByOffset(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U32               *pValue
     )
 {
@@ -1994,13 +2457,9 @@ PlxPci_EepromReadByOffset(
         );
 
     if (IoBuffer.ReturnCode == ApiSuccess)
-    {
         *pValue = (U32)IoBuffer.value[1];
-    }
     else
-    {
-        *pValue = (U32)-1;
-    }
+        *pValue = 0;
 
     return IoBuffer.ReturnCode;
 }
@@ -2018,7 +2477,7 @@ PlxPci_EepromReadByOffset(
 PLX_STATUS
 PlxPci_EepromWriteByOffset(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U32                value
     )
 {
@@ -2057,7 +2516,7 @@ PlxPci_EepromWriteByOffset(
 PLX_STATUS
 PlxPci_EepromReadByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U16               *pValue
     )
 {
@@ -2083,13 +2542,9 @@ PlxPci_EepromReadByOffset_16(
         );
 
     if (IoBuffer.ReturnCode == ApiSuccess)
-    {
         *pValue = (U16)IoBuffer.value[1];
-    }
     else
-    {
-        *pValue = (U16)-1;
-    }
+        *pValue = 0;
 
     return IoBuffer.ReturnCode;
 }
@@ -2107,7 +2562,7 @@ PlxPci_EepromReadByOffset_16(
 PLX_STATUS
 PlxPci_EepromWriteByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U16                value
     )
 {
@@ -3375,6 +3830,9 @@ PlxPci_DmaTransferBlock(
     if (!IsObjectValid(pDevice))
         return ApiInvalidDeviceInfo;
 
+    // Added to avoid compiler warning
+    bIgnoreInt = FALSE;
+
     // Setup to wait for interrupt if requested
     if (Timeout_ms != 0)
     {
@@ -4385,7 +4843,7 @@ BOOLEAN
 Driver_Connect(
     PLX_DRIVER_HANDLE *pHandle,
     U8                 ApiIndex,
-    U8                 DeviceNumber
+    U16                DeviceNumber
     )
 {
     char Extension[10];
@@ -4459,8 +4917,7 @@ Driver_Connect(
     *pHandle =
         open(
             DriverName,
-            O_RDWR,
-            0666
+            O_RDWR
             );
 
     if (*pHandle < 0)
@@ -4513,7 +4970,7 @@ PlxIoMessage(
     )
 {
     S32 status;
-#if defined(PLX_MSWINDOWS)
+#if defined(PLX_MSWINDOWS) && !defined(PLX_DEMO_API)
     U32 BytesReturned;
 #endif
 
@@ -4522,6 +4979,15 @@ PlxIoMessage(
     if (pDevice->Key.ApiMode == PLX_API_MODE_PCI)
     {
 #if defined(PLX_MSWINDOWS)
+    #if defined(PLX_DEMO_API)
+        status =
+            PlxDemo_Dispatch_IoControl(
+                pDevice,                // Device
+                IoControlCode,          // Control code
+                pBuffer,                // Pointer to buffer
+                sizeof(PLX_PARAMS)      // Size of buffer
+                );
+    #else
         status =
             DeviceIoControl(
                 pDevice->hDevice,       // Driver handle
@@ -4533,6 +4999,7 @@ PlxIoMessage(
                 &BytesReturned,         // Required when lpOverlapped is NULL
                 NULL                    // Pointer to OVERLAPPED struct for asynchronous I/O
                 );
+    #endif
 
 #elif defined(PLX_LINUX)
         status =

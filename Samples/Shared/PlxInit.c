@@ -82,7 +82,7 @@ API_ERRORS ApiErrors[] =
  *              -1,  if user cancelled the selection
  *
  ********************************************************************/
-S8
+S16
 SelectDevice(
     PLX_DEVICE_KEY *pKey
     )
@@ -107,7 +107,7 @@ SelectDevice(
         rc =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (rc == ApiSuccess)
@@ -136,7 +136,7 @@ SelectDevice(
                 NumDevices++;
 
                 Cons_printf(
-                    "\t\t    %2d. %04x %04x  [b:%02x s:%02x f:%02x]\n",
+                    "\t\t    %2d. %04x %04x  [b:%02x s:%02x f:%x]\n",
                     NumDevices, DevKey.DeviceId, DevKey.VendorId,
                     DevKey.bus, DevKey.slot, DevKey.function
                     );
@@ -170,7 +170,7 @@ SelectDevice(
     // Return key information
     *pKey = DevList[i - 1];
 
-    return (S8)NumDevices;
+    return NumDevices;
 }
 
 

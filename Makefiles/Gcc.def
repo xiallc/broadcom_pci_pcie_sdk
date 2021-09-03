@@ -2,8 +2,6 @@
 #
 #      File         :  Gcc.def
 #      Abstract     :  The definitions for building with the GCC tools
-#      Last Revision:  06-01-05
-#      SDK Version  :  4.40
 #
 #-----------------------------------------------------------------------------
 
@@ -56,21 +54,21 @@ EXTRA_CFLAGS += -c -Wall -pipe
 .SUFFIXES: .c
 
 %.o : %.c
-	@echo Compiling: $<
+	@echo Compile: $<
 	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
 	@echo
 
 $(OBJ_DIR)/%.o : %.c
-	@echo Compiling: $<
+	@echo Compile: $<
 	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
 	@echo
 
 $(OBJ_DIR)/%.o : $(COMMON_DIR)/%.c
-	@echo Compiling: $*.c
+	@echo Compile: $*.c
 	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
 	@echo
 
 $(OBJ_DIR)/%.o : $(PLX_CHIP_DIR)/%.c
-	@echo Compiling: Pci$(PLX_CHIP)/$*.c
+	@echo Compile: Pci$(PLX_CHIP)/$*.c
 	$(Q)$(CC) $< -o $@ $(EXTRA_CFLAGS)
 	@echo

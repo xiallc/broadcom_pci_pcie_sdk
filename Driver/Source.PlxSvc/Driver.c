@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      07-01-12 : PLX SDK v7.00
  *
  *****************************************************************************/
 
@@ -40,9 +40,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-    #include <linux/vermagic.h>
-#endif
+#include <linux/vermagic.h>
 #include "Dispatch.h"
 #include "Driver.h"
 #include "PciFunc.h"
@@ -119,10 +117,15 @@ Plx_init_module(
 
     // Fill in the appropriate dispatch handlers
     pGbl_DriverObject->DispatchTable.owner   = THIS_MODULE;
-    pGbl_DriverObject->DispatchTable.ioctl   = Dispatch_IoControl;
     pGbl_DriverObject->DispatchTable.mmap    = Dispatch_mmap;
     pGbl_DriverObject->DispatchTable.open    = Dispatch_open;
     pGbl_DriverObject->DispatchTable.release = Dispatch_release;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
+    pGbl_DriverObject->DispatchTable.ioctl = Dispatch_IoControl;
+#else
+    pGbl_DriverObject->DispatchTable.unlocked_ioctl = Dispatch_IoControl;
+#endif
 
     // Initialize spin locks
     spin_lock_init(
@@ -201,7 +204,7 @@ Plx_cleanup_module(
 
 
     DebugPrintf_Cont(("\n"));
-    DebugPrintf(("Unloading driver...\n"));
+    DebugPrintf(("Unload driver...\n"));
 
     // Get the device list
     fdo = pGbl_DriverObject->DeviceObject;
@@ -232,7 +235,7 @@ Plx_cleanup_module(
         );
 
     DebugPrintf((
-        "Releasing global driver object (%p)\n",
+        "Release global driver object (%p)\n",
         pGbl_DriverObject
         ));
 
@@ -309,10 +312,7 @@ AddDevice(
     pdx = fdo->DeviceExtension;
 
     // Clear device extension
-    RtlZeroMemory(
-        pdx,
-        sizeof(DEVICE_EXTENSION)
-        );
+    RtlZeroMemory( pdx, sizeof(DEVICE_EXTENSION) );
 
     // Store parent device object
     pdx->pDeviceObject = fdo;
@@ -401,7 +401,7 @@ RemoveDevice(
 
     pdx = fdo->DeviceExtension;
 
-    DebugPrintf(("Deleting supported devices list\n"));
+    DebugPrintf(("Delete supported devices list\n"));
 
     // Free device list
     while (!list_empty(
@@ -431,7 +431,7 @@ RemoveDevice(
     }
 
     DebugPrintf((
-        "Removing device (%s)\n",
+        "Remove device (%s)\n",
         PLX_DRIVER_NAME
         ));
 
@@ -495,7 +495,7 @@ RemoveDevice(
         );
 
     DebugPrintf((
-        "Deleting device object (%p)\n",
+        "Delete device object (%p)\n",
         fdo
         ));
 

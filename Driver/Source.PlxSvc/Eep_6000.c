@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      11-01-08 : PLX SDK v6.10
+ *      08-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -53,7 +53,7 @@
 PLX_STATUS
 Plx6000_EepromReadByOffset_16(
     PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    U32              offset,
     U16             *pValue
     )
 {
@@ -159,7 +159,7 @@ Plx6000_EepromReadByOffset_16(
 PLX_STATUS
 Plx6000_EepromWriteByOffset_16(
     PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    U32              offset,
     U16              value
     )
 {

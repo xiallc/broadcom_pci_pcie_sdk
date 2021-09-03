@@ -6,8 +6,6 @@
 #-----------------------------------------------------------------------------
 
 
-clear
-
 # Remove comment to display script commands as it runs
 #set -x
 
@@ -17,161 +15,210 @@ clear
 # of the PLX Linux installation path.  Some examples are:
 #
 #      export PLX_SDK_DIR=/usr/src/PlxSdk
-#      export PLX_SDK_DIR=/$HOME/PlxSdk
+#      export PLX_SDK_DIR=$HOME/PlxSdk
 #=============================================================================
-if [ "${PLX_SDK_DIR}1" == "1" ]; then
-    # Add PLX_SDK_DIR to environment variables
-    export PLX_SDK_DIR=/usr/src/PlxSdk
+if [ "${PLX_SDK_DIR}1" = "1" ]; then
 
-    echo
-    echo "  Note:"
-    echo
-    echo "      The required environment variable, PLX_SDK_DIR, is not defined"
-    echo "      in the environment.  The default value (\"$PLX_SDK_DIR\")"
-    echo "      will be used instead.  Please update your environment to override"
-    echo "      the default, or modify this script accordingly.  To set an"
-    echo "      environment variable, use the \"declare\" command as follows:"
-    echo
-    echo "         export PLX_SDK_DIR=<root of PLX Linux installation>"
-    echo
+    # Attempt to auto-find PLX directory
+    PLX_DIR=PlxSdk
+    CWD=`pwd`
+
+    while [ `pwd` != "/" ]; do
+        if [ -d $PLX_DIR ]; then
+            export PLX_SDK_DIR=`pwd`/$PLX_DIR
+            break
+        fi
+        cd ..
+    done
+
+    # Return to original directory
+    cd $CWD
+
+    if [ "${PLX_SDK_DIR}1" = "1" ]; then
+        # Add environment variable
+        export PLX_SDK_DIR=$HOME/PLX_DIR
+
+        echo
+        echo "  Note:"
+        echo
+        echo "      The required environment variable, PLX_SDK_DIR, is not defined"
+        echo "      in the environment.  The default value (\"$PLX_SDK_DIR\")"
+        echo "      will be used instead.  Please update your environment to override"
+        echo "      the default, or modify this script accordingly.  To set an"
+        echo "      environment variable, use the \"export\" command as follows:"
+        echo
+        echo "         export PLX_SDK_DIR=<root of PLX installation>"
+        echo
+    fi
 else
-    # Make sure that PLX_SDK_DIR is in the environment, not just a shell variable
+    # Make sure the variable is in the environment, not just a shell variable
     export PLX_SDK_DIR=${PLX_SDK_DIR}
 fi
 
 
-# Path to the driver nodes
-path=/dev/plx
+# Verify insmod is found
+if [ -f /sbin/insmod ]; then
+    InsMod=/sbin/insmod
+fi
+if [ -f /usr/sbin/insmod ]; then
+    InsMod=/usr/sbin/insmod
+fi
+if [ "$InsMod" = "" ]; then
+    echo "ERROR: 'insmod' not found in /sbin or /usr/sbin"
+    echo
+    exit
+fi
+
+
+# Set directory
+PLX_DIR=${PLX_SDK_DIR}
+
+# Set default driver name
+plx_drv_name=$1
 
 # Default to non-service driver
 bServiceDriver=0
 
+# Store parameters
+Param2=$2
 
-# Verify command-line
-if [ "$1" = "" ]; then
-    plx_error=1
-else
-    plx_error=1
-
-    if [ "$1" = "9050" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9030" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9080" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9054" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9056" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9656" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "8311" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "6000" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "8000" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "Dma" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "EoPCIe" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "Svc" ]; then
-        plx_error=0
-        bServiceDriver=1
-    fi
+# Check for debug version
+if [ "$2" = "d" ]; then
+    debug=_dbg
+    Param2=
 fi
 
-if [ "${plx_error}" == "1" ]; then
+
+# Verify command-line
+case "$1" in
+    8000n) plx_drv_name=8000_NT  ;;
+    8000d) plx_drv_name=8000_DMA ;;
+    6000n) plx_drv_name=6000_NT  ;;
+    9050)  ;;
+    9030)  ;;
+    9080)  ;;
+    9054)  ;;
+    9056)  ;;
+    9656)  ;;
+    8311)  ;;
+    Svc)   bServiceDriver=1 ;;
+
+    *)
     echo
     echo "PLX Linux module load script"
     echo
-    echo "  Usage: Plx_load {PLX_Chip} [DebugOption]"
+    echo "  Usage: Plx_load {Driver} [DebugOption]"
     echo
-    echo "     PLX_Chip    = 6000       : PLX 6254/6540/6466 NT-mode PnP driver"
-    echo "                   8000       : PLX 8000 NT-mode PnP driver"
-    echo "                   9050       : PLX 9050/9052 PnP driver"
-    echo "                   9030       : PLX 9030 PnP driver"
-    echo "                   9080       : PLX 9080 PnP driver"
-    echo "                   9054       : PLX 9054 PnP driver"
-    echo "                   9056       : PLX 9056 PnP driver"
-    echo "                   9656       : PLX 9656 PnP driver"
-    echo "                   8311       : PLX 8311 PnP driver"
-    echo "                   Dma        : PLX 8600 DMA Controller PnP driver"
+    echo "     Driver      = 8000n      : PLX 8000 NT-mode driver"
+    echo "                   8000d      : PLX 8000 DMA Controller driver"
+    echo "                   9050       : PLX 9050/9052 driver"
+    echo "                   9030       : PLX 9030 driver"
+    echo "                   9080       : PLX 9080 driver"
+    echo "                   9054       : PLX 9054 driver"
+    echo "                   9056       : PLX 9056 driver"
+    echo "                   9656       : PLX 9656 driver"
+    echo "                   8311       : PLX 8311 driver"
+    echo "                   6000n      : PLX 6254/6540/6466 NT-mode driver"
     echo "                   Svc        : PLX PCI/PCIe Service driver"
     echo
     echo "     DebugOption = <none>     : Load Release build of module"
     echo "                   'd'        : Load Debug build of module"
     echo
     echo "  E.g.: Plx_load 9054 d   - Load 9054 module debug version"
-    echo "        Plx_load 8000     - Load 8000 NT module release version"
+    echo "        Plx_load 8000n    - Load 8000 NT module release version"
+    echo
+    exit
+    ;;
+esac
+
+
+# Verify superuser access
+if [ `id -u` != 0 ]; then
+    echo
+    echo "   ***************************************************"
+    echo "   * NOTE: You must be superuser, logged in as root, *"
+    echo "   *       or have sufficient rights to install      *"
+    echo "   *       modules or this script will not work.     *"
+    echo "   ***************************************************"
+    echo
+    echo "    ---- ERROR: Admin rights not detected, halting ----"
     echo
     exit
 fi
 
 
-# PLX Chip to load module for
-plx_chip=$1
-
-# Check for debug version
-if [ "$2" != "" ]; then
-    debug=_dbg
-fi
+# Path to the driver nodes
+path=/dev/plx
 
 # Registered name of driver
-name=Plx${plx_chip}
+name=Plx$plx_drv_name
 
-# Name of module to load
-module=${name}${debug}.ko
+# Name of module
+module=$name$debug
+
+# Probe for a loaded conflicting driver
+drv_Name=`lsmod | awk "\\$1==\"$name\" {print \\$1}"`
+if [ "$drv_Name" = "" ]; then
+    drv_Name=`lsmod | awk "\\$1==\"${name}_dbg\" {print \\$1}"`
+fi
+
 
 # Install the module
+# echo
+# echo "   *****************************************************************"
+# echo "   *  NOTE: A warning regarding 'kernel tainting' is normal. This  *"
+# echo "   *  is because the PLX driver is marked with a 'Proprietary'     *"
+# echo "   *  license tag & not GPL.  For more information, refer to:      *"
+# echo "   *        http://www.tux.org/lkml/#export-tainted                *"
+# echo "   *****************************************************************"
 echo
-echo "   *****************************************************************"
-echo "   * NOTES:                                                        *"
-echo "   *                                                               *"
-echo "   *  You must be superuser, logged in as root, or have sufficient *"
-echo "   *  rights to install modules or this script will not work.      *"
-echo "   *                                                               *"
-echo "   *  A warning regarding 'kernel tainting' is normal.  This is    *"
-echo "   *  because the PLX driver is marked with a 'Proprietary'        *"
-echo "   *  license tag, not GPL.  For more information, please refer    *"
-echo "   *  to:                                                          *"
-echo "   *        http://www.tux.org/lkml/#export-tainted                *"
-echo "   *****************************************************************"
-echo
+echo Install: $module
 
-echo "Installing module ($module)...."
-/sbin/insmod $PLX_SDK_DIR/Linux/Driver/${name}/${module}
-echo
+echo -n "  Load module......... "
+# Check if conflicting driver already loaded
+if [ "$drv_Name" != "" ]; then
+    echo "ERROR: '$drv_Name' conflicts & already loaded"
+    echo
+    exit
+fi
+
+# Verify driver file exists
+if [ ! -f $PLX_DIR/Driver/$name/$module.ko ]; then
+    echo "ERROR: Driver not built or invalid path"
+    echo "         \-- File: $PLX_DIR/Driver/$name/$module.ko"
+    echo
+    exit
+fi
+
+# Load module
+if $InsMod $PLX_DIR/Driver/$name/$module.ko $Param2 $3 $4 $5 $6 $7 2>/dev/null; then
+    echo "Ok ($module.ko)"
+else
+    echo ERROR: Load error or no supported devices found
+    if [ "$1" = "8000n" ]; then
+        echo "   -- NOTE: 8000_NT driver is only for PLX switch Non-Transparent(NT) ports --"
+    fi
+    echo
+    exit
+fi
+
+# Verify driver loaded
+echo -n "  Verify load......... "
+drv_Name=`lsmod | awk "\\$1==\"$module\" {print \\$1}"`
+if [ "$drv_Name" = "" ]; then
+    echo ERROR: \'$module\' not detected
+    echo
+    exit
+fi
+echo Ok
 
 # Get the major number
-echo -n "Getting Module major number..... "
+echo -n "  Get major number.... "
 major=`cat /proc/devices | awk "\\$2==\"$name\" {print \\$1}"`
 
 # Check if valid
 if [ "$major" = "" ]; then
-    echo "ERROR: Module not loaded or no device found"
+    echo ERROR: Module major number not detected
     echo
     exit
 fi
@@ -180,45 +227,41 @@ fi
 echo "Ok (MajorID = $major)"
 
 # Create the device node path
-echo -n "Creating device node path....... "
-if [ -d ${path} ]; then
-    echo "$path already exists"
+echo -n "  Create node path.... "
+if [ -d $path ]; then
+    echo "Ok ($path already exists)"
 else
     mkdir $path
     chmod 0777 $path
     echo "Ok ($path)"
 fi
 
-# Create the device nodes (up to 10 by default)
-echo -n "Creating device nodes........... "
-rm -f ${path}/${name}*
-mknod ${path}/${name} c $major 255
+# Create the device nodes
+echo -n "  Create nodes........ "
+rm -f $path/$name*
+mknod $path/$name c $major 255
 
 # Create additional nodes for non-service driver
-if [ "${bServiceDriver}" == "0" ]; then
-    mknod ${path}/${name}-0  c $major 0
-    mknod ${path}/${name}-1  c $major 1
-    mknod ${path}/${name}-2  c $major 2
-    mknod ${path}/${name}-3  c $major 3
-    mknod ${path}/${name}-4  c $major 4
-    mknod ${path}/${name}-5  c $major 5
-    mknod ${path}/${name}-6  c $major 6
-    mknod ${path}/${name}-7  c $major 7
-    mknod ${path}/${name}-8  c $major 8
-    mknod ${path}/${name}-9  c $major 9
-    mknod ${path}/${name}-10 c $major 10
-    mknod ${path}/${name}-11 c $major 11
-    mknod ${path}/${name}-12 c $major 12
-    mknod ${path}/${name}-13 c $major 13
-    mknod ${path}/${name}-14 c $major 14
-    mknod ${path}/${name}-15 c $major 15
-    mknod ${path}/${name}-16 c $major 16
+if [ "$bServiceDriver" = "0" ]; then
+    mknod ${path}/$name-0  c $major 0
+    mknod ${path}/$name-1  c $major 1
+    mknod ${path}/$name-2  c $major 2
+    mknod ${path}/$name-3  c $major 3
+    mknod ${path}/$name-4  c $major 4
+    mknod ${path}/$name-5  c $major 5
+    mknod ${path}/$name-6  c $major 6
+    mknod ${path}/$name-7  c $major 7
+    mknod ${path}/$name-8  c $major 8
+    mknod ${path}/$name-9  c $major 9
+    mknod ${path}/$name-10 c $major 10
+    mknod ${path}/$name-11 c $major 11
+    mknod ${path}/$name-12 c $major 12
+    mknod ${path}/$name-13 c $major 13
+    mknod ${path}/$name-14 c $major 14
+    mknod ${path}/$name-15 c $major 15
+    mknod ${path}/$name-16 c $major 16
 fi
 
 chmod 777 $path/*
 echo "Ok ($path/$name)"
-
-echo
-echo Module load complete.
-echo
 echo

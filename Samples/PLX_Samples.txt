@@ -1,0 +1,103 @@
+
+                            PLX SDK Samples
+  ================================================================
+
+ABOUT
+
+This document provides a brief description of the samples included
+in the PLX SDK. Please refer to the source code in each sample &
+the PLX SDK User's Manual for additional details.
+
+The PLX samples are intended to demonstrate use of the PLX API. The
+samples are not intended for debug or real world applications, although
+they can be extended to complex applications. They should be treated
+as a reference for writing custom software that utilizes the PLX API.
+
+Not all samples work with all PLX devices. The PLX API supports numerous
+PLX chip families in PCI/PCIe, including 6000-series PCI-to-PCI bridges,
+9000-series PCI-to-Local bus bridges, & 8000-series PCI/PCIe bridges &
+switches. Some samples are provided only for specific chip families.
+
+
+SAMPLES
+
+- ApiTest
+Simple application that calls various PLX APIs for a selected device
+& verifies return codes & parameters.  The API calls made depend upon
+the type of device selected.
+
+- DSlave
+Demonstrates how to read/write from a PLX 9000 PCI BAR space using the
+PLX API/driver to perform the data transer. This operation is often
+referred to as "Direct Slave".
+
+- DSlave_BypassApi
+Similar to the 'DSlave' sample, except this sample uses the PLX API only
+to map a PCI BAR space directly to the application's virtual space. The
+application can then directly access the space via simple memory dereferencing,
+bypassing the PLX API/driver & resulting in greater performance, especially
+for small transfers.  The application is responsible for initializing the
+BAR space, such as setup of translation/remap registers.
+
+- HotPlugDemo
+This is not true Hot Plug. It's just provided to demonstrate the hardware
+Hot Plug feature of PLX switches. It polls hot plug registers to wait for
+events, then notifies the OS by forcing a PCI bus rescan through Device Manager.
+True Hot Plug support is actually the responsibility of the OS & beyond the
+scope of the sample.
+
+- LocalToPciInt [9000-series & 8311]
+Demonstrates how to wait for a generic Local-to-PCI interrupt using the
+PLX Notification API.
+
+- NT_DmaTest [8000-series switches with DMA & NT support]
+Demonstrates using the DMA engine in a PLX 8000 switch to transfer data through
+a PLX 8000 NT port.
+
+- NT_DmaTest [8000-series switches with DMA & NT support]
+Demonstrates using the DMA engine in a PLX 8000 switch to transfer data through
+a PLX 8000 NT port.
+
+- NT_LinkTest [8000-series switches with NT support]
+Demonstrates NT communication by sending random sized data buffers through a
+PLX 8000 NT port.
+
+- NT_Sample [8000-series switches with NT support]
+Demonstrates very basic NT communication by sending keystrokes from one system
+through a PLX 8000 NT port & displaying them on the other system.
+
+- PerfMonitor [8000-series switches with Performance Counter support]
+Demonstrates use of the PLX Performance API to capture & display performance
+measurements from the chip.
+
+- PlxCm
+The PLX Command-Line Monitor useful for debugging. Complete source is provided.
+
+- PlxDma [9000 & 8000 series devices with DMA support]
+Demonstrates block & SGL DMA using the PLX DMA API.
+
+- PlxDmaPerf [8000-series devices with DMA support]
+Demonstrates continuous block DMA & calculates performance measurements.
+
+- PlxDmaSglNoApi [9000 & 8000-series devices with DMA support]
+Demonstrates DMA using manual setup of SGL descriptors. This is useful when an
+application has a list of specific DMA transfers to perform.
+
+- PlxEep
+A PLX command-line utility for reading/writing EEPROMs connected to PLX devices.
+Useful for production-line type environments.
+
+- PlxNotification
+Demonstrates use of the PLX Notification API to wait for interrupt events.
+
+- SampleAppGUI
+A very simple GUI provided only to demonstrate using the PLX API in a GUI app
+instead of a console type application.
+
+- SerdesEyeTest
+Code taken from the PLX PDE tool to show how to measure serdes eye data. This code
+is only sample source for reference purposes & not an actual running application.
+
+- Shared
+Some common functions shared by all sample application to perform tasks such as
+device selection, error display, etc.

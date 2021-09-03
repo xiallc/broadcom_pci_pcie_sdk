@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      12-01-12 : PLX SDK v7.00
  *
  *****************************************************************************/
 
@@ -40,44 +40,16 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-    #include <linux/vermagic.h>
-#endif
+#include <linux/vermagic.h>
 #include "ApiFunc.h"
 #include "Dispatch.h"
 #include "Driver.h"
 #include "PciFunc.h"
+#include "PciRegs.h"
 #include "PlxChipFn.h"
 #include "PlxInterrupt.h"
 #include "Plx_sysdep.h"
 #include "SuppFunc.h"
-
-
-
-
-/***********************************************
- *     List of IDs the driver will support
- *
- * Note: Static allocation for now.  Will move
- *       to some dynamic configuration later.
- **********************************************/
-#if defined(PCI9050)
-    char SupportedDevices[] = "905010b5 520110b5";
-#elif defined(PCI9030)
-    char SupportedDevices[] = "903010b5 300110b5 30c110b5";
-#elif defined(PCI9080)
-    char SupportedDevices[] = "908010b5 040110b5 086010b5";
-#elif defined(PCI9054)
-    char SupportedDevices[] = "905410b5 186010b5 c86010b5 540610b5";
-#elif defined(PCI9056)
-    char SupportedDevices[] = "905610b5 560110b5 56c210b5";
-#elif defined(PCI9656)
-    char SupportedDevices[] = "965610b5 960110b5 96c210b5";
-#elif defined(PCI8311)
-    char SupportedDevices[] = "831110b5 86e110b5";
-#else
-    #error Supported Device IDs not provided
-#endif
 
 
 
@@ -91,21 +63,66 @@
  *       if multiple PLX drivers are loaded.
  **********************************************/
 // Pointer to the main driver object
-#if defined(PCI9050)
+#if (PLX_CHIP == 9050)
     DRIVER_OBJECT *pGbl_DriverObject_9050;
-#elif defined(PCI9030)
+#elif (PLX_CHIP == 9030)
     DRIVER_OBJECT *pGbl_DriverObject_9030;
-#elif defined(PCI9080)
+#elif (PLX_CHIP == 9080)
     DRIVER_OBJECT *pGbl_DriverObject_9080;
-#elif defined(PCI9054)
+#elif (PLX_CHIP == 9054)
     DRIVER_OBJECT *pGbl_DriverObject_9054;
-#elif defined(PCI9056)
+#elif (PLX_CHIP == 9056)
     DRIVER_OBJECT *pGbl_DriverObject_9056;
-#elif defined(PCI9656)
+#elif (PLX_CHIP == 9656)
     DRIVER_OBJECT *pGbl_DriverObject_9656;
-#elif defined(PCI8311)
+#elif (PLX_CHIP == 8311)
     DRIVER_OBJECT *pGbl_DriverObject_8311;
 #endif
+
+// Setup the PCI device table to probe
+static struct pci_device_id PlxPciIdTable[] =
+{
+    // VenID  DevID   SubVenID    SubDevID    Class     ClassMask
+#if (PLX_CHIP == 9050)
+    { 0x10B5, 0x9050, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x5201, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#elif (PLX_CHIP == 9030)
+    { 0x10B5, 0x9030, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x3001, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x30C1, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#elif (PLX_CHIP == 9080)
+    { 0x10B5, 0x9080, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x0401, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x0860, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#elif (PLX_CHIP == 9054)
+    { 0x10B5, 0x9054, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x1860, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0xC860, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x5406, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#elif (PLX_CHIP == 9056)
+    { 0x10B5, 0x9056, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x5601, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x56C2, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#elif (PLX_CHIP == 9656)
+    { 0x10B5, 0x9656, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x9601, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x96C2, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#elif (PLX_CHIP == 8311)
+    { 0x10B5, 0x8311, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+    { 0x10B5, 0x86E1, PCI_ANY_ID, PCI_ANY_ID, 0x000000, 0x000000 },
+#endif
+    { 0 } // Required last entry
+};
+MODULE_DEVICE_TABLE(pci, PlxPciIdTable);
+
+
+static struct pci_driver PlxPciDriver =
+{
+    .name     = PLX_DRIVER_NAME,
+    .id_table = PlxPciIdTable,
+    .probe    = PlxDispatch_Probe,
+    .remove   = PlxDispatch_Remove
+};
 
 
 
@@ -122,6 +139,7 @@ Plx_init_module(
     void
     )
 {
+    int              status;
     PLX_PHYSICAL_MEM PhysicalMem;
 
 
@@ -165,15 +183,19 @@ Plx_init_module(
 
     // Initialize driver object
     pGbl_DriverObject->DeviceObject = NULL;
-    pGbl_DriverObject->SupportedIDs = SupportedDevices;
     pGbl_DriverObject->DeviceCount  = 0;
 
     // Fill in the appropriate dispatch handlers
     pGbl_DriverObject->DispatchTable.owner   = THIS_MODULE;
-    pGbl_DriverObject->DispatchTable.ioctl   = Dispatch_IoControl;
     pGbl_DriverObject->DispatchTable.mmap    = Dispatch_mmap;
     pGbl_DriverObject->DispatchTable.open    = Dispatch_open;
     pGbl_DriverObject->DispatchTable.release = Dispatch_release;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
+    pGbl_DriverObject->DispatchTable.ioctl = Dispatch_IoControl;
+#else
+    pGbl_DriverObject->DispatchTable.unlocked_ioctl = Dispatch_IoControl;
+#endif
 
     // Initialize spin locks
     spin_lock_init(
@@ -200,19 +222,24 @@ Plx_init_module(
         pGbl_DriverObject->MajorID
         ));
 
-    // Scan the system for supported devices
-    PlxDeviceListBuild(
-        pGbl_DriverObject
-        );
+    // Register the driver
+    status = pci_register_driver( &PlxPciDriver );
+
+    if (status != 0)
+    {
+        ErrorPrintf(("ERROR: Unable to register driver (status=%d)\n", status));
+        Plx_cleanup_module();
+        return status;
+    }
+
+    // Flag driver was registered
+    pGbl_DriverObject->bPciDriverReg = TRUE;
 
     // Check if any devices were found
     if (pGbl_DriverObject->DeviceCount == 0)
     {
         ErrorPrintf(("ERROR - No supported devices found\n"));
-
-        // Unload the driver
         Plx_cleanup_module();
-
         return (-ENODEV);
     }
 
@@ -225,8 +252,6 @@ Plx_init_module(
     // Allocate common buffer
     if (PhysicalMem.Size != 0)
     {
-        DebugPrintf(("Allocating common buffer\n"));
-
         // Allocate common buffer
         PlxPciPhysicalMemoryAllocate(
             pGbl_DriverObject->DeviceObject->DeviceExtension,  // Assign buffer to first device
@@ -236,8 +261,8 @@ Plx_init_module(
             );
     }
 
-    DebugPrintf(("...driver loaded\n"));
-
+    DebugPrintf(( "Added: %d supported device(s)\n", pGbl_DriverObject->DeviceCount ));
+    DebugPrintf(("...driver loaded\n\n"));
     return 0;
 }
 
@@ -256,17 +281,13 @@ Plx_cleanup_module(
     void
     )
 {
-    DEVICE_OBJECT *fdo;
-    DEVICE_OBJECT *pNext;
-
-
     DebugPrintf_Cont(("\n"));
-    DebugPrintf(("Unloading driver...\n"));
+    DebugPrintf(("Unload driver...\n"));
 
     // Release common buffer
     if (pGbl_DriverObject->CommonBuffer.Size != 0)
     {
-        DebugPrintf(("De-allocating Common Buffer\n"));
+        DebugPrintf(("De-allocate Common Buffer\n"));
 
         // Release the buffer
         Plx_dma_buffer_free(
@@ -275,28 +296,9 @@ Plx_cleanup_module(
             );
     }
 
-    // Get the device list
-    fdo = pGbl_DriverObject->DeviceObject;
-
-    // Remove all devices
-    while (fdo != NULL)
-    {
-        // Store next device
-        pNext = fdo->NextDevice;
-
-        // Stop device and release its resources
-        StopDevice(
-            fdo
-            );
-
-        // Delete the device & remove from device list
-        RemoveDevice(
-            fdo
-            );
-
-        // Jump to next device object
-        fdo = pNext;
-    }
+    // De-register driver
+    if (pGbl_DriverObject->bPciDriverReg)
+        pci_unregister_driver( &PlxPciDriver );
 
     DebugPrintf((
         "De-register driver (MajorID = %03d)\n",
@@ -317,15 +319,12 @@ Plx_cleanup_module(
         );
 
     DebugPrintf((
-        "Releasing global driver object (%p)\n",
+        "Release global driver object (%p)\n",
         pGbl_DriverObject
         ));
 
     // Release driver object
-    kfree(
-        pGbl_DriverObject
-        );
-
+    kfree( pGbl_DriverObject );
     pGbl_DriverObject = NULL;
 
     DebugPrintf(("...driver unloaded\n"));
@@ -348,6 +347,104 @@ module_exit(Plx_cleanup_module);
 
 /*******************************************************************************
  *
+ * Function   :  PlxDispatch_Probe
+ *
+ * Description:  Called by the OS to determine if a device is supported by the driver
+ *
+ ******************************************************************************/
+int
+PlxDispatch_Probe(
+    struct pci_dev             *pDev,
+    const struct pci_device_id *pID
+    )
+{
+    int status;
+
+
+    // Default to supported device
+    status = 0;
+
+    DebugPrintf(("   --------------------\n"));
+    DebugPrintf((
+        "Probe: %04X %04X [b:%02x s:%02x f:%x]\n",
+        pDev->device, pDev->vendor, pDev->bus->number, PCI_SLOT(pDev->devfn), PCI_FUNC(pDev->devfn)
+        ));
+
+    // Verify PLX device
+    if (pDev->vendor != PLX_VENDOR_ID)
+        status = -ENODEV;
+
+    // Make sure the PCI Header type is 0
+    if (pDev->hdr_type != 0)
+        status = -ENODEV;
+
+    // Must be a function 0 device
+    if (PCI_FUNC(pDev->devfn) != 0)
+        status = -ENODEV;
+
+    if (status != 0)
+    {
+        DebugPrintf(("Probe: -- Unsupported Device --\n"));
+        return status;
+    }
+
+    // Add the device to the device list
+    status =
+        AddDevice(
+            pGbl_DriverObject,
+            pDev
+            );
+
+    return status;
+}
+
+
+
+
+/*******************************************************************************
+ *
+ * Function   :  PlxDispatch_Remove
+ *
+ * Description:  Called by the OS to remove a device from the driver
+ *
+ ******************************************************************************/
+void
+PlxDispatch_Remove(
+    struct pci_dev *pDev
+    )
+{
+    DEVICE_OBJECT *fdo;
+
+
+    DebugPrintf((
+        "Remove: %04X %04X [b:%02x s:%02x f:%02x]\n",
+        pDev->device, pDev->vendor,
+        pDev->bus->number, PCI_SLOT(pDev->devfn), PCI_FUNC(pDev->devfn)
+        ));
+
+    // Find the device in the list
+    fdo = pGbl_DriverObject->DeviceObject;
+
+    // Remove all devices
+    while (fdo != NULL)
+    {
+        if (fdo->DeviceExtension->pPciDevice == pDev)
+        {
+            // Delete the device & remove from device list
+            RemoveDevice( fdo );
+            return;
+        }
+
+        // Jump to next device object
+        fdo = fdo->NextDevice;
+    }
+}
+
+
+
+
+/*******************************************************************************
+ *
  * Function   :  AddDevice
  *
  * Description:  Add a new device object to the driver
@@ -359,15 +456,15 @@ AddDevice(
     struct pci_dev *pPciDev
     )
 {
+#if defined(PLX_DMA_SUPPORT)
     U8                i;
+#endif
+    int               status;
     U32               RegValue;
     DEVICE_OBJECT    *fdo;
     DEVICE_OBJECT    *pDevice;
     DEVICE_EXTENSION *pdx;
 
-
-    // Added to avoid compiler warning for non-DMA devices
-    i = 0;
 
     // Allocate memory for the device object
     fdo =
@@ -383,10 +480,7 @@ AddDevice(
     }
 
     // Initialize device object
-    RtlZeroMemory(
-        fdo,
-        sizeof(DEVICE_OBJECT)
-        );
+    RtlZeroMemory( fdo, sizeof(DEVICE_OBJECT) );
 
     fdo->DriverObject    = pDriverObject;         // Save parent driver object
     fdo->DeviceExtension = &(fdo->DeviceInfo);
@@ -404,7 +498,6 @@ AddDevice(
     // Enable bus mastering
     pci_set_master( pPciDev );
 
-
     //
     // Initialize the device extension
     //
@@ -412,10 +505,7 @@ AddDevice(
     pdx = fdo->DeviceExtension;
 
     // Clear device extension
-    RtlZeroMemory(
-        pdx,
-        sizeof(DEVICE_EXTENSION)
-        );
+    RtlZeroMemory( pdx, sizeof(DEVICE_EXTENSION) );
 
     // Store parent device object
     pdx->pDeviceObject = fdo;
@@ -439,6 +529,9 @@ AddDevice(
     pdx->Key.SubDeviceId  = pPciDev->subsystem_device;
     pdx->Key.DeviceNumber = pDriverObject->DeviceCount;
 
+    // Set API access mode
+    pdx->Key.ApiMode = PLX_API_MODE_PCI;
+
     // Update Revision ID
     PLX_PCI_REG_READ(
         pdx,
@@ -448,11 +541,6 @@ AddDevice(
 
     pdx->Key.Revision = (U8)(RegValue & 0xFF);
 
-    // Set chip properties
-    pdx->Key.PlxChip     = PLX_CHIP_TYPE;
-    pdx->Key.PlxRevision = pdx->Key.Revision;
-    pdx->Key.PlxFamily   = PLX_FAMILY_BRIDGE_P2L;
-
     // Build device name
     sprintf(
         pdx->LinkName,
@@ -460,22 +548,12 @@ AddDevice(
         pDriverObject->DeviceCount
         );
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-    // Initialize task element for ISR DPC queueing
-    pdx->Task_DpcForIsr.sync    = 0;
-    pdx->Task_DpcForIsr.routine = DpcForIsr;               // DPC routine
-    pdx->Task_DpcForIsr.data    = &(pdx->Task_DpcForIsr);  // DPC parameter
-#else
     // Initialize work queue for ISR DPC queueing
     PLX_INIT_WORK(
         &(pdx->Task_DpcForIsr),
         DpcForIsr,                // DPC routine
         &(pdx->Task_DpcForIsr)    // DPC parameter (pre-2.6.20 only)
         );
-#endif
-
-    // Initialize device open mutex
-    Plx_sema_init( &(pdx->Mutex_DeviceOpen), 1 );
 
     // Initialize ISR spinlock
     spin_lock_init(
@@ -567,7 +645,13 @@ AddDevice(
         pdx->LinkName
         ));
 
-    DebugPrintf_Cont(("\n"));
+    // Start the device
+    status = StartDevice( fdo );
+    if (status != 0)
+    {
+        RemoveDevice( fdo );
+        return status;
+    }
 
     return 0;
 }
@@ -593,8 +677,11 @@ RemoveDevice(
 
     pdx = fdo->DeviceExtension;
 
+    // Stop device and release its resources
+    StopDevice( fdo );
+
     DebugPrintf((
-        "Removing device (%s)\n",
+        "Remove device (%s)\n",
         pdx->LinkName
         ));
 
@@ -662,14 +749,12 @@ RemoveDevice(
     DebugPrintf(("Disabled PCI device\n"));
 
     DebugPrintf((
-        "Deleting device object (%p)\n",
+        "Delete device object (%p)\n",
         fdo
         ));
 
     // Release device object
-    kfree(
-        fdo
-        );
+    kfree( fdo );
 
     return 0;
 }
@@ -692,13 +777,14 @@ StartDevice(
     int               rc;
     U8                i;
     U8                ResourceCount;
+    U32               RegValue;
     DEVICE_EXTENSION *pdx;
 
 
     if (fdo->DeviceExtension->State == PLX_STATE_STARTED)
         return 0;
 
-    DebugPrintf(("Starting device...\n"));
+    DebugPrintf(("Start device...\n"));
 
     pdx           = fdo->DeviceExtension;
     ResourceCount = 0;
@@ -732,36 +818,43 @@ StartDevice(
                 i
                 ) & IORESOURCE_IO)
         {
-            DebugPrintf(("     Type     : I/O Port\n"));
+            DebugPrintf(("     Type     : I/O\n"));
 
             // Make sure flags are cleared properly
             pdx->PciBar[i].Properties.Physical &= ~(0x3);
-            pdx->PciBar[i].Properties.bIoSpace  = TRUE;
+            pdx->PciBar[i].Properties.Flags     = PLX_BAR_FLAG_IO;
         }
         else
         {
-            DebugPrintf(("     Type     : Memory Space\n"));
+            DebugPrintf(("     Type     : Memory\n"));
 
             // Make sure flags are cleared properly
             pdx->PciBar[i].Properties.Physical &= ~(0xf);
-            pdx->PciBar[i].Properties.bIoSpace  = FALSE;
+            pdx->PciBar[i].Properties.Flags     = PLX_BAR_FLAG_MEM;
         }
 
+        // Set BAR as already probed
+        pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_PROBED;
+
         // Get the actual BAR value
-        PLX_PCI_REG_READ(
-            pdx,
-            0x10 + (i * sizeof(U32)),
-            &(pdx->PciBar[i].Properties.BarValue)
-            );
+        PLX_PCI_REG_READ( pdx, 0x10 + (i * sizeof(U32)), &RegValue );
+        pdx->PciBar[i].Properties.BarValue = RegValue;
+
+        // If 64-bit BAR, get upper address
+        if (pci_resource_flags(pdx->pPciDevice, i) & IORESOURCE_MEM_64)
+        {
+            PLX_PCI_REG_READ( pdx, 0x10 + ((i+1) * sizeof(U32)), &RegValue );
+            pdx->PciBar[i].Properties.BarValue |= (U64)RegValue << 32;
+        }
 
         DebugPrintf((
-            "     PCI BAR %d: %08X\n",
+            "     PCI BAR %d: %08llX\n",
             i, pdx->PciBar[i].Properties.BarValue
             ));
 
         DebugPrintf((
-            "     Phys Addr: %08lX\n",
-            (PLX_UINT_PTR)pdx->PciBar[i].Properties.Physical
+            "     Phys Addr: %08llX\n",
+            pdx->PciBar[i].Properties.Physical
             ));
 
         // Get the size
@@ -771,45 +864,39 @@ StartDevice(
                 i
                 );
 
-        if (pdx->PciBar[i].Properties.Size >= (1 << 10))
-        {
-            DebugPrintf((
-                "     Size     : %08lx  (%ld Kb)\n",
-                (PLX_UINT_PTR)pdx->PciBar[i].Properties.Size,
-                (PLX_UINT_PTR)pdx->PciBar[i].Properties.Size >> 10
-                ));
-        }
-        else
-        {
-            DebugPrintf((
-                "     Size     : %08lx  (%ld bytes)\n",
-                (PLX_UINT_PTR)pdx->PciBar[i].Properties.Size,
-                (PLX_UINT_PTR)pdx->PciBar[i].Properties.Size
-                ));
-        }
-
-        // Set prefetch flag
-        if ((pdx->PciBar[i].Properties.bIoSpace == FALSE) &&
-            (pci_resource_flags(pdx->pPciDevice, i) & IORESOURCE_PREFETCH))
-        {
-            pdx->PciBar[i].Properties.bPrefetchable = TRUE;
-        }
-
         DebugPrintf((
-            "     Prefetch?: %s\n",
-            (pdx->PciBar[i].Properties.bPrefetchable) ? "Yes" : "No"
+            "     Size     : %8llx (%lld %s)\n",
+            pdx->PciBar[i].Properties.Size,
+            (pdx->PciBar[i].Properties.Size < ((U64)1 << 10)) ?
+              pdx->PciBar[i].Properties.Size :
+              pdx->PciBar[i].Properties.Size >> 10,
+            (pdx->PciBar[i].Properties.Size < ((U64)1 << 10)) ? "bytes" : "KB"
             ));
 
+        // Set flags
+        if (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_MEM)
+        {
+            if (pci_resource_flags(pdx->pPciDevice, i) & IORESOURCE_MEM_64)
+                pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_64_BIT;
+            else
+                pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_32_BIT;
+
+            if (pci_resource_flags(pdx->pPciDevice, i) & IORESOURCE_PREFETCH)
+                pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_PREFETCHABLE;
+
+            DebugPrintf((
+                "     Property : %sPrefetchable %d-bit\n",
+                (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE) ? "" : "Non-",
+                (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_64_BIT) ? 64 : 32
+                ));
+        }
+
         // Claim and map the resource
-        rc =
-            PlxPciBarResourceMap(
-                pdx,
-                i
-                );
+        rc = PlxPciBarResourceMap( pdx, i );
 
         if (rc == 0)
         {
-            if (pdx->PciBar[i].Properties.bIoSpace == FALSE)
+            if (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_MEM)
             {
                 DebugPrintf((
                     "     Kernel VA: %p\n",
@@ -819,7 +906,7 @@ StartDevice(
         }
         else
         {
-            if (pdx->PciBar[i].Properties.bIoSpace == FALSE)
+            if (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_MEM)
             {
                 ErrorPrintf(("     Kernel VA: ERROR - Unable to map space to Kernel VA\n"));
             }
@@ -833,20 +920,8 @@ StartDevice(
         return -ENOSYS;
     }
 
-    // Check for interrupt resource
-    if (pdx->pPciDevice->irq != 0)
-    {
-        DebugPrintf(("   Resource %02d\n", ResourceCount));
-        DebugPrintf(("     Type     : Interrupt\n"));
-        DebugPrintf(("     IRQ      : %02d [%02Xh]\n",
-                     pdx->pPciDevice->irq, pdx->pPciDevice->irq));
-
-        // Increment resource count
-        ResourceCount++;
-    }
-
     // Store BAR 0 kernel virtual address for register access
-    pdx->pRegVa = (U8*)pdx->PciBar[0].pVa;
+    pdx->pRegVa = pdx->PciBar[0].pVa;
 
     // Determine & store the PLX chip type
     PlxChipTypeDetect(
@@ -858,9 +933,23 @@ StartDevice(
         pdx
         );
 
+    // Default interrupt to none
+    pdx->IrqType = PLX_IRQ_TYPE_NONE;
+
+    // Store PCI IRQ
+    pdx->IrqPci = pdx->pPciDevice->irq;
+
     // Install the ISR if available
-    if (pdx->pPciDevice->irq != 0)
+    if (pdx->pPciDevice->irq == 0)
     {
+        DebugPrintf(("Device not using a PCI interrupt resource\n"));
+    }
+    else
+    {
+        // Default to INTx interrupt
+        pdx->IrqType = PLX_IRQ_TYPE_INTX;
+
+        // Install the ISR
         rc =
             request_irq(
                 pdx->pPciDevice->irq,    // The device IRQ
@@ -873,23 +962,17 @@ StartDevice(
         if (rc != 0)
         {
             ErrorPrintf(("ERROR - Unable to install ISR\n"));
+            pdx->IrqType = PLX_IRQ_TYPE_NONE;
         }
         else
         {
             DebugPrintf(("Installed ISR for interrupt\n"));
-
-            // Flag that the interrupt resource was claimed
-            pdx->Flag_Interrupt = TRUE;
 
             // Re-enable interrupts
             PlxChipInterruptsEnable(
                 pdx
                 );
         }
-    }
-    else
-    {
-        DebugPrintf(("Device is not using a PCI interrupt resource\n"));
     }
 
     // Update device state
@@ -952,9 +1035,9 @@ StopDevice(
         schedule_timeout( Plx_ms_to_jiffies( 100 ) );
     }
 
-    DebugPrintf(("Releasing device resources...\n"));
+    DebugPrintf(("Release device resources...\n"));
 
-    if (pdx->Flag_Interrupt == TRUE)
+    if (pdx->IrqType != PLX_IRQ_TYPE_NONE)
     {
         // Disable all interrupts
         PlxChipInterruptsDisable(
@@ -962,7 +1045,7 @@ StopDevice(
             );
 
         DebugPrintf((
-            "Removing interrupt handler (IRQ = %02d [%02Xh])\n",
+            "Remove ISR (IRQ = %02d [%02Xh])\n",
             pdx->pPciDevice->irq, pdx->pPciDevice->irq
             ));
 
@@ -972,99 +1055,18 @@ StopDevice(
             pdx
             );
 
-        // Flag that the interrupt resource was released
-        pdx->Flag_Interrupt = FALSE;
+        // Mark the interrupt resource released
+        pdx->IrqType = PLX_IRQ_TYPE_NONE;
     }
-
-    // Mark registers are no longer mapped
-    pdx->pRegVa = NULL;
 
     // Unmap I/O regions from kernel space (No local register access after this)
     PlxPciBarResourcesUnmap(
         pdx
         );
 
+    // Mark registers are no longer mapped
+    pdx->pRegVa = NULL;
+
     // Update device state
     pdx->State = PLX_STATE_STOPPED;
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  PlxDeviceListBuild
- *
- * Description:  Scan OS-generated PCI device list to search for supported devices
- *
- ******************************************************************************/
-int
-PlxDeviceListBuild(
-    DRIVER_OBJECT *pDriverObject
-    )
-{
-    int             status;
-    int             DeviceCount;
-    struct pci_dev *pPciDev;
-
-
-    DebugPrintf(("Scanning PCI bus for supported devices\n"));
-
-    // Clear device count
-    DeviceCount = 0;
-
-    // Get OS-generated list of PCI devices
-    pPciDev =
-        Plx_pci_get_device(
-            PCI_ANY_ID,
-            PCI_ANY_ID,
-            NULL
-            );
-
-    while (pPciDev)
-    {
-        DebugPrintf((
-            "Scanning - %04X %04X  [b:%02x s:%02x f:%02x]\n",
-            pPciDev->device, pPciDev->vendor,
-            pPciDev->bus->number, PCI_SLOT(pPciDev->devfn),
-            PCI_FUNC(pPciDev->devfn)
-            ));
-
-        // Check if device is supported
-        if (IsSupportedDevice(
-                pDriverObject,
-                pPciDev
-                ))
-        {
-            DebugPrintf(("SUPPORTED - Adding device to list\n")); 
-
-            // Add the device to the device list
-            status =
-                AddDevice(
-                    pDriverObject,
-                    pPciDev
-                    );
-
-            if (status == 0)
-            {
-                // Increment number of devices found
-                DeviceCount++;
-            }
-        }
-
-        // Jump to next device
-        pPciDev =
-            Plx_pci_get_device(
-                PCI_ANY_ID,
-                PCI_ANY_ID,
-                pPciDev     // Ref count will be decremented for this device
-                );
-    }
-
-    DebugPrintf((
-        "Device Scan: %d supported device(s) found\n",
-        DeviceCount
-        ));
-
-    return DeviceCount;
 }

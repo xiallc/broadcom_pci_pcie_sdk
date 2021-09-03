@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      03-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -226,7 +226,7 @@ PlxChipTypeDetect(
         {
             PLX_PCI_REG_READ(
                 pdx,
-                CFG_REV_ID,
+                0x08,
                 &RegValue
                 );
 

@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      12-01-07 : PLX SDK v5.20
+ *      07-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -63,10 +63,10 @@ extern "C" {
 
 
 // EEPROM Control register offset
-#if (defined(PCI9080) || defined(PCI9054) || \
-     defined(PCI9056) || defined(PCI9656) || defined(PCI8311))
+#if ((PLX_CHIP == 9080) || (PLX_CHIP == 9054) || \
+     (PLX_CHIP == 9056) || (PLX_CHIP == 9656) || (PLX_CHIP == 8311))
     #define REG_EEPROM_CTRL     0x6C
-#elif defined(PCI9050) || defined(PCI9030)
+#elif ((PLX_CHIP == 9050) || (PLX_CHIP == 9030))
     #define REG_EEPROM_CTRL     0x50
 #else
     #error ERROR: 'REG_EEPROM_CTRL' not defined
@@ -74,10 +74,10 @@ extern "C" {
 
 
 // EEPROM type
-#if (defined(PCI9030) || defined(PCI9054) || \
-     defined(PCI9056) || defined(PCI9656) || defined(PCI8311))
+#if ((PLX_CHIP == 9030) || (PLX_CHIP == 9054) || \
+     (PLX_CHIP == 9056) || (PLX_CHIP == 9656) || (PLX_CHIP == 8311))
     #define PLX_9000_EEPROM_TYPE   Eeprom93CS56
-#elif defined(PCI9050) || defined(PCI9080)
+#elif ((PLX_CHIP == 9050) || (PLX_CHIP == 9080))
     #define PLX_9000_EEPROM_TYPE   Eeprom93CS46
 #else
     #error ERROR: 'PLX_9000_EEPROM_TYPE' not defined

@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      03-01-10 : PLX SDK v6.40
+ *      04-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -194,29 +194,10 @@ PlxChipTypeDetect(
     DEVICE_EXTENSION *pdx
     )
 {
-    U32 RegValue;
-
-
-    // Set default values
+    // Set default values (ignore hard-coded ID since 8311 will be 9056)
     pdx->Key.PlxChip     = PLX_CHIP_TYPE;
-    pdx->Key.PlxRevision = pdx->Key.Revision;
+    pdx->Key.PlxRevision = 0xAA;                  // 8311 is only revision AA
     pdx->Key.PlxFamily   = PLX_FAMILY_BRIDGE_P2L;
-
-    // Check hard-coded ID
-    RegValue =
-        PLX_9000_REG_READ(
-            pdx,
-            0x70
-            );
-
-    if ((RegValue & 0xFFFF) == PLX_VENDOR_ID)
-    {
-        pdx->Key.PlxChip = (U16)(RegValue >> 16);
-
-        // 8311 is only revision AA
-        if (pdx->Key.PlxChip == PLX_CHIP_TYPE)
-            pdx->Key.PlxRevision = 0xAA;
-    }
 
     DebugPrintf((
         "Device %04X_%04X = %04X rev %02X\n",

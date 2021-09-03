@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      02-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -60,10 +60,10 @@ PLX_STATUS
 PlxDeviceFind(
     DEVICE_EXTENSION *pdx,
     PLX_DEVICE_KEY   *pKey,
-    U8               *pDeviceNumber
+    U16              *pDeviceNumber
     )
 {
-    U8             DeviceCount;
+    U16            DeviceCount;
     BOOLEAN        bMatchId;
     BOOLEAN        bMatchLoc;
     DEVICE_OBJECT *fdo;
@@ -174,7 +174,7 @@ PlxDeviceFind(
                 *pKey = pdx->Key;
 
                 DebugPrintf((
-                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%02x]\n",
+                    "Criteria matched device %04X_%04X [b:%02x s:%02x f:%x]\n",
                     pdx->Key.DeviceId, pdx->Key.VendorId,
                     pdx->Key.bus, pdx->Key.slot, pdx->Key.function
                     ));
@@ -215,113 +215,12 @@ PlxChipTypeGet(
     U8               *pRevision
     )
 {
-    U32 RegValue;
-
-
-    // Reset values
-    *pChipType = PLX_CHIP_TYPE;
-    *pRevision = pdx->Key.Revision;
-
-    switch (*pChipType)
-    {
-        case 0x9080:
-        case 0x9054:
-        case 0x9056:
-        case 0x9656:
-            // Verify by reading hard-coded ID
-            RegValue =
-                PLX_9000_REG_READ(
-                    pdx,
-                    0x70               // Hard-coded ID register
-                    );
-
-            if (((RegValue & 0xFFFF) == 0x10b5) &&
-                ((RegValue >> 16) == *pChipType))
-            {
-                // Get revision
-                RegValue =
-                    PLX_9000_REG_READ(
-                        pdx,
-                        0x74           // Revision ID
-                        );
-
-                // 9054 requires additional verification
-                if (*pChipType != 0x9054)
-                {
-                    *pRevision = (U8)RegValue;
-                }
-                else
-                {
-                    // AA & AB versions have same revision ID
-                    if (RegValue == 0xA)
-                    {
-                        PLX_PCI_REG_READ(
-                            pdx,
-                            CFG_REV_ID,
-                            &RegValue
-                            );
-
-                        if ((RegValue & 0xf) == 0xb)
-                            *pRevision = 0xAB;
-                        else
-                            *pRevision = 0xAA;
-                    }
-                    else
-                    {
-                        if (RegValue == 0xC)
-                        {
-                            // Set value for AC revision
-                            *pRevision = 0xAC;
-                        }
-                        else
-                        {
-                            *pRevision = (U8)RegValue;
-                        }
-                    }
-                }
-            }
-            break;
-
-        case 0x9050:
-        case 0x9030:
-            // 9050/52 require additional verification
-            if (*pChipType == 0x9030)
-            {
-                *pRevision = 0xAA;
-            }
-            else
-            {
-                // Read 9050/9052 PCI revision
-                PLX_PCI_REG_READ(
-                    pdx,
-                    CFG_REV_ID,
-                    &RegValue
-                    );
-
-                if ((RegValue & 0xF) == 0x2)
-                {
-                    *pRevision = 2;
-                }
-                else
-                {
-                    *pRevision = 1;
-                }
-            }
-            break;
-
-        case 0x8311:
-            // Only AA revision exists
-            *pRevision = 0xAA;
-            break;
-
-        default:
-            DebugPrintf(("ERROR - Unable to determine chip type\n"));
-            return ApiInvalidDeviceInfo;
-    }
+    *pChipType = pdx->Key.PlxChip;
+    *pRevision = pdx->Key.PlxRevision;
 
     DebugPrintf((
-        "Device %04X_%04X = %04X rev %02X\n",
-        pdx->Key.DeviceId, pdx->Key.VendorId, *pChipType, *pRevision
+        "PLX chip = %04X rev %02X\n",
+        *pChipType, *pRevision
         ));
 
     return ApiSuccess;
@@ -406,7 +305,7 @@ PlxPciDeviceReset(
  *
  * Function   :  PlxRegisterRead
  *
- * Description:  Reads a PLX-specific control register
+ * Description:  Reads a PLX-specific register
  *
  ******************************************************************************/
 U32
@@ -444,7 +343,7 @@ PlxRegisterRead(
  *
  * Function   :  PlxRegisterWrite
  *
- * Description:  Writes to a PLX-specific control register
+ * Description:  Writes to a PLX-specific register
  *
  ******************************************************************************/
 PLX_STATUS
@@ -503,58 +402,39 @@ PlxPciBarProperties(
             return ApiInvalidIndex;
     }
 
-    // Get the actual BAR value in case OS didn't provide it
-    if ((pdx->PciBar[BarIndex].Properties.BarValue == 0) &&
-        (pdx->PciBar[BarIndex].Properties.Size != 0))
-    {
-        PLX_PCI_REG_READ(
-            pdx,
-            0x10 + (BarIndex * sizeof(U32)),
-            &pdx->PciBar[BarIndex].Properties.BarValue
-            );
-    }
-
-    // Return PCI BAR properties
+    // Return BAR properties
     *pBarProperties = pdx->PciBar[BarIndex].Properties;
 
-    // Don't display properties if disabled
+    // Display BAR properties if enabled
     if (pdx->PciBar[BarIndex].Properties.Size == 0)
     {
         DebugPrintf(("BAR %d is disabled\n", BarIndex));
         return ApiSuccess;
     }
 
-    // Display BAR properties
     DebugPrintf((
-        "    PCI BAR %d: %08X\n",
+        "    PCI BAR %d: %08llX\n",
         BarIndex, pdx->PciBar[BarIndex].Properties.BarValue
         ));
 
     DebugPrintf((
-        "    Phys Addr: %08lX\n",
-        (PLX_UINT_PTR)pdx->PciBar[BarIndex].Properties.Physical
+        "    Phys Addr: %08llX\n",
+        pdx->PciBar[BarIndex].Properties.Physical
         ));
 
-    if (pdx->PciBar[BarIndex].Properties.Size >= (1 << 10))
-    {
-        DebugPrintf((
-            "    Size     : %08lx  (%ld Kb)\n",
-            (PLX_UINT_PTR)pdx->PciBar[BarIndex].Properties.Size,
-            (PLX_UINT_PTR)pdx->PciBar[BarIndex].Properties.Size >> 10
-            ));
-    }
-    else
-    {
-        DebugPrintf((
-            "    Size     : %08lx  (%ld bytes)\n",
-            (PLX_UINT_PTR)pdx->PciBar[BarIndex].Properties.Size,
-            (PLX_UINT_PTR)pdx->PciBar[BarIndex].Properties.Size
-            ));
-    }
+    DebugPrintf((
+        "    Size     : %08llX (%lld %s)\n",
+        pdx->PciBar[BarIndex].Properties.Size,
+        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ?
+            pdx->PciBar[BarIndex].Properties.Size :
+            pdx->PciBar[BarIndex].Properties.Size >> 10,
+        pdx->PciBar[BarIndex].Properties.Size < ((U64)1 << 10) ? "Bytes" : "KB"
+        ));
 
     DebugPrintf((
-        "    Prefetch?: %s\n",
-        (pdx->PciBar[BarIndex].Properties.bPrefetchable) ? "Yes" : "No"
+        "    Property : %sPrefetchable %d-bit\n",
+        (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE) ? "" : "Non-",
+        (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_64_BIT) ? 64 : 32
         ));
 
     return ApiSuccess;
@@ -645,7 +525,7 @@ PlxEepromProbe(
     U32        ValueRead;
     U32        ValueWrite;
     U32        ValueOriginal;
-    PLX_STATUS rc;
+    PLX_STATUS status;
 
 
     // Default to no EEPROM present
@@ -654,43 +534,43 @@ PlxEepromProbe(
     // Set EEPROM offset to use for probe
     OffsetProbe = 0x70;
 
-    DebugPrintf(("Probing EEPROM at offset %02xh\n", OffsetProbe));
+    DebugPrintf(("Probe EEPROM at offset %02xh\n", OffsetProbe));
 
     // Get the current value
-    rc =
+    status =
         PlxEepromReadByOffset(
             pdx,
             OffsetProbe,
             &ValueOriginal
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != ApiSuccess)
+        return status;
 
     // Prepare inverse value to write
     ValueWrite = ~(ValueOriginal);
 
     // Write inverse of original value
-    rc =
+    status =
         PlxEepromWriteByOffset(
             pdx,
             OffsetProbe,
             ValueWrite
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != ApiSuccess)
+        return status;
 
     // Read updated value
-    rc =
+    status =
         PlxEepromReadByOffset(
             pdx,
             OffsetProbe,
             &ValueRead
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != ApiSuccess)
+        return status;
 
     // Check if value was written properly
     if (ValueRead == ValueWrite)
@@ -731,7 +611,11 @@ PlxEepromCrcGet(
     U8               *pCrcStatus
     )
 {
-    // Device does not support CRC
+    // Clear return value
+    *pCrc       = 0;
+    *pCrcStatus = PLX_CRC_UNSUPPORTED;
+
+    // CRC not supported
     return ApiUnsupportedFunction;
 }
 
@@ -752,7 +636,10 @@ PlxEepromCrcUpdate(
     BOOLEAN           bUpdateEeprom
     )
 {
-    // Device does not support CRC
+    // Clear return value
+    *pCrc = 0;
+
+    // CRC not supported
     return ApiUnsupportedFunction;
 }
 
@@ -807,9 +694,7 @@ PlxEepromWriteByOffset(
 {
     // Make sure offset is aligned on 32-bit boundary
     if (offset & (3 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     // Call chip-specific function
     return PlxChip_EepromWriteByOffset(
@@ -837,7 +722,7 @@ PlxEepromReadByOffset_16(
     )
 {
     U32        Value_32;
-    PLX_STATUS rc;
+    PLX_STATUS status;
 
 
     // Set default return value
@@ -845,34 +730,32 @@ PlxEepromReadByOffset_16(
 
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     /******************************************
      * For devices that do not support 16-bit
      * EEPROM accesses, use 32-bit access
      *****************************************/
 
-    // Get current 32-bit value
-    rc =
+    // Get 32-bit value
+    status =
         PlxEepromReadByOffset(
             pdx,
             (offset & ~0x3),
             &Value_32
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != ApiSuccess)
+        return status;
 
     // Return desired 16-bit portion
-    if ((offset & 0x3) == 2)
+    if (offset & 0x3)
     {
         *pValue = (U16)(Value_32 >> 16);
     }
     else
     {
-        *pValue = (U16)(Value_32);
+        *pValue = (U16)Value_32;
     }
 
     return ApiSuccess;
@@ -896,14 +779,12 @@ PlxEepromWriteByOffset_16(
     )
 {
     U32        Value_32;
-    PLX_STATUS rc;
+    PLX_STATUS status;
 
 
     // Make sure offset is aligned on 16-bit boundary
     if (offset & (1 << 0))
-    {
         return ApiInvalidOffset;
-    }
 
     /******************************************
      * For devices that do not support 16-bit
@@ -911,18 +792,18 @@ PlxEepromWriteByOffset_16(
      *****************************************/
 
     // Get current 32-bit value
-    rc =
+    status =
         PlxEepromReadByOffset(
             pdx,
             (offset & ~0x3),
             &Value_32
             );
 
-    if (rc != ApiSuccess)
-        return rc;
+    if (status != ApiSuccess)
+        return status;
 
     // Insert new 16-bit value in correct location
-    if ((offset & 0x3) == 2)
+    if (offset & 0x3)
     {
         Value_32 = ((U32)value << 16) | (Value_32 & 0xFFFF);
     }
@@ -1567,7 +1448,7 @@ PlxNotificationWait(
             {
                 // Wait for interrupt event
                 Wait_rc =
-                    Plx_wait_event_interruptible_timeout(
+                    wait_event_interruptible_timeout(
                         pWaitObject->WaitQueue,
                         (pWaitObject->state != PLX_STATE_WAITING),
                         Timeout_ms
@@ -1946,7 +1827,7 @@ PlxPciBarSpaceTransfer(
     }
 
     // Only memory spaces are supported by this function
-    if (pdx->PciBar[BarIndex].Properties.bIoSpace)
+    if (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_IO)
     {
         DebugPrintf(("ERROR - I/O spaces not supported by this function\n"));
         return ApiInvalidIopSpace;
@@ -1957,11 +1838,7 @@ PlxPciBarSpaceTransfer(
 
     if (pVaSpace == NULL)
     {
-        DebugPrintf((
-            "ERROR - Invalid kernel VA (%08lx) for PCI BAR\n",
-            pVaSpace
-            ));
-
+        DebugPrintf(("ERROR - Invalid kernel VA (%p) for PCI BAR\n", pVaSpace));
         return ApiInvalidAddress;
     }
 

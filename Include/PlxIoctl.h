@@ -35,7 +35,7 @@
  *
  * Revision History:
  *
- *      11-01-10 : PLX SDK v6.40
+ *      08-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -144,6 +144,7 @@ typedef enum _DRIVER_MSGS
     MSG_VPD_WRITE,
     MSG_EEPROM_PRESENT,
     MSG_EEPROM_PROBE,
+    MSG_EEPROM_GET_ADDRESS_WIDTH,
     MSG_EEPROM_SET_ADDRESS_WIDTH,
     MSG_EEPROM_CRC_GET,
     MSG_EEPROM_CRC_UPDATE,
@@ -224,6 +225,7 @@ typedef enum _DRIVER_MSGS
 
 #define PLX_IOCTL_EEPROM_PRESENT                IOCTL_MSG( MSG_EEPROM_PRESENT )
 #define PLX_IOCTL_EEPROM_PROBE                  IOCTL_MSG( MSG_EEPROM_PROBE )
+#define PLX_IOCTL_EEPROM_GET_ADDRESS_WIDTH      IOCTL_MSG( MSG_EEPROM_GET_ADDRESS_WIDTH )
 #define PLX_IOCTL_EEPROM_SET_ADDRESS_WIDTH      IOCTL_MSG( MSG_EEPROM_SET_ADDRESS_WIDTH )
 #define PLX_IOCTL_EEPROM_CRC_GET                IOCTL_MSG( MSG_EEPROM_CRC_GET )
 #define PLX_IOCTL_EEPROM_CRC_UPDATE             IOCTL_MSG( MSG_EEPROM_CRC_UPDATE )
@@ -260,7 +262,7 @@ typedef enum _DRIVER_MSGS
 #define PLX_IOCTL_NT_PROBE_REQ_ID               IOCTL_MSG( MSG_NT_PROBE_REQ_ID )
 #define PLX_IOCTL_NT_LUT_PROPERTIES             IOCTL_MSG( MSG_NT_LUT_PROPERTIES )
 #define PLX_IOCTL_NT_LUT_ADD                    IOCTL_MSG( MSG_NT_LUT_ADD )
-#define PLX_IOCTL_NT_LUT_DISABLE                IOCTL_MSG( MSG_NT_LUT_DISABLE)
+#define PLX_IOCTL_NT_LUT_DISABLE                IOCTL_MSG( MSG_NT_LUT_DISABLE )
 
 
 #ifdef __cplusplus

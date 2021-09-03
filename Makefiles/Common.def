@@ -6,11 +6,55 @@
 #-----------------------------------------------------------------------------
 
 
+
+#=============================================================================
+# Set kernel & CPU Properties
+#=============================================================================
+# Get kernel version
+KERNEL_VER := $(shell uname -r | awk -F. '{print $$1"."$$2}')
+
+# Determine CPU architecture & properties
+ARCH := $(shell uname -m | sed 's/i.86/i386/')
+ifeq ($(ARCH),i386)
+    PLX_CPU_BITS   = 32
+    PLX_CPU_ENDIAN = Little
+endif
+ifeq ($(ARCH),alpha)
+    PLX_CPU_BITS   = 32
+    PLX_CPU_ENDIAN = Big
+endif
+ifeq ($(ARCH),x86_64)
+    PLX_CPU_BITS   = 64
+    PLX_CPU_ENDIAN = Little
+endif
+ifeq ($(ARCH),ia64)
+    PLX_CPU_BITS   = 64
+    PLX_CPU_ENDIAN = Little
+endif
+ifeq ($(ARCH),ppc)
+    PLX_CPU_BITS   = 32
+    PLX_CPU_ENDIAN = Big
+endif
+ifeq ($(ARCH),mips)
+    PLX_CPU_BITS   = 32
+    PLX_CPU_ENDIAN = Big
+endif
+ifeq ($(ARCH),mips64)
+    PLX_CPU_BITS   = 64
+    PLX_CPU_ENDIAN = Big
+endif
+
+
+
 #=============================================================================
 # Check for errors
 #=============================================================================
 ifndef PLX_SDK_DIR
     $(error ERROR: Variable 'PLX_SDK_DIR' not set ***)
+endif
+
+ifndef PLX_DIR
+    PLX_DIR=$(PLX_SDK_DIR)
 endif
 
 ifndef TOOLS_NAME
@@ -35,23 +79,15 @@ ifndef PLX_CHIP
 endif
 
 ifndef KERNEL_VER
-    ifeq ($(TGT_TYPE), Driver)
-        $(error ERROR: Variable 'KERNEL_VER' not set ***)
-    else
-        KERNEL_VER := n/a
-    endif
+    $(error ERROR: Variable 'KERNEL_VER' not set ***)
 endif
 
 ifndef PLX_CPU_BITS
-    ifneq ($(TGT_TYPE), Driver)
-        PLX_CPU_BITS := ??
-    endif
+    $(error ERROR: Variable 'PLX_CPU_BITS' not set ***)
 endif
 
-ifdef PLX_CPU_BIG_ENDIAN
-    PLX_CPU_ENDIAN := Big
-else
-    PLX_CPU_ENDIAN := Little
+ifndef PLX_CPU_ENDIAN
+    $(error ERROR: Variable 'PLX_CPU_ENDIAN' not set ***)
 endif
 
 ifndef KDIR
@@ -94,25 +130,17 @@ endif
 OBJ_DIR = $(OUT_DIR)/Obj$(DBG)
 
 ifeq ($(TGT_TYPE), App)
-    COMMON_DIR := $(PLX_SDK_DIR)/Linux/Samples/Shared
+    COMMON_DIR := $(PLX_DIR)/Samples/Shared
 endif
 
 ifeq ($(TGT_TYPE), Driver)
     # Set default source directory
     COMMON_DIR := Source.Plx$(PLX_CHIP)
 
-    # Set source directory for 9000 series
-    ifneq ($(PLX_CHIP), Svc)
-        ifneq ($(PLX_CHIP), 8000)
-            ifneq ($(PLX_CHIP), 6000)
-                ifneq ($(PLX_CHIP), Dma)
-                    ifneq ($(PLX_CHIP), EoPCIe)
-                        COMMON_DIR   := Source.Plx9000
-                        PLX_CHIP_DIR := $(COMMON_DIR)/Chip/$(PLX_CHIP)
-                    endif
-                endif
-            endif
-        endif
+    # 9000-series if chip folder exists
+    ifneq ($(wildcard $(PLX_DIR)/Driver/Source.Plx9000/Chip/$(PLX_CHIP)),)
+        COMMON_DIR   := Source.Plx9000
+        PLX_CHIP_DIR := $(COMMON_DIR)/Chip/$(PLX_CHIP)
     endif
 endif
 
@@ -122,7 +150,7 @@ endif
 # Additional include directories
 # Note: Put '-I' before Include directories
 #=============================================================================
-PLX_INC_DIR += -I$(PLX_SDK_DIR)/Include
+PLX_INC_DIR += -I$(PLX_DIR)/Include
 
 ifeq ($(TGT_TYPE), App)
     PLX_INC_DIR +=  -I. -I$(COMMON_DIR)
@@ -131,8 +159,11 @@ endif
 ifeq ($(TGT_TYPE), Driver)
     PLX_INC_DIR += \
        -I$(KDIR)/include \
-       -I$(PLX_SDK_DIR)/Linux/Driver/$(COMMON_DIR) \
-       -I$(PLX_SDK_DIR)/Linux/Driver/$(PLX_CHIP_DIR)
+       -I$(PLX_DIR)/Driver/$(COMMON_DIR)
+
+    ifneq ($(PLX_CHIP_DIR),)
+        PLX_INC_DIR += -I$(PLX_DIR)/Driver/$(PLX_CHIP_DIR)
+    endif
 endif
 
 
@@ -143,8 +174,8 @@ endif
 #   -ldl : Add support for dynamic library loading functions (used in Aardvark.c)
 #=============================================================================
 ifeq ($(TGT_TYPE), App)
-    LFLAGS += -lm -ldl
-    LIBS   += $(PLX_SDK_DIR)/Linux/PlxApi/Library/PlxApi$(DBG).a
+    LIBS += $(PLX_DIR)/PlxApi/Library/PlxApi$(DBG).a
+    LIBS += -lm -ldl
 endif
 
 
@@ -152,13 +183,13 @@ endif
 #=============================================================================
 # Additional PLX-specific command-line options
 #=============================================================================
-ifdef PLX_CPU_BIG_ENDIAN
+ifeq ($(PLX_CPU_ENDIAN),Big)
     PLX_OPT += -DPLX_BIG_ENDIAN
 else
     PLX_OPT += -DPLX_LITTLE_ENDIAN
 endif
 
-ifdef PLX_RED_HAT_KERNEL
+ifeq (1,$(shell [ -r /etc/redhat-release ] && echo 1 || echo 0))
     PLX_OPT += -DRED_HAT_LINUX_KERNEL
 endif
 
@@ -170,24 +201,17 @@ ifeq ($(TGT_TYPE), App)
     PLX_OPT += -DPLX_LINUX 
 endif
 
+# Add Position Independent Code (-fPIC) to support Shared Object libaries
 ifeq ($(TGT_TYPE), Library)
-    PLX_OPT += -DPLX_LINUX
+    PLX_OPT += -DPLX_LINUX -fPIC
 endif
 
 ifeq ($(TGT_TYPE), Driver)
-    ifeq ($(KERNEL_VER), 2.4)
-        PLX_OPT += -D__KERNEL__ -D__NO_VERSION__ -DMODULE
-    endif
-
-    ifneq ($(PLX_CHIP), Svc)
-        PLX_OPT += -DPCI$(PLX_CHIP)
-    endif
-
     ifdef PLX_DISPLAY_SGL
         PLX_OPT += -DPLX_DISPLAY_SGL
     endif
 
-    PLX_OPT += -DPLX_DRIVER -DPLX_LINUX_DRIVER
+    PLX_OPT += -DPLX_DRIVER -DPLX_LINUX_DRIVER -DPLX_CHIP=$(PLX_CHIP)
 endif
 
 # Set flag for 32/64-bit system

@@ -10,7 +10,7 @@
  *
  * Revision History:
  *
- *      12-01-09 : PLX SDK v6.40
+ *      03-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -33,7 +33,7 @@
 /**********************************************
  *               Functions
  *********************************************/
-S8
+S16
 SelectDevice_DMA(
     PLX_DEVICE_KEY *pKey
     );
@@ -63,7 +63,7 @@ main(
     void
     )
 {
-    S8                DeviceSelected;
+    S16               DeviceSelected;
     PLX_STATUS        rc;
     PLX_DEVICE_KEY    DeviceKey;
     PLX_DEVICE_OBJECT Device;
@@ -111,7 +111,7 @@ main(
     Cons_clear();
 
     Cons_printf(
-        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%02x]\n\n",
+        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
@@ -120,33 +120,22 @@ main(
     /************************************
      *        Perform the DMA
      ************************************/
-    switch (DeviceKey.PlxChip)
+    if (((DeviceKey.PlxChip & 0xF000) == 0x9000) ||
+         (DeviceKey.PlxChip == 0x8311))
     {
-        case 0x9080:
-        case 0x9054:
-        case 0x9056:
-        case 0x9656:
-        case 0x8311:
-            PerformDma_9000( &Device );
-            break;
-
-        case 0x8609:
-        case 0x8613:
-        case 0x8615:
-        case 0x8617:
-        case 0x8619:
-        case 0x8716:
-        case 0x8717:
-        case 0x8749:
-            PerformDma_8000( &Device );
-            break;
-
-        default:
-            Cons_printf(
-                "ERROR: DMA not supported by the selected device (%04X)\n",
-                DeviceKey.PlxChip
-                );
-            goto _Exit_App;
+        PerformDma_9000( &Device );
+    }
+    else if ((DeviceKey.PlxChip & 0xF000) == 0x8000)
+    {
+        PerformDma_8000( &Device );
+    }
+    else
+    {
+        Cons_printf(
+            "ERROR: DMA not supported by the selected device (%04X)\n",
+            DeviceKey.PlxChip
+            );
+        goto _Exit_App;
     }
 
 
@@ -180,7 +169,7 @@ _Exit_App:
  *              -1,  if user cancelled the selection
  *
  ********************************************************************/
-S8
+S16
 SelectDevice_DMA(
     PLX_DEVICE_KEY *pKey
     )
@@ -209,7 +198,7 @@ SelectDevice_DMA(
         status =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (status == ApiSuccess)
@@ -278,7 +267,7 @@ SelectDevice_DMA(
                 DevKey_DMA[NumDevices] = DevKey;
 
                 Cons_printf(
-                    "\t\t  %2d. %04x [b:%02x s:%02x f:%02x]\n",
+                    "\t\t  %2d. %04x [b:%02x s:%02x f:%x]\n",
                     (NumDevices + 1), DevKey.PlxChip,
                     DevKey.bus, DevKey.slot, DevKey.function
                     );
@@ -303,7 +292,6 @@ SelectDevice_DMA(
     do
     {
         Cons_printf("\t  Device Selection --> ");
-
         Cons_scanf("%d", &i);
     }
     while (i > NumDevices);
@@ -314,7 +302,7 @@ SelectDevice_DMA(
     // Return selected device information
     *pKey = DevKey_DMA[i - 1];
 
-    return (S8)NumDevices;
+    return (S16)NumDevices;
 }
 
 

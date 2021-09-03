@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      07-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -96,12 +96,6 @@ VOID
 Plx_dma_buffer_free(
     DEVICE_EXTENSION    *pdx,
     PLX_PHYS_MEM_OBJECT *pMemObject
-    );
-
-BOOLEAN
-IsSupportedDevice(
-    DRIVER_OBJECT  *pDriverObject,
-    struct pci_dev *pDev
     );
 
 VOID

@@ -11,7 +11,7 @@
  *
  * Revision History:
  *
- *      11-01-10 : PLX SDK v6.40
+ *      08-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -34,7 +34,7 @@
 /**********************************************
  *               Definitions
  *********************************************/
-#define NT_PCI_BUFFER_SIZE                  0x100000        // Size of buffer for receiving data
+#define NT_PCI_BUFFER_SIZE                  (500 * 1000)    // Size of buffer for receiving data
 #define MAX_DEVICES_TO_LIST                 50              // Max number of devices for user selection
 
 #define NT_MSG_SYSTEM_READY                 0xFEEDFACE      // Code passed between systems to signal ready
@@ -79,7 +79,7 @@ U32 Gbl_Regs[0x14];              // Global storage for PCI register save
 /**********************************************
  *               Functions
  *********************************************/
-S8
+S16
 SelectDevice_NT(
     PLX_DEVICE_KEY *pKey
     );
@@ -120,7 +120,7 @@ main(
     void
     )
 {
-    S8                  DeviceSelected;
+    S16                 DeviceSelected;
     U8                  BarNum;
     U8                 *pSysMem;
     U16                 LutIndex;
@@ -193,7 +193,7 @@ main(
         );
 
     Cons_printf(
-        "\nSelected: %.4x %.4x [b:%02x s:%02x f:%02x]\n\n",
+        "\nSelected: %.4x %.4x [b:%02x s:%02x f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
@@ -254,13 +254,17 @@ main(
      ************************************************************/
     Cons_printf("Probe for write ReqID      : ");
 
-    if (PlxPci_Nt_ReqIdProbe(
+    status =
+        PlxPci_Nt_ReqIdProbe(
             &Device,
             FALSE,          // Probe for writes
             &ReqId_Write
-            ) == FALSE)
+            );
+
+    if (status != ApiSuccess)
     {
-        Cons_printf("ERROR: Unable to probe ReqID\n");
+        Cons_printf("ERROR: Unable to probe ReqID, auto-add 0,0,0\n");
+        ReqId_Write = 0;
     }
     else
     {
@@ -271,25 +275,25 @@ main(
             (ReqId_Write >> 3) & 0x1F,
             (ReqId_Write >> 0) & 0x03
             );
+    }
 
-        Cons_printf("Add write Req ID to LUT    : ");
+    Cons_printf("Add write Req ID to LUT    : ");
 
-        // Default to auto-selected LUT index
-        LutIndex = (U16)-1;
+    // Default to auto-selected LUT index
+    LutIndex = (U16)-1;
 
-        if (PlxPci_Nt_LutAdd(
-                &Device,
-                &LutIndex,
-                ReqId_Write,
-                FALSE       // Snoop must be disabled
-                ) != ApiSuccess)
-        {
-            Cons_printf("ERROR: Unable to add LUT entry\n");
-        }
-        else
-        {
-            Cons_printf("Ok (LUT_Index=%d No_Snoop=OFF)\n", LutIndex);
-        }
+    if (PlxPci_Nt_LutAdd(
+            &Device,
+            &LutIndex,
+            ReqId_Write,
+            FALSE       // Snoop must be disabled
+            ) != ApiSuccess)
+    {
+        Cons_printf("ERROR: Unable to add LUT entry\n");
+    }
+    else
+    {
+        Cons_printf("Ok (LUT_Index=%d No_Snoop=OFF)\n", LutIndex);
     }
 
     Cons_printf("Probe for read ReqID       : ");
@@ -298,7 +302,7 @@ main(
             &Device,
             TRUE,           // Probe for reads
             &ReqId_Read
-            ) == FALSE)
+            ) != ApiSuccess)
     {
         Cons_printf("ERROR: Unable to probe ReqID\n");
     }
@@ -582,7 +586,7 @@ _ExitApp:
  *              -1,  if user cancelled the selection
  *
  ********************************************************************/
-S8
+S16
 SelectDevice_NT(
     PLX_DEVICE_KEY *pKey
     )
@@ -612,7 +616,7 @@ SelectDevice_NT(
         status =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (status == ApiSuccess)
@@ -715,7 +719,7 @@ SelectDevice_NT(
     // Return selected device information
     *pKey = DevKey_NT[i - 1];
 
-    return (S8)NumDevices;
+    return (S16)NumDevices;
 }
 
 

@@ -34,12 +34,15 @@
  *
  * Revision:
  *
- *     02-01-10 : PLX SDK v6.40
+ *     04-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
 
 #include "PlxIoctl.h"
+#if defined(PLX_DEMO_API)
+    #include "PexApi.h"
+#endif
 
 
 #ifdef __cplusplus
@@ -53,20 +56,10 @@ extern "C" {
  *             Definitions
  ******************************************/
 #define PLX_I2C_MAX_DEVICES         10          // Max number of I2C USB devices supported
+#define PLX_I2C_MAX_NT_PORTS        2           // Max number of NT ports in single switch
 #define PLX_I2C_DEFAULT_CLOCK_RATE  100         // I2C default clock rate in Khz
 #define PLX_I2C_CMD_REG_READ        0x04        // I2C read command code
 #define PLX_I2C_CMD_REG_WRITE       0x03        // I2C write command code
-
-#define PLX_FLAG_PORT_NT_LINK_1     63          // Port bit for NT Link port 0
-#define PLX_FLAG_PORT_NT_LINK_0     62          // Port bit for NT Link port 1
-#define PLX_FLAG_PORT_NT_VIRTUAL_1  61          // Port bit for NT Virtual port 0
-#define PLX_FLAG_PORT_NT_VIRTUAL_0  60          // Port bit for NT Virtual port 1
-#define PLX_FLAG_PORT_NT_DS_P2P     59          // Port bit for NT DS P2P port (Virtual)
-#define PLX_FLAG_PORT_DMA_RAM       58          // Port bit for DMA RAM
-#define PLX_FLAG_PORT_DMA_3         57          // Port bit for DMA channel 0 or Function 1 (all 4 channels)
-#define PLX_FLAG_PORT_DMA_2         56          // Port bit for DMA channel 1
-#define PLX_FLAG_PORT_DMA_1         55          // Port bit for DMA channel 2
-#define PLX_FLAG_PORT_DMA_0         54          // Port bit for DMA channel 3
 
 // NT Legacy or P2P mode
 #define PLX_I2C_NT_MODE_LEGACY      0
@@ -77,13 +70,27 @@ extern "C" {
 
 #define Plx_pow_int                 pow         // Used to X^Y calculations
 
+#if defined(PLX_MSWINDOWS)
+    #define Plx_sleep               Sleep
+#elif defined(PLX_LINUX)
+    #define Plx_sleep(arg)          usleep((arg) * 1000)
+#endif
+
 #if !defined(PLX_DOS)
     // Macros for PLX chip register access
-    #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, TRUE )
-    #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), TRUE )
+    #if defined(PLX_DEMO_API)
+        #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxPci_PciRegisterReadFast( (pDevice), (U16)(offset), NULL )
+        #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxPci_PciRegisterWriteFast( (pDevice), (U16)(offset), (value) )
 
-    #define PLX_8000_REG_READ(pDevice, offset)          PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, FALSE )
-    #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), FALSE )
+        #define PLX_8000_REG_READ(pDevice, offset)          PlxPci_PlxRegisterRead( (pDevice), (offset), NULL )
+        #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxPci_PlxRegisterWrite( (pDevice), (offset), (value) )
+    #else
+        #define PLX_PCI_REG_READ(pDevice, offset, pValue)   *(pValue) = PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, TRUE )
+        #define PLX_PCI_REG_WRITE(pDevice, offset, value)   PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), TRUE )
+
+        #define PLX_8000_REG_READ(pDevice, offset)          PlxI2c_PlxRegisterRead( (pDevice), (offset), NULL, FALSE )
+        #define PLX_8000_REG_WRITE(pDevice, offset, value)  PlxI2c_PlxRegisterWrite( (pDevice), (offset), (value), FALSE )
+    #endif
 #endif
 
 
@@ -111,7 +118,7 @@ PlxI2c_DeviceClose(
 PLX_STATUS
 PlxI2c_DeviceFindEx(
     PLX_DEVICE_KEY *pKey,
-    U8              DeviceNumber,
+    U16             DeviceNumber,
     PLX_MODE_PROP  *pModeProp
     );
 
@@ -202,6 +209,12 @@ PlxI2c_EepromProbe(
     );
 
 PLX_STATUS
+PlxI2c_EepromGetAddressWidth(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pWidth
+    );
+
+PLX_STATUS
 PlxI2c_EepromSetAddressWidth(
     PLX_DEVICE_OBJECT *pDevice,
     U8                 width
@@ -224,28 +237,28 @@ PlxI2c_EepromCrcGet(
 PLX_STATUS
 PlxI2c_EepromReadByOffset(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U32               *pValue
     );
 
 PLX_STATUS
 PlxI2c_EepromWriteByOffset(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U32                value
     );
 
 PLX_STATUS
 PlxI2c_EepromReadByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U16               *pValue
     );
 
 PLX_STATUS
 PlxI2c_EepromWriteByOffset_16(
     PLX_DEVICE_OBJECT *pDevice,
-    U16                offset,
+    U32                offset,
     U16                value
     );
 
@@ -326,8 +339,8 @@ PLX_STATUS
 PlxI2c_ProbeSwitch(
     PLX_DEVICE_OBJECT *pDevice,
     PLX_DEVICE_KEY    *pKey,
-    U8                 DeviceNumber,
-    U8                *pNumMatched
+    U16                DeviceNumber,
+    U16               *pNumMatched
     );
 
 U16

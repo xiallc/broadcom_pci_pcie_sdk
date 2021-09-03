@@ -34,7 +34,7 @@
  *
  * Revision:
  *
- *      04-01-08 : PLX SDK v6.00
+ *      02-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -139,6 +139,10 @@ extern "C" {
 
     typedef HANDLE                PLX_DRIVER_HANDLE;  // Windows-specific driver handle
     #define PLX_SIZE_64           8
+
+    #if defined(_DEBUG)
+        #define PLX_DEBUG
+    #endif
 #endif
 
 
@@ -147,7 +151,7 @@ extern "C" {
  *    Windows WDM Driver Compatability
  ******************************************/
 #if defined(PLX_WDM_DRIVER)
-    // RtlIsNtDdiVersionAvailable supported in Windows & higher
+    // RtlIsNtDdiVersionAvailable supported in Windows Vista & higher
     #if (WINVER < 0x600)
         #define RtlIsNtDdiVersionAvailable(ver)     IoIsWdmVersionAvailable( (U8)(ver >> 24), (U8)(ver >> 16) )
 
@@ -163,6 +167,10 @@ extern "C" {
         #define NTDDI_VISTA                         NTDDI_WIN6
         #define NTDDI_WS08                          NTDDI_WIN6SP1
         #define NTDDI_WIN7                          0x06010000
+    #endif
+
+    #if (WINVER < 0x602)
+        #define NTDDI_WIN8                          0x06020000
     #endif
 
     #if (WINVER < 0x601)

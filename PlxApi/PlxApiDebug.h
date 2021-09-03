@@ -98,8 +98,8 @@ extern "C" {
     #define DebugPrintf(arg)                _Debug_Print_Macro(arg)
     #define DebugPrintf_Cont(arg)           _PlxDbgFunc arg
 #else
-    #define DebugPrintf(arg)
-    #define DebugPrintf_Cont(arg)
+    #define DebugPrintf(arg)                do { } while(0)
+    #define DebugPrintf_Cont(arg)           do { } while(0)
 #endif
 #define ErrorPrintf(arg)                    _Debug_Print_Macro(arg)
 #define ErrorPrintf_Cont(arg)               _PlxDbgFunc arg

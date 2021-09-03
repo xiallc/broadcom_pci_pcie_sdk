@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      07-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -49,7 +49,7 @@
 // Probing is only enabled on i386 or x64 platforms since it requires
 // parsing ACPI tables.  This is not supported on non-x86 platforms.
 //
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(PLX_COSIM)
     static U32 Gbl_Acpi_Addr_ECAM[2] = {ACPI_PCIE_NOT_PROBED, ACPI_PCIE_NOT_PROBED};
 #else
     static U32 Gbl_Acpi_Addr_ECAM[2] = {ACPI_PCIE_NOT_AVAILABLE, ACPI_PCIE_NOT_AVAILABLE};
@@ -105,19 +105,74 @@ PlxPciRegisterRead_UseOS(
     if (pPciDevice == NULL)
     {
         DebugPrintf((
-            "ERROR - Device at [b:%02x s:%02x f:%02x] does not exist\n",
+            "ERROR - Device at [b:%02x s:%02x f:%x] does not exist\n",
             pKey->bus, pKey->slot, pKey->function
             ));
 
         return ApiInvalidDeviceInfo;
     }
 
-    rc =
-        pci_read_config_dword(
-            pPciDevice,
-            offset,
-            pValue
-            );
+    // Assume non-VF device
+    rc = -1;
+
+    // If the device is a VF, trap some PCI register accesses
+    if (Plx_pcie_is_virtfn(pPciDevice))
+    {
+        rc = 0;
+        switch (offset)
+        {
+            case 0x00:
+                *pValue = ((U32)pPciDevice->device << 16) | pPciDevice->vendor;
+                break;
+
+            case 0x08:
+                *pValue = ((U32)pPciDevice->class << 8) | pKey->Revision;
+                break;
+
+            case 0x10:
+                *pValue = pci_resource_start( pPciDevice, 0 );
+                break;
+
+            case 0x14:
+                *pValue = pci_resource_start( pPciDevice, 1 );
+                break;
+
+            case 0x18:
+                *pValue = pci_resource_start( pPciDevice, 2 );
+                break;
+
+            case 0x1C:
+                *pValue = pci_resource_start( pPciDevice, 3 );
+                break;
+
+            case 0x20:
+                *pValue = pci_resource_start( pPciDevice, 4 );
+                break;
+
+            case 0x24:
+                *pValue = pci_resource_start( pPciDevice, 5 );
+                break;
+
+            case 0x2C:
+                *pValue = ((U32)pPciDevice->subsystem_device << 16) |
+                           pPciDevice->subsystem_vendor;
+                break;
+
+            default:
+                rc = -1;
+                break;
+        }
+    }
+
+    if (rc != 0)
+    {
+        rc =
+            pci_read_config_dword(
+                pPciDevice,
+                offset,
+                pValue
+                );
+    }
 
     // Decrement reference count to device
     Plx_pci_dev_put( pPciDevice );
@@ -175,7 +230,7 @@ PlxPciRegisterWrite_UseOS(
     if (pPciDevice == NULL)
     {
         DebugPrintf((
-            "ERROR - Device at [b:%02x s:%02x f:%02x] does not exist\n",
+            "ERROR - Device at [b:%02x s:%02x f:%x] does not exist\n",
             pKey->bus, pKey->slot, pKey->function
             ));
 
@@ -324,6 +379,23 @@ PlxPciRegisterRead_BypassOS(
     U32 *pValue
     )
 {
+// Non-X86 architectures may not support CF8/CFC
+#if !defined(__i386__) && !defined(__x86_64__)
+
+    PLX_DEVICE_KEY Key;
+
+
+    // Prepare key with device information
+    RtlZeroMemory( &Key, sizeof(PLX_DEVICE_KEY) );
+    Key.bus      = bus;
+    Key.slot     = slot;
+    Key.function = function;
+
+    // Revert to standard OS method
+    return PlxPciRegisterRead_UseOS( &Key, offset, pValue );
+
+#else
+
     U32 RegSave;
 
 
@@ -383,6 +455,8 @@ PlxPciRegisterRead_BypassOS(
         );
 
     return ApiSuccess;
+
+#endif
 }
 
 
@@ -404,6 +478,23 @@ PlxPciRegisterWrite_BypassOS(
     U32 value
     )
 {
+// Non-X86 architectures may not support CF8/CFC
+#if !defined(__i386__) && !defined(__x86_64__)
+
+    PLX_DEVICE_KEY Key;
+
+
+    // Prepare key with device information
+    RtlZeroMemory( &Key, sizeof(PLX_DEVICE_KEY) );
+    Key.bus      = bus;
+    Key.slot     = slot;
+    Key.function = function;
+
+    // Revert to standard OS method
+    return PlxPciRegisterWrite_UseOS( &Key, offset, value );
+
+#else
+
     U32 RegSave;
 
 
@@ -462,6 +553,8 @@ PlxPciRegisterWrite_BypassOS(
         );
 
     return ApiSuccess;
+
+#endif
 }
 
 
@@ -556,11 +649,14 @@ PlxProbeForEcamBase(
         goto _Exit_PlxProbeForEcamBase;
     }
 
+    // Reset flag
+    bFound = FALSE;
+
     // Get ACPI revision
     value = PHYS_MEM_READ_8( (U8*)(pAddress + 15) );
 
     DebugPrintf((
-        "ACPI Probe - ACPI is version %s (revision=%d)\n",
+        "ACPI Probe - ACPI is v%s (rev=%d)\n",
         (value == 0) ? "1.0" : "2.0 or higher",
         (int)value
         ));
@@ -575,9 +671,10 @@ PlxProbeForEcamBase(
 
     // Map RSDT table
     Va_RSDT =
-        ioremap(
+        ioremap_prot(
             PLX_PTR_TO_INT( pAcpi_Addr_RSDT ),
-            1024
+            1024,
+            0
             );
 
     if (Va_RSDT == NULL)
@@ -610,19 +707,18 @@ PlxProbeForEcamBase(
     // Get address of first entry
     pEntry = Va_RSDT + sizeof(ACPI_RSDT_v1_0);
 
-    bFound = FALSE;
-
     // Parse entry pointers for MCFG table
-    while ((bFound == FALSE) && (NumEntries != 0))
+    while (NumEntries != 0)
     {
         // Get address of entry
         pAddress = (U8*)PLX_INT_TO_PTR( PHYS_MEM_READ_32( (U32*)pEntry ) );
 
         // Map table
         Va_Table =
-            ioremap(
+            ioremap_prot(
                 PLX_PTR_TO_INT( pAddress ),
-                200
+                200,
+                0
                 );
 
         if (Va_Table == NULL)
@@ -687,7 +783,7 @@ _Exit_PlxProbeForEcamBase:
     if (bFound)
     {
         DebugPrintf((
-            "ACPI Probe - PCIe ECAM is located at %08X_%08X\n",
+            "ACPI Probe - PCIe ECAM at %08X_%08X\n",
             (unsigned int)Gbl_Acpi_Addr_ECAM[1], (unsigned int)Gbl_Acpi_Addr_ECAM[0]
             ));
     }
@@ -726,7 +822,7 @@ PlxPhysicalMemRead(
 
     if (KernelVa == NULL)
     {
-        DebugPrintf(("ERROR: Unable to map address into kernel space\n"));
+        DebugPrintf(("ERROR - Unable to map %p ==> kernel space\n", pAddress));
         return -1;
     }
 
@@ -743,10 +839,6 @@ PlxPhysicalMemRead(
 
         case sizeof(U32):
             value = PHYS_MEM_READ_32( KernelVa );
-            break;
-
-        case sizeof(U64):
-            value = PHYS_MEM_READ_64( KernelVa );
             break;
 
         default:
@@ -792,7 +884,7 @@ PlxPhysicalMemWrite(
 
     if (KernelVa == NULL)
     {
-        DebugPrintf(("ERROR: Unable to map address into kernel space\n"));
+        DebugPrintf(("ERROR - Unable to map %p ==> kernel space\n", pAddress));
         return -1;
     }
 
@@ -809,10 +901,6 @@ PlxPhysicalMemWrite(
 
         case sizeof(U32):
             PHYS_MEM_WRITE_32( KernelVa, (U32)value );
-            break;
-
-        case sizeof(U64):
-            PHYS_MEM_WRITE_64( KernelVa, value );
             break;
     }
 

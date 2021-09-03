@@ -13,7 +13,7 @@
  *
  * Revision History:
  *
- *      02-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -22,6 +22,7 @@
     #include <stdio.h>
     #include <conio.h>
     #include <Windows.h>
+    #define PLX_MSWINDOWS
 #elif defined(PLX_LINUX)
     #include <stdio.h>
     #include <stdlib.h>
@@ -44,7 +45,7 @@
 /*************************************
  *          Definitions
  ************************************/
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(PLX_MSWINDOWS)
 
     #define Plx_sleep                   Sleep
     #define Plx_strcmp                  strcmp
@@ -69,7 +70,7 @@
     #define Plx_strncasecmp             strncasecmp
     #define Cons_clear()                system("clear")
     #define Cons_fflush                 fflush
-    #define Cons_flushinp               flushinp
+    #define Cons_flushinp               do {while (Plx_kbhit()) Plx_getch();} while (0)
     #define Cons_fputs                  Plx_fputs
     #define Cons_kbhit                  Plx_kbhit
     #define Cons_getch                  Plx_getch
@@ -86,7 +87,7 @@
     #define Plx_strncasecmp             strncasecmp
     #define Cons_clear                  clrscr
     #define Cons_fflush                 fflush
-    #define Cons_flushinp               (do {while (kbhit()) getch();} while (0))
+    #define Cons_flushinp()             do {while (kbhit()) getch();} while (0)
     #define Cons_fputs                  Plx_fputs
     #define Cons_kbhit                  kbhit
     #define Cons_getch                  getch
@@ -138,6 +139,62 @@
     }                                                                            \
     while(0)
 
+// Standard key codes
+#define CONS_KEY_NULL                       '\0'
+#define CONS_KEY_ESCAPE                     27
+#define CONS_KEY_NEWLINE                    '\n'
+#define CONS_KEY_CARRIAGE_RET               '\r'
+#define CONS_KEY_TAB                        '\t'
+
+// 1st extended key code
+#if defined(PLX_LINUX)
+    #define CONS_KEY_EXT_CODE               91
+    #define CONS_KEY_KEYPAD_CODE            79
+#elif defined(PLX_MSWINDOWS)
+    #define CONS_KEY_EXT_CODE               224
+    #define CONS_KEY_KEYPAD_CODE            1      // For code compatability, not actually used
+#elif defined(PLX_DOS)
+    #define CONS_KEY_EXT_CODE               0
+    #define CONS_KEY_KEYPAD_CODE            1      // For code compatability, not actually used
+#endif
+
+// Extended key codes
+#if defined(PLX_LINUX)
+    #define CONS_KEY_BACKSPACE              127
+    #define CONS_KEY_ARROW_UP               65
+    #define CONS_KEY_ARROW_DOWN             66
+    #define CONS_KEY_ARROW_LEFT             68
+    #define CONS_KEY_ARROW_RIGHT            67
+    #define CONS_KEY_HOME                   49
+    #define CONS_KEY_HOME_XTERM             72     // Code different in GUI terminal
+    #define CONS_KEY_END                    70
+    #define CONS_KEY_END_XTERM              52     // Code different in GUI terminal
+    #define CONS_KEY_INSERT                 50
+    #define CONS_KEY_DELETE                 51
+    #define CONS_KEY_PAGE_UP                53
+    #define CONS_KEY_PAGE_DOWN              54
+#else
+    #define CONS_KEY_BACKSPACE              '\b'
+    #define CONS_KEY_ARROW_UP               72
+    #define CONS_KEY_ARROW_DOWN             80
+    #define CONS_KEY_ARROW_LEFT             75
+    #define CONS_KEY_ARROW_RIGHT            77
+    #define CONS_KEY_HOME                   71
+    #define CONS_KEY_HOME_XTERM             254    // Added for code compatability
+    #define CONS_KEY_END                    79
+    #define CONS_KEY_END_XTERM              253    // Added for code compatability
+    #define CONS_KEY_INSERT                 82
+    #define CONS_KEY_DELETE                 83
+    #define CONS_KEY_PAGE_UP                73
+    #define CONS_KEY_PAGE_DOWN              81
+#endif
+
+// Preset cursor sizes/types
+#define CONS_CURSOR_DISABLED                0
+#define CONS_CURSOR_UNDERLINE               20
+#define CONS_CURSOR_INSERT                  70
+#define CONS_CURSOR_DEFAULT                 CONS_CURSOR_UNDERLINE
+
 
 
 
@@ -162,6 +219,11 @@ ConsoleScreenHeightSet(
 unsigned short
 ConsoleScreenHeightGet(
     void
+    );
+
+void
+ConsoleCursorPropertiesSet(
+    int size
     );
 
 void
@@ -198,7 +260,7 @@ Plx_printf(
 
 
 // Windows-specific functions
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(PLX_MSWINDOWS)
 
 void
 Plx_clrscr(

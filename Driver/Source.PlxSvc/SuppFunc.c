@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      08-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -39,6 +39,7 @@
 #include <linux/delay.h>
 #include "ApiFunc.h"
 #include "PciFunc.h"
+#include "PciRegs.h"
 #include "SuppFunc.h"
 
 
@@ -112,7 +113,7 @@ Plx_pow_int(
  ******************************************************************************/
 U16
 PlxGetExtendedCapabilityOffset(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pDevice,
     U16              CapabilityId
     )
 {
@@ -121,7 +122,7 @@ PlxGetExtendedCapabilityOffset(
 
 
     // Verify PCI header is not Type 2
-    if (pNode->PciHeaderType == 2)
+    if (pDevice->PciHeaderType == 2)
     {
         DebugPrintf(("Device header is PCI Type 2 (Cardbus) - PCI extended capabilities not supported\n"));
         return 0;
@@ -129,7 +130,7 @@ PlxGetExtendedCapabilityOffset(
 
     // Get offset of first capability
     PLX_PCI_REG_READ(
-        pNode,
+        pDevice,
         0x34,           // PCI capabilities pointer
         &RegValue
         );
@@ -146,7 +147,7 @@ PlxGetExtendedCapabilityOffset(
     {
         // Get next capability
         PLX_PCI_REG_READ(
-            pNode,
+            pDevice,
             Offset_Cap,
             &RegValue
             );
@@ -177,7 +178,7 @@ PlxGetExtendedCapabilityOffset(
  ******************************************************************************/
 int
 PlxPciBarResourceMap(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pDevice,
     U8               BarIndex
     )
 {
@@ -185,7 +186,7 @@ PlxPciBarResourceMap(
 
 
     // Verify BAR index
-    switch (pNode->PciHeaderType)
+    switch (pDevice->PciHeaderType)
     {
         case 0:
             if ((BarIndex != 0) && (BarIndex > 5))
@@ -204,59 +205,51 @@ PlxPciBarResourceMap(
             break;
 
         default:
-            DebugPrintf(("PCI Header Type %d is not supported for PCI BAR mappings\n", pNode->PciHeaderType));
+            DebugPrintf(("PCI Header Type %d is not supported for PCI BAR mappings\n", pDevice->PciHeaderType));
             return (-1);
     }
 
     // Check if BAR already mapped
-    if (pNode->PciBar[BarIndex].pVa != NULL)
-    {
+    if (pDevice->PciBar[BarIndex].pVa != NULL)
         return 0;
-    }
 
-    DebugPrintf((
-        "Mapping PCI BAR %d to kernel space...\n",
-        BarIndex
-        ));
-
-    // Get BAR properties
-    if (PlxPciBarProperties(
-            pNode,
-            BarIndex,
-            &BarProp
-            ) != ApiSuccess)
+    // Get BAR properties if haven't yet
+    if ((pDevice->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_PROBED) == 0)
     {
-        return (-1);
+        if (PlxPciBarProperties(
+                pDevice,
+                BarIndex,
+                &BarProp
+                ) != ApiSuccess)
+        {
+            return (-1);
+        }
     }
 
     // Verify BAR is valid and is memory space
-    if ((BarProp.Physical == 0) || (BarProp.bIoSpace))
-    {
+    if ((pDevice->PciBar[BarIndex].Properties.Physical == 0) ||
+        (pDevice->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_IO))
         return (-1);
-    }
-
-    // Store BAR properties
-    pNode->PciBar[BarIndex].Properties = BarProp;
 
     // Map into kernel virtual space
-    pNode->PciBar[BarIndex].pVa =
+    pDevice->PciBar[BarIndex].pVa =
         ioremap(
-            pNode->PciBar[BarIndex].Properties.Physical,
-            pNode->PciBar[BarIndex].Properties.Size
+            pDevice->PciBar[BarIndex].Properties.Physical,
+            pDevice->PciBar[BarIndex].Properties.Size
             );
 
-    if (pNode->PciBar[BarIndex].pVa == NULL)
+    if (pDevice->PciBar[BarIndex].pVa == NULL)
     {
-        ErrorPrintf(("    Kernel VA: ERROR - Unable to map space to Kernel VA\n"));
+        ErrorPrintf(("ERROR - Unable to map BAR %d to Kernel VA\n", BarIndex));
         return (-1);
     }
 
     // Flag BARs mapped to kernel space
-    pNode->bBarKernelMap = TRUE;
+    pDevice->bBarKernelMap = TRUE;
 
     DebugPrintf((
-        "    Kernel VA: %p\n",
-        pNode->PciBar[BarIndex].pVa
+        "Mapped BAR %d ==> kernel space (VA=%p)\n",
+        BarIndex, pDevice->PciBar[BarIndex].pVa
         ));
 
     return 0;
@@ -274,7 +267,7 @@ PlxPciBarResourceMap(
  ******************************************************************************/
 int
 PlxPciBarResourcesUnmap(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pDevice,
     U8               BarIndex
     )
 {
@@ -282,9 +275,9 @@ PlxPciBarResourcesUnmap(
     U8 MaxBar;
 
 
-    if (pNode->PciHeaderType == 0)
+    if (pDevice->PciHeaderType == 0)
         MaxBar = PCI_NUM_BARS_TYPE_00;
-    else if (pNode->PciHeaderType == 1)
+    else if (pDevice->PciHeaderType == 1)
         MaxBar = PCI_NUM_BARS_TYPE_01;
     else
         return (-1);
@@ -294,7 +287,7 @@ PlxPciBarResourcesUnmap(
         if ((BarIndex == (U8)-1) || (BarIndex == i))
         {
             // Unmap the space from Kernel space if previously mapped
-            if (pNode->PciBar[i].pVa == NULL)
+            if (pDevice->PciBar[i].pVa == NULL)
             {
                 if (BarIndex != (U8)-1)
                     return (-1);
@@ -303,25 +296,22 @@ PlxPciBarResourcesUnmap(
             {
                 DebugPrintf((
                     "Unmap BAR %d from kernel space (VA=%p)\n",
-                    i, pNode->PciBar[i].pVa
+                    i, pDevice->PciBar[i].pVa
                     ));
 
                 // Unmap from kernel space
                 iounmap(
-                    pNode->PciBar[i].pVa
+                    pDevice->PciBar[i].pVa
                     );
 
                 // Clear BAR information
-                RtlZeroMemory(
-                    &(pNode->PciBar[i]),
-                    sizeof(PLX_PCI_BAR_INFO)
-                    );
+                pDevice->PciBar[i].pVa = NULL;
             }
         }
     }
 
     // Flag BARs no longer mapped
-    pNode->bBarKernelMap = FALSE;
+    pDevice->bBarKernelMap = FALSE;
 
     return 0;
 }
@@ -342,7 +332,7 @@ PlxResourcesReleaseAll(
     )
 {
     struct list_head *pEntry;
-    PLX_DEVICE_NODE  *pNode;
+    PLX_DEVICE_NODE  *pDevice;
 
 
     pEntry = pdx->List_Devices.next;
@@ -351,36 +341,36 @@ PlxResourcesReleaseAll(
     while (pEntry != &(pdx->List_Devices))
     {
         // Get the object
-        pNode =
+        pDevice =
             list_entry(
                 pEntry,
                 PLX_DEVICE_NODE,
                 ListEntry
                 );
 
-        if ((pNode->bBarKernelMap) || (pNode->MapRequestPending))
+        if ((pDevice->bBarKernelMap) || (pDevice->MapRequestPending))
         {
             DebugPrintf((
-                "Release resources for %p (%04X_%04X [b:%02x s:%02x f:%02x])\n",
-                pNode, pNode->Key.DeviceId, pNode->Key.VendorId,
-                pNode->Key.bus, pNode->Key.slot, pNode->Key.function
+                "Release resources for %p (%04X_%04X [b:%02x s:%02x f:%x])\n",
+                pDevice, pDevice->Key.DeviceId, pDevice->Key.VendorId,
+                pDevice->Key.bus, pDevice->Key.slot, pDevice->Key.function
                 ));
         }
 
-        if (pNode->MapRequestPending)
+        if (pDevice->MapRequestPending)
         {
             // Remove any pending mapping requests
             PlxUserMappingRequestFreeAll_ByNode(
                 pdx,
-                pNode
+                pDevice
                 );
         }
 
-        if (pNode->bBarKernelMap == TRUE)
+        if (pDevice->bBarKernelMap == TRUE)
         {
             // Unmap any kernel mappings to PCI BAR spaces
             PlxPciBarResourcesUnmap(
-                pNode,
+                pDevice,
                 (U8)-1          // Specify to unmap all PCI BARs
                 );
         }
@@ -405,7 +395,7 @@ PlxResourcesReleaseAll(
 VOID
 PlxUserMappingRequestFreeAll_ByNode(
     DEVICE_EXTENSION *pdx,
-    PLX_DEVICE_NODE  *pNode
+    PLX_DEVICE_NODE  *pDevice
     )
 {
     struct list_head *pEntry;
@@ -430,10 +420,10 @@ PlxUserMappingRequestFreeAll_ByNode(
                 ListEntry
                 );
 
-        if (pMapObject->pNode == pNode)
+        if (pMapObject->pDevice == pDevice)
         {
             // Decrement request counter
-            pNode->MapRequestPending--;
+            pDevice->MapRequestPending--;
 
             // Remove the object from the list
             list_del(
@@ -481,14 +471,15 @@ PlxDeviceListBuild(
     )
 {
     U8                DeviceCount;
+    U16               offset;
     U32               RegValue;
     struct pci_dev   *pPciDev;
-    PLX_DEVICE_NODE  *pNode;
+    PLX_DEVICE_NODE  *pDevice;
     struct list_head *pEntry;
     DEVICE_EXTENSION *pdx;
 
 
-    DebugPrintf(("Scanning PCI bus for devices...\n"));
+    DebugPrintf(("Scan for devices...\n"));
 
     // Clear device count
     DeviceCount = 0;
@@ -507,7 +498,7 @@ PlxDeviceListBuild(
     while (pPciDev)
     {
         DebugPrintf((
-            "Adding - %04X %04X  [b:%02x s:%02x f:%02x]\n",
+            "Add - %04X %04X  [b:%02x s:%02x f:%x]\n",
             pPciDev->device, pPciDev->vendor,
             pPciDev->bus->number, PCI_SLOT(pPciDev->devfn),
             PCI_FUNC(pPciDev->devfn)
@@ -517,7 +508,7 @@ PlxDeviceListBuild(
         DeviceCount++;
 
         // Allocate memory for new node
-        pNode =
+        pDevice =
             kmalloc(
                 sizeof(PLX_DEVICE_NODE),
                 GFP_KERNEL
@@ -525,62 +516,105 @@ PlxDeviceListBuild(
 
         // Clear node
         RtlZeroMemory(
-            pNode,
+            pDevice,
             sizeof(PLX_DEVICE_NODE)
             );
 
         // Fill device structure with the PCI information
-        pNode->pPciDevice      = pPciDev;
-        pNode->Key.bus         = pPciDev->bus->number;
-        pNode->Key.slot        = PCI_SLOT(pPciDev->devfn);
-        pNode->Key.function    = PCI_FUNC(pPciDev->devfn);
-        pNode->Key.VendorId    = pPciDev->vendor;
-        pNode->Key.DeviceId    = pPciDev->device;
-        pNode->Key.SubVendorId = pPciDev->subsystem_vendor;
-        pNode->Key.SubDeviceId = pPciDev->subsystem_device;
+        pDevice->pPciDevice      = pPciDev;
+        pDevice->Key.bus         = pPciDev->bus->number;
+        pDevice->Key.slot        = PCI_SLOT(pPciDev->devfn);
+        pDevice->Key.function    = PCI_FUNC(pPciDev->devfn);
+        pDevice->Key.VendorId    = pPciDev->vendor;
+        pDevice->Key.DeviceId    = pPciDev->device;
+        pDevice->Key.SubVendorId = pPciDev->subsystem_vendor;
+        pDevice->Key.SubDeviceId = pPciDev->subsystem_device;
+
+        // Set API access mode
+        pDevice->Key.ApiMode = PLX_API_MODE_PCI;
 
         // Save parent device object
-        pNode->pdx = pdx;
+        pDevice->pdx = pdx;
 
-        // Get PCI Revision
+        // Get PCI Class code & Revision
         PlxPciRegisterRead_BypassOS(
-            pNode->Key.bus,
-            pNode->Key.slot,
-            pNode->Key.function,
+            pDevice->Key.bus,
+            pDevice->Key.slot,
+            pDevice->Key.function,
             0x08,
             &RegValue
             );
 
-        pNode->Key.Revision = (U8)RegValue;
+        pDevice->Key.Revision = (U8)RegValue;
+        pDevice->PciClass     = (RegValue >> 8);
 
         // Get PCI header type
         PlxPciRegisterRead_BypassOS(
-            pNode->Key.bus,
-            pNode->Key.slot,
-            pNode->Key.function,
+            pDevice->Key.bus,
+            pDevice->Key.slot,
+            pDevice->Key.function,
             0x0c,
             &RegValue
             );
 
         // Set header type field
-        pNode->PciHeaderType = (U8)((RegValue >> 16) & 0x7F);
+        pDevice->PciHeaderType = (U8)((RegValue >> 16) & 0x7F);
+
+        // BIOS may not enable PLX devices so do it manually
+        if (pDevice->Key.VendorId == PLX_VENDOR_ID)
+        {
+            PLX_PCI_REG_READ(
+                pDevice,
+                0x04,
+                &RegValue
+                );
+
+            if ((RegValue & 0x7) == 0)
+            {
+                // Enable device but don't clear any PCI error status
+                RegValue = (RegValue & (~0x1F << 27)) | 0x7;
+
+                PLX_PCI_REG_WRITE(
+                    pDevice,
+                    0x04,
+                    RegValue
+                    );
+            }
+        }
+
+        // For Upstream/Downstream port, get Subsystem ID from capability
+        if ((pDevice->Key.VendorId == PLX_VENDOR_ID) && (pDevice->PciHeaderType == 1))
+        {
+            offset = PlxGetExtendedCapabilityOffset(pDevice, CAP_ID_BRIDGE_SUB_ID);
+
+            if (offset != 0)
+            {
+                PLX_PCI_REG_READ( pDevice, offset + 0x04, &RegValue );
+                pDevice->Key.SubVendorId = (U16)(RegValue >> 0);
+                pDevice->Key.SubDeviceId = (U16)(RegValue >> 16);
+            }
+        }
 
         // Add node to device list
         list_add_tail(
-            &(pNode->ListEntry),
+            &(pDevice->ListEntry),
             &(pdx->List_Devices)
             );
 
+        // Probe the PCI BAR spaces, mainly to check for 64-bit properties
+        PlxProbePciBarSpaces( pDevice );
+
         // Set PLX chip version
         PlxChipTypeDetect(
-            pNode
+            pDevice,
+            FALSE
             );
 
         // Set port number as unknown
-        pNode->PortNumber = (U8)-1;
+        pDevice->PortNumber = (U8)-1;
 
         // Set default EEPROM width (for 8111/8112 series)
-        pNode->Default_EepWidth = 2;
+        pDevice->Default_EepWidth = 2;
 
         // Jump to next device
         pPciDev =
@@ -598,7 +632,7 @@ PlxDeviceListBuild(
     while (pEntry != &(pdx->List_Devices))
     {
         // Get the object
-        pNode =
+        pDevice =
             list_entry(
                 pEntry,
                 PLX_DEVICE_NODE,
@@ -608,38 +642,68 @@ PlxDeviceListBuild(
         // Find & assign parent P2P device
         PlxAssignParentDevice(
             pdx,
-            pNode
+            pDevice
             );
 
         // Set register access device back to itself
-        pNode->pRegNode = pNode;
+        pDevice->pRegNode = pDevice;
 
         // For some 8000 devices, upstream port must be used for reg access
-        if (((pNode->Key.PlxChip & 0xFF00) == 0x8400) ||
-            ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-            ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-            ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+        if (((pDevice->Key.PlxChip & 0xFF00) == 0x2300) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x3300) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x8500) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x8600) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x8700))
         {
             // Read BAR 0
             PLX_PCI_REG_READ(
-                pNode,
+                pDevice,
                 0x10,       // BAR 0
                 &RegValue
                 );
 
             // If BAR 0 not enabled, use parent upstream port
             if (RegValue == 0)
-                pNode->pRegNode = pNode->pParent;
+                pDevice->pRegNode = pDevice->pParent;
         }
 
         // For 6000 & 8000 NT ports, determine NT port side
-        if (((pNode->Key.PlxChip & 0xF000) == 0x6000) ||
-            ((pNode->Key.PlxChip & 0xFF00) == 0x8500) ||
-            ((pNode->Key.PlxChip & 0xFF00) == 0x8600) ||
-            ((pNode->Key.PlxChip & 0xFF00) == 0x8700))
+        if (((pDevice->Key.PlxChip & 0xF000) == 0x6000) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x8500) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x8600) ||
+            ((pDevice->Key.PlxChip & 0xFF00) == 0x8700))
         {
-            if ((pNode->PciHeaderType == 0) && (pNode->Key.function == 0))
-                PlxDetermineNtPortSide( pNode );
+            if ((pDevice->PciHeaderType == 0) && (pDevice->PciClass == 0x068000))
+                PlxDetermineNtPortSide( pDevice );
+        }
+
+        // Default to unknown mode
+        pDevice->Key.DeviceMode = PLX_PORT_UNKNOWN;
+
+        // For Mira USB, determine whether this is in Legacy mode (USB root EP) or
+        // Enhanced Mode (PCIe Switch + USB EP). Some features not available in Enhanced mode.
+        if (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA)
+        {
+            if (pDevice->PciHeaderType == 1)
+            {
+                // For US/DS ports, device must be in Enhanced mode
+                pDevice->Key.DeviceMode = PLX_PORT_ENDPOINT;
+            }
+            else
+            {
+                // For EP, 90h[11] will report mode (1=Enhanced/0=Legacy)
+                RegValue = PlxRegisterRead( pDevice, 0x90, NULL, FALSE );
+                if (RegValue & (1 << 11))
+                    pDevice->Key.DeviceMode = PLX_PORT_ENDPOINT;
+                else
+                    pDevice->Key.DeviceMode = PLX_PORT_LEGACY_ENDPOINT;
+            }
+
+            DebugPrintf((
+                "MIRA Device @ [b:%02x s:%02x] in %s mode\n",
+                pDevice->Key.bus, pDevice->Key.slot,
+                (pDevice->Key.DeviceMode == PLX_PORT_ENDPOINT) ? "Enhanced" : "Legacy"
+                ));
         }
 
         // Jump to next entry
@@ -667,7 +731,7 @@ PlxDeviceListBuild(
 PLX_DEVICE_NODE *
 PlxAssignParentDevice(
     DEVICE_EXTENSION *pdx,
-    PLX_DEVICE_NODE  *pNode
+    PLX_DEVICE_NODE  *pDevice
     )
 {
     U8                OwnedBus;
@@ -705,9 +769,9 @@ PlxAssignParentDevice(
         }
 
         // Check if device exists on owned bus
-        if (pNode->Key.bus == OwnedBus)
+        if (pDevice->Key.bus == OwnedBus)
         {
-            pNode->pParent = pCurrNode;
+            pDevice->pParent = pCurrNode;
             return pCurrNode;
         }
 
@@ -716,6 +780,111 @@ PlxAssignParentDevice(
     }
 
     return NULL;
+}
+
+
+
+
+/*******************************************************************************
+ *
+ * Function   :  PlxProbePciBarSpaces
+ *
+ * Description:  Probe the PCI BARs of a device & set properties
+ *
+ ******************************************************************************/
+VOID
+PlxProbePciBarSpaces(
+    PLX_DEVICE_NODE *pdx
+    )
+{
+    U8       i;
+    U8       NumBars;
+    U32      PciBar;
+    BOOLEAN  bBarUpper64;
+
+
+    // Set max BAR index
+    switch (pdx->PciHeaderType)
+    {
+        case 0:
+            NumBars = 6;
+            break;
+
+        case 1:
+            NumBars = 2;
+            break;
+
+        default:
+            // PCI Type 2 not supported
+            DebugPrintf(("NOTE: Probe of PCI Type 2 headers (CardBus) not supported\n"));
+            return;
+    }
+
+    bBarUpper64 = FALSE;
+
+    // Probe the BARs in order
+    for (i=0; i<NumBars; i++)
+    {
+        // Read PCI BAR
+        PLX_PCI_REG_READ(
+            pdx,
+            0x10 + (i * sizeof(U32)),
+            &PciBar
+            );
+
+        // Handle upper 32-bits of 64-bit BAR
+        if (bBarUpper64)
+        {
+            // Put upper 32-bit address in previous BAR
+            pdx->PciBar[i-1].Properties.BarValue |= ((U64)PciBar << 32);
+
+            // Mark as upper 32-bit
+            pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_UPPER_32 | PLX_BAR_FLAG_MEM;
+
+            // Set BAR as already probed so size not checked in future
+            pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_PROBED;
+
+            // Reset upper 64-bit flag
+            bBarUpper64 = FALSE;
+        }
+        else
+        {
+            // Do nothing if BAR is disabled
+            if (PciBar == 0)
+                continue;
+
+            // Store BAR value
+            pdx->PciBar[i].Properties.BarValue = PciBar;
+
+            // Set BAR properties
+            pdx->PciBar[i].Properties.Physical = pci_resource_start( pdx->pPciDevice, i );
+            pdx->PciBar[i].Properties.Size     = pci_resource_len( pdx->pPciDevice, i );
+
+            // Set BAR flags
+            if (PciBar & (1 << 0))
+                pdx->PciBar[i].Properties.Flags = PLX_BAR_FLAG_IO;
+            else
+                pdx->PciBar[i].Properties.Flags = PLX_BAR_FLAG_MEM;
+
+            // Set BAR flags
+            if (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_MEM)
+            {
+                if (((PciBar >> 1) & 3) == 0)
+                    pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_32_BIT;
+                else if (((PciBar >> 1) & 3) == 1)
+                    pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_BELOW_1MB;
+                else if (((PciBar >> 1) & 3) == 2)
+                    pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_64_BIT;
+
+                if (PciBar & (1 << 3))
+                    pdx->PciBar[i].Properties.Flags |= PLX_BAR_FLAG_PREFETCHABLE;
+            }
+
+            // If 64-bit memory BAR, set flag for next BAR
+            if (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_64_BIT)
+                bBarUpper64 = TRUE;
+        }
+    }
 }
 
 
@@ -730,7 +899,7 @@ PlxAssignParentDevice(
  ******************************************************************************/
 BOOLEAN
 PlxDetermineNtPortSide(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pDevice
     )
 {
     U8  *pRegVa;
@@ -741,27 +910,27 @@ PlxDetermineNtPortSide(
 
 
     // Default to non-NT port
-    pNode->Key.NTPortType = PLX_NT_PORT_NONE;
+    pDevice->Key.NTPortType = PLX_NT_PORT_NONE;
 
     // Check for DMA controller
-    if (pNode->Key.function >= 1)
+    if (pDevice->Key.function >= 1)
         return TRUE;
 
     // Check for 6000-NT device
-    if (((pNode->Key.PlxChip & 0xF000) == 0x6000) &&
-         (pNode->PciHeaderType == 0))
+    if (((pDevice->Key.PlxChip & 0xF000) == 0x6000) &&
+         (pDevice->PciHeaderType == 0))
     {
-        if (pNode->Key.DeviceId & (1 << 0))
-            pNode->Key.NTPortType = PLX_NT_PORT_PRIMARY;
+        if (pDevice->Key.DeviceId & (1 << 0))
+            pDevice->Key.NTPortType = PLX_NT_PORT_PRIMARY;
         else
-            pNode->Key.NTPortType = PLX_NT_PORT_SECONDARY;
+            pDevice->Key.NTPortType = PLX_NT_PORT_SECONDARY;
 
         return TRUE;
     }
 
     // Get BAR 0
     PLX_PCI_REG_READ(
-        pNode,
+        pDevice,
         0x10,       // BAR 0
         &RegPciBar0
         );
@@ -770,50 +939,58 @@ PlxDetermineNtPortSide(
     if (RegPciBar0 == 0)
     {
         // If BAR 0 not enabled, this is 8500 virtual-side
-        pNode->Key.NTPortType   = PLX_NT_PORT_VIRTUAL;
-        pNode->Offset_NtRegBase = 0x10000;
+        pDevice->Key.NTPortType   = PLX_NT_PORT_VIRTUAL;
+        pDevice->Offset_NtRegBase = 0x10000;
     }
     else
     {
         // Verify access to internal registers
-        if (pNode->pRegNode == NULL)
+        if (pDevice->pRegNode == NULL)
         {
             DebugPrintf(("Error: Register access not setup\n"));
             return FALSE;
         }
 
         // Set NT base offset
-        switch (pNode->Key.PlxFamily)
+        switch (pDevice->Key.PlxFamily)
         {
             case PLX_FAMILY_SCOUT:
             case PLX_FAMILY_DRACO_2:
+            case PLX_FAMILY_CAPELLA_1:
                 // Read NT ID register
-                PLX_PCI_REG_READ( pNode, 0xC8C, &RegPci );
+                PLX_PCI_REG_READ( pDevice, 0xC8C, &RegPci );
 
                 // Check which NT port
                 if (RegPci & (1 << 0))
-                    pNode->Offset_NtRegBase = 0x3C000;   // NT 1
+                    pDevice->Offset_NtRegBase = 0x3C000;   // NT 1
                 else
-                    pNode->Offset_NtRegBase = 0x3E000;   // NT 0
+                    pDevice->Offset_NtRegBase = 0x3E000;   // NT 0
 
                 // Determine NT Virtual or Link
                 if (RegPci & (1 << 31))
-                    pNode->Key.NTPortType = PLX_NT_PORT_LINK;
+                    pDevice->Key.NTPortType = PLX_NT_PORT_LINK;
                 else
-                    pNode->Key.NTPortType = PLX_NT_PORT_VIRTUAL;
+                    pDevice->Key.NTPortType = PLX_NT_PORT_VIRTUAL;
                 break;
 
             case PLX_FAMILY_DRACO_1:
                 // NT ID register not implemented, revert to probe algorithm
-                pNode->Offset_NtRegBase = 0x3E000;
+                pDevice->Offset_NtRegBase = 0x3E000;
                 break;
 
             case PLX_FAMILY_CYGNUS:
-                pNode->Offset_NtRegBase = 0x3E000;
+                pDevice->Offset_NtRegBase = 0x3E000;
                 break;
 
             default:
-                pNode->Offset_NtRegBase = 0x10000;
+                if (((pDevice->Key.PlxChip & 0xFF00) == 0x8500) ||
+                    ((pDevice->Key.PlxChip & 0xFF00) == 0x8600))
+                    pDevice->Offset_NtRegBase = 0x10000;
+                else
+                {
+                    ErrorPrintf(("ERROR: NT detection not implemented for %04X\n", pDevice->Key.PlxChip));
+                    return FALSE;
+                }
                 break;
         }
 
@@ -831,13 +1008,13 @@ PlxDetermineNtPortSide(
          * get the updated value.  As a result, the PLX driver bypasses
          * the OS in this case to ensure accurate reading of PCI 3Ch.
          *********************************************************/
-        if (pNode->Key.NTPortType == PLX_NT_PORT_NONE)
+        if (pDevice->Key.NTPortType == PLX_NT_PORT_NONE)
         {
             // Default to NT Virtual side
-            pNode->Key.NTPortType = PLX_NT_PORT_VIRTUAL;
+            pDevice->Key.NTPortType = PLX_NT_PORT_VIRTUAL;
 
             // Get current BAR 0 kernel virtual address
-            pRegVa = pNode->pRegNode->PciBar[0].pVa;
+            pRegVa = pDevice->pRegNode->PciBar[0].pVa;
 
             // Get PCI interrupt register through memory-mapped BAR 0
             if (pRegVa == NULL)
@@ -846,7 +1023,7 @@ PlxDetermineNtPortSide(
                 RegPciBar0 &= ~0xF;
 
                 // Set register offset
-                pRegVa = PLX_INT_TO_PTR(RegPciBar0 + pNode->Offset_NtRegBase + 0x3C);
+                pRegVa = PLX_INT_TO_PTR(RegPciBar0 + pDevice->Offset_NtRegBase + 0x3C);
 
                 // Store original value
                 RegSave = (U32)PlxPhysicalMemRead( pRegVa, sizeof(U32) );
@@ -857,11 +1034,17 @@ PlxDetermineNtPortSide(
                 // Write expected value
                 PlxPhysicalMemWrite( pRegVa, RegExpected, sizeof(U32) );
 
+                // Some chips have an internal latency when updating a
+                //  mem-mapped register to PCI config space. Some dummy
+                //  register reads are used to account for the latency.
+                PlxPhysicalMemRead( pRegVa, sizeof(U32) );
+                PlxPhysicalMemRead( pRegVa, sizeof(U32) );
+
                 // Read register through PCI config cycle (bypass OS)
                 PlxPciRegisterRead_BypassOS(
-                    pNode->Key.bus,
-                    pNode->Key.slot,
-                    pNode->Key.function,
+                    pDevice->Key.bus,
+                    pDevice->Key.slot,
+                    pDevice->Key.function,
                     0x3C,
                     &RegPci
                     );
@@ -872,7 +1055,7 @@ PlxDetermineNtPortSide(
             else
             {
                 // Set register offset
-                pRegVa = pRegVa + pNode->Offset_NtRegBase + 0x3C;
+                pRegVa = pRegVa + pDevice->Offset_NtRegBase + 0x3C;
 
                 // Store original value
                 RegSave = PHYS_MEM_READ_32( (U32*)pRegVa );
@@ -885,9 +1068,9 @@ PlxDetermineNtPortSide(
 
                 // Read register through PCI config cycle (bypass OS)
                 PlxPciRegisterRead_BypassOS(
-                    pNode->Key.bus,
-                    pNode->Key.slot,
-                    pNode->Key.function,
+                    pDevice->Key.bus,
+                    pDevice->Key.slot,
+                    pDevice->Key.function,
                     0x3C,
                     &RegPci
                     );
@@ -898,19 +1081,19 @@ PlxDetermineNtPortSide(
 
             // If PCI register does not match expected value, port is link side
             if (RegPci != RegExpected)
-                pNode->Key.NTPortType = PLX_NT_PORT_LINK;
+                pDevice->Key.NTPortType = PLX_NT_PORT_LINK;
         }
     }
 
     // Adjust offset for NT Link port
-    if (pNode->Key.NTPortType == PLX_NT_PORT_LINK)
-        pNode->Offset_NtRegBase += 0x1000;
+    if (pDevice->Key.NTPortType == PLX_NT_PORT_LINK)
+        pDevice->Offset_NtRegBase += 0x1000;
 
     DebugPrintf((
-        "%04X NT port at [b:%02x s:%02x f:%02x] is %s-side (NT base=%Xh)\n",
-        pNode->Key.PlxChip, pNode->Key.bus, pNode->Key.slot, pNode->Key.function,
-        (pNode->Key.NTPortType == PLX_NT_PORT_LINK) ? "Link" : "Virtual",
-        pNode->Offset_NtRegBase
+        "%04X NT @ [b:%02x s:%02x] is %s-side (NT base=%Xh)\n",
+        pDevice->Key.PlxChip, pDevice->Key.bus, pDevice->Key.slot,
+        (pDevice->Key.NTPortType == PLX_NT_PORT_LINK) ? "Link" : "Virtual",
+        (int)pDevice->Offset_NtRegBase
         ));
 
     return TRUE;
@@ -933,7 +1116,7 @@ GetDeviceNodeFromKey(
     )
 {
     struct list_head *pEntry;
-    PLX_DEVICE_NODE  *pNode;
+    PLX_DEVICE_NODE  *pDevice;
 
 
     pEntry = pdx->List_Devices.next;
@@ -942,18 +1125,18 @@ GetDeviceNodeFromKey(
     while (pEntry != &(pdx->List_Devices))
     {
         // Get the object
-        pNode =
+        pDevice =
             list_entry(
                 pEntry,
                 PLX_DEVICE_NODE,
                 ListEntry
                 );
 
-        if ((pNode->Key.bus      == pKey->bus) &&
-            (pNode->Key.slot     == pKey->slot) &&
-            (pNode->Key.function == pKey->function))
+        if ((pDevice->Key.bus      == pKey->bus) &&
+            (pDevice->Key.slot     == pKey->slot) &&
+            (pDevice->Key.function == pKey->function))
         {
-            return pNode;
+            return pDevice;
         }
 
         // Jump to next entry
@@ -975,17 +1158,22 @@ GetDeviceNodeFromKey(
  ******************************************************************************/
 BOOLEAN
 PlxChipTypeDetect(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pDevice,
+    BOOLEAN          bOnlySetFamily
     )
 {
     U8  i;
-    U16 offset[] = {0xE0,0x958,0xB78,0x0};
+    U16 offset[] = {0xE0,0x958,0xB78,0xF8,0x0};
     U16 DeviceId;
     U32 RegValue;
 
 
+    // Jump to set family if requested
+    if (bOnlySetFamily)
+        goto _PlxChipAssignFamily;
+
     // Default revision to PCI revision
-    pNode->Key.PlxRevision = pNode->Key.Revision;
+    pDevice->Key.PlxRevision = pDevice->Key.Revision;
 
     i = 0;
 
@@ -993,32 +1181,34 @@ PlxChipTypeDetect(
     {
         // Check for hard-coded ID
         PLX_PCI_REG_READ(
-            pNode,
+            pDevice,
             offset[i],
             &RegValue
             );
 
         if ((RegValue & 0xFFFF) == PLX_VENDOR_ID)
         {
-            pNode->Key.PlxChip = (U16)(RegValue >> 16);
+            pDevice->Key.PlxChip = (U16)(RegValue >> 16);
 
-            // Some PLX chips did not update hard-coded ID in revisions
-            if ((pNode->Key.PlxChip != 0x8612) &&
-                (pNode->Key.PlxChip != 0x8616) &&
-                (pNode->Key.PlxChip != 0x8624) &&
-                (pNode->Key.PlxChip != 0x8632) &&
-                (pNode->Key.PlxChip != 0x8647) &&
-                (pNode->Key.PlxChip != 0x8648))
+            // Some chips do not have updated hard-coded revision ID
+            if ((pDevice->Key.PlxChip != 0x8612) &&
+                (pDevice->Key.PlxChip != 0x8616) &&
+                (pDevice->Key.PlxChip != 0x8624) &&
+                (pDevice->Key.PlxChip != 0x8632) &&
+                (pDevice->Key.PlxChip != 0x8647) &&
+                (pDevice->Key.PlxChip != 0x8648))
             {
                 // PLX revision should be in next register
                 PLX_PCI_REG_READ(
-                    pNode,
+                    pDevice,
                     offset[i] + sizeof(U32),
                     &RegValue
                     );
 
-                pNode->Key.PlxRevision = (U8)(RegValue & 0xFF);
+                pDevice->Key.PlxRevision = (U8)(RegValue & 0xFF);
             }
+
+            // Skip to assigning family
             goto _PlxChipAssignFamily;
         }
 
@@ -1027,146 +1217,126 @@ PlxChipTypeDetect(
     }
 
     // Get current device ID
-    DeviceId = pNode->Key.DeviceId;
+    DeviceId = pDevice->Key.DeviceId;
 
     // Generalize for PLX 8000 devices
-    if (pNode->Key.VendorId == PLX_VENDOR_ID)
+    if (pDevice->Key.VendorId == PLX_VENDOR_ID)
     {
-        // Attempt to use Subsytem ID for DMA devices that don't have hard-coded ID
-        if ((DeviceId == 0x87D0) || (DeviceId == 0x87E0))
+        switch (DeviceId & 0xFF00)
         {
-            // Get PCI Subsystem ID
-            PLX_PCI_REG_READ(
-                pNode,
-                0x2C,
-                &RegValue
-                );
-
-            if ((RegValue & 0xFF00FFFF) == 0x870010B5)
-            {
-                pNode->Key.PlxChip = (U16)(RegValue >> 16);
-                goto _PlxChipAssignFamily;
-            }
-        }
-
-        // Don't include 8311 RDK
-        if (DeviceId != 0x86e1)
-        {
-            if (((DeviceId & 0xFF00) == 0x8400) ||
-                ((DeviceId & 0xFF00) == 0x8500) ||
-                ((DeviceId & 0xFF00) == 0x8600) ||
-                ((DeviceId & 0xFF00) == 0x8700) ||
-                ((DeviceId & 0xFFF0) == 0x8110))
-            {
-                DeviceId = 0x8000;
-            }
+            case 0x2300:
+            case 0x3300:
+            case 0x8500:
+            case 0x8600:
+            case 0x8700:
+            case 0x8100:
+                // Don't include 8311 RDK
+                if (DeviceId != 0x86e1)
+                    DeviceId = 0x8000;
+                break;
         }
     }
 
     // Hard-coded ID doesn't exist, so use Device/Vendor ID
-    switch (((U32)DeviceId << 16) | pNode->Key.VendorId)
+    switch (((U32)DeviceId << 16) | pDevice->Key.VendorId)
     {
         case 0x800010B5:        // All 8000 series devices
-            // DMA devices that don't have hard-coded ID
-            if ((pNode->Key.DeviceId == 0x87D0) || (pNode->Key.DeviceId == 0x87E0))
-                pNode->Key.PlxChip = 0x8700;
-            else
-                pNode->Key.PlxChip = pNode->Key.DeviceId;
+            pDevice->Key.PlxChip = pDevice->Key.DeviceId;
             break;
 
         case 0x905010b5:        // 9050/9052
         case 0x520110b5:        // PLX 9052 RDK
-            pNode->Key.PlxChip = 0x9050;
+            pDevice->Key.PlxChip = 0x9050;
             break;
 
         case 0x903010b5:        // 9030
         case 0x300110b5:        // PLX 9030 RDK
         case 0x30c110b5:        // PLX 9030 RDK - cPCI
-            pNode->Key.PlxChip = 0x9030;
+            pDevice->Key.PlxChip = 0x9030;
             break;
 
         case 0x908010b5:        // 9080
         case 0x040110b5:        // PLX 9080-401B RDK
         case 0x086010b5:        // PLX 9080-860 RDK
-            pNode->Key.PlxChip = 0x9080;
+            pDevice->Key.PlxChip = 0x9080;
             break;
 
         case 0x905410b5:        // 9054
         case 0x540610b5:        // PLX 9054 RDK-LITE
         case 0x186010b5:        // PLX 9054-860 RDK
         case 0xc86010b5:        // PLX 9054-860 RDK - cPCI
-            pNode->Key.PlxChip = 0x9054;
+            pDevice->Key.PlxChip = 0x9054;
             break;
 
         case 0x905610b5:        // 9056
         case 0x560110b5:        // PLX 9056 RDK-LITE
         case 0x56c210b5:        // PLX 9056-860 RDK
-            pNode->Key.PlxChip = 0x9056;
+            pDevice->Key.PlxChip = 0x9056;
             break;
 
         case 0x965610b5:        // 9656
         case 0x960110b5:        // PLX 9656 RDK-LITE
         case 0x96c210b5:        // PLX 9656-860 RDK
-            pNode->Key.PlxChip = 0x9656;
+            pDevice->Key.PlxChip = 0x9656;
             break;
 
         case 0x831110b5:        // 8311
         case 0x86e110b5:        // PLX 8311 RDK
-            pNode->Key.PlxChip = 0x8311;
+            pDevice->Key.PlxChip = 0x8311;
             break;
 
         case 0x00213388:        // 6140/6152/6254(NT)
-            if (pNode->PciHeaderType == 0)
+            if (pDevice->PciHeaderType == 0)
             {
-                pNode->Key.PlxChip = 0x6254;
+                pDevice->Key.PlxChip = 0x6254;
             }
             else
             {
                 // Get 6152 VPD register
                 PLX_PCI_REG_READ(
-                    pNode,
+                    pDevice,
                     0xA0,
                     &RegValue
                     );
 
                 if ((RegValue & 0xF) == 0x03)    // CAP_ID_VPD
                 {
-                    pNode->Key.PlxChip = 0x6152;
+                    pDevice->Key.PlxChip = 0x6152;
                 }
                 else
                 {
-                    pNode->Key.PlxChip = 0x6140;
+                    pDevice->Key.PlxChip = 0x6140;
                 }
             }
             break;
 
         case 0x00223388:        // 6150/6350
         case 0x00a23388:        // 6350
-            if (pNode->Key.PlxRevision == 0x20)
+            if (pDevice->Key.PlxRevision == 0x20)
             {
-                pNode->Key.PlxChip = 0x6350;
+                pDevice->Key.PlxChip = 0x6350;
             }
             else
             {
-                pNode->Key.PlxChip = 0x6150;
+                pDevice->Key.PlxChip = 0x6150;
             }
             break;
 
         case 0x00263388:        // 6154
-            pNode->Key.PlxChip = 0x6154;
+            pDevice->Key.PlxChip = 0x6154;
             break;
 
         case 0x00313388:        // 6156
-            pNode->Key.PlxChip = 0x6156;
+            pDevice->Key.PlxChip = 0x6156;
             break;
 
         case 0x00203388:        // 6254
-            pNode->Key.PlxChip = 0x6254;
+            pDevice->Key.PlxChip = 0x6254;
             break;
 
         case 0x00303388:        // 6520
         case 0x652010B5:        // 6520
-            pNode->Key.PlxChip = 0x6520;
+            pDevice->Key.PlxChip = 0x6520;
             break;
 
         case 0x00283388:        // 6540      - Transparent mode
@@ -1174,18 +1344,24 @@ PlxChipTypeDetect(
         case 0x00293388:        // 6540      - Non-transparent mode
         case 0x654110B5:        // 6540/6466 - Non-transparent mode
         case 0x654210B5:        // 6540/6466 - Non-transparent mode
-            pNode->Key.PlxChip = 0x6540;
+            pDevice->Key.PlxChip = 0x6540;
+            break;
+
+        // Cases where PCIe regs not accessible, use SubID
+        case 0x100810B5:        // PLX Synthetic Enabler EP
+        case 0x100910B5:        // PLX GEP
+            pDevice->Key.PlxChip = pDevice->Key.SubDeviceId;
             break;
     }
 
     // Detect the PLX chip revision
     PlxChipRevisionDetect(
-        pNode
+        pDevice
         );
 
 _PlxChipAssignFamily:
 
-    switch (pNode->Key.PlxChip)
+    switch (pDevice->Key.PlxChip)
     {
         case 0x9050:        // 9000 series
         case 0x9030:
@@ -1194,7 +1370,7 @@ _PlxChipAssignFamily:
         case 0x9056:
         case 0x9656:
         case 0x8311:
-            pNode->Key.PlxFamily = PLX_FAMILY_BRIDGE_P2L;
+            pDevice->Key.PlxFamily = PLX_FAMILY_BRIDGE_P2L;
             break;
 
         case 0x6140:        // 6000 series
@@ -1207,38 +1383,38 @@ _PlxChipAssignFamily:
         case 0x6520:
         case 0x6540:
         case 0x6466:
-            pNode->Key.PlxFamily = PLX_FAMILY_BRIDGE_PCI_P2P;
+            pDevice->Key.PlxFamily = PLX_FAMILY_BRIDGE_PCI_P2P;
             break;
 
         case 0x8111:
         case 0x8112:
         case 0x8114:
-            pNode->Key.PlxFamily = PLX_FAMILY_BRIDGE_PCIE_P2P;
+            pDevice->Key.PlxFamily = PLX_FAMILY_BRIDGE_PCIE_P2P;
             break;
 
         case 0x8525:
         case 0x8533:
         case 0x8547:
         case 0x8548:
-            pNode->Key.PlxFamily = PLX_FAMILY_ALTAIR;
+            pDevice->Key.PlxFamily = PLX_FAMILY_ALTAIR;
             break;
 
         case 0x8505:
         case 0x8509:
-            pNode->Key.PlxFamily = PLX_FAMILY_ALTAIR_XL;
+            pDevice->Key.PlxFamily = PLX_FAMILY_ALTAIR_XL;
             break;
 
         case 0x8516:
         case 0x8524:
         case 0x8532:
-            pNode->Key.PlxFamily = PLX_FAMILY_VEGA;
+            pDevice->Key.PlxFamily = PLX_FAMILY_VEGA;
             break;
 
         case 0x8508:
         case 0x8512:
         case 0x8517:
         case 0x8518:
-            pNode->Key.PlxFamily = PLX_FAMILY_VEGA_LITE;
+            pDevice->Key.PlxFamily = PLX_FAMILY_VEGA_LITE;
             break;
 
         case 0x8612:
@@ -1247,7 +1423,7 @@ _PlxChipAssignFamily:
         case 0x8632:
         case 0x8647:
         case 0x8648:
-            pNode->Key.PlxFamily = PLX_FAMILY_DENEB;
+            pDevice->Key.PlxFamily = PLX_FAMILY_DENEB;
             break;
 
         case 0x8604:
@@ -1260,7 +1436,7 @@ _PlxChipAssignFamily:
         case 0x8617:
         case 0x8618:
         case 0x8619:
-            pNode->Key.PlxFamily = PLX_FAMILY_SIRIUS;
+            pDevice->Key.PlxFamily = PLX_FAMILY_SIRIUS;
             break;
 
         case 0x8625:
@@ -1269,26 +1445,28 @@ _PlxChipAssignFamily:
         case 0x8664:
         case 0x8680:
         case 0x8696:
-            pNode->Key.PlxFamily = PLX_FAMILY_CYGNUS;
+            pDevice->Key.PlxFamily = PLX_FAMILY_CYGNUS;
             break;
 
         case 0x8700:
             // DMA devices that don't have hard-coded ID
-            if ((pNode->Key.DeviceId == 0x87D0) || (pNode->Key.DeviceId == 0x87E0))
-                pNode->Key.PlxFamily = PLX_FAMILY_DRACO_1;
+            if ((pDevice->Key.DeviceId == 0x87D0) || (pDevice->Key.DeviceId == 0x87E0))
+                pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_1;
             else
-                pNode->Key.PlxFamily = PLX_FAMILY_SCOUT;
+                pDevice->Key.PlxFamily = PLX_FAMILY_SCOUT;
             break;
 
-        case 0x8408:
-        case 0x8416:
         case 0x8712:
         case 0x8716:
+        case 0x8723:
         case 0x8724:
         case 0x8732:
         case 0x8747:
         case 0x8748:
-            pNode->Key.PlxFamily = PLX_FAMILY_DRACO_1;
+            if (pDevice->Key.PlxRevision == 0xAA)
+                pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_1;
+            else
+                pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_2;
             break;
 
         case 0x8713:
@@ -1296,15 +1474,44 @@ _PlxChipAssignFamily:
         case 0x8725:
         case 0x8733:
         case 0x8749:
-            pNode->Key.PlxFamily = PLX_FAMILY_DRACO_2;
+            pDevice->Key.PlxFamily = PLX_FAMILY_DRACO_2;
+            break;
+
+        case 0x2380:
+        case 0x3380:
+        case 0x3382:
+        case 0x8603:
+        case 0x8605:
+            pDevice->Key.PlxFamily = PLX_FAMILY_MIRA;
+            break;
+
+        case 0x8714:
+        case 0x8718:
+        case 0x8734:
+        case 0x8750:
+        case 0x8764:
+        case 0x8780:
+        case 0x8796:
+            pDevice->Key.PlxFamily = PLX_FAMILY_CAPELLA_1;
+            break;
+
+        case 0x8715:
+        case 0x8719:
+        case 0x8735:
+        case 0x8751:
+        case 0x8765:
+        case 0x8781:
+        case 0x8797:
+            pDevice->Key.PlxFamily = PLX_FAMILY_CAPELLA_2;
             break;
 
         case 0:
-            pNode->Key.PlxFamily = PLX_FAMILY_NONE;
+            pDevice->Key.PlxFamily = PLX_FAMILY_NONE;
             break;
 
         default:
-            pNode->Key.PlxFamily = PLX_FAMILY_UNKNOWN;
+            DebugPrintf(("ERROR - PLX Family not set for %04X\n", pDevice->Key.PlxChip));
+            pDevice->Key.PlxFamily = PLX_FAMILY_UNKNOWN;
             break;
     }
 
@@ -1323,132 +1530,131 @@ _PlxChipAssignFamily:
  ******************************************************************************/
 VOID
 PlxChipRevisionDetect(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pDevice
     )
 {
     // Default revision to value in chip
-    pNode->Key.PlxRevision = pNode->Key.Revision;
+    pDevice->Key.PlxRevision = pDevice->Key.Revision;
 
     // Determine if PLX revision should override default
-    switch (pNode->Key.PlxChip)
+    switch (pDevice->Key.PlxChip)
     {
         case 0x8111:
-            if (pNode->Key.PlxRevision == 0x10)
-                pNode->Key.PlxRevision = 0xAA;
-            else if (pNode->Key.PlxRevision == 0x20)
-                pNode->Key.PlxRevision = 0xBA;
-            else if (pNode->Key.PlxRevision == 0x21)
-                pNode->Key.PlxRevision = 0xBB;
+            if (pDevice->Key.PlxRevision == 0x10)
+                pDevice->Key.PlxRevision = 0xAA;
+            else if (pDevice->Key.PlxRevision == 0x20)
+                pDevice->Key.PlxRevision = 0xBA;
+            else if (pDevice->Key.PlxRevision == 0x21)
+                pDevice->Key.PlxRevision = 0xBB;
             break;
 
         case 0x8112:
-            pNode->Key.PlxRevision = 0xAA;
+            pDevice->Key.PlxRevision = 0xAA;
             break;
 
         case 0x9050:
-            if (pNode->Key.PlxRevision == 0x2)
-                pNode->Key.PlxRevision = 2;
+            if (pDevice->Key.PlxRevision == 0x2)
+                pDevice->Key.PlxRevision = 2;
             else
-                pNode->Key.PlxRevision = 1;
+                pDevice->Key.PlxRevision = 1;
             break;
 
         case 0x9030:
-            pNode->Key.PlxRevision = 0xAA;
+            pDevice->Key.PlxRevision = 0xAA;
             break;
 
         case 0x9080:
-            pNode->Key.PlxRevision = 3;
+            pDevice->Key.PlxRevision = 3;
             break;
 
         case 0x9056:
         case 0x9656:
-            // Just use default revision for these chips
             break;
 
         case 0x9054:
             // AA & AB versions have same revision ID
-            if ((pNode->Key.PlxRevision == 0x1) ||
-                (pNode->Key.PlxRevision == 0xA) ||
-                (pNode->Key.PlxRevision == 0xB))
+            if ((pDevice->Key.PlxRevision == 0x1) ||
+                (pDevice->Key.PlxRevision == 0xA) ||
+                (pDevice->Key.PlxRevision == 0xB))
             {
-                pNode->Key.PlxRevision = 0xAB;
+                pDevice->Key.PlxRevision = 0xAB;
             }
             else
             {
-                pNode->Key.PlxRevision = 0xAC;
+                pDevice->Key.PlxRevision = 0xAC;
             }
             break;
 
         case 0x8311:
-            pNode->Key.PlxRevision = 0xAA;
+            pDevice->Key.PlxRevision = 0xAA;
             break;
 
         case 0x6140:
-            if (pNode->Key.PlxRevision == 0x12)
+            if (pDevice->Key.PlxRevision == 0x12)
             {
-                pNode->Key.PlxRevision = 0xAA;
+                pDevice->Key.PlxRevision = 0xAA;
             }
             else
             {
                 // Revision 0x13 only other
-                pNode->Key.PlxRevision = 0xDA;
+                pDevice->Key.PlxRevision = 0xDA;
             }
             break;
 
         case 0x6150:
-            if (pNode->Key.PlxRevision == 0x4)
-                pNode->Key.PlxRevision = 0xBB;
+            if (pDevice->Key.PlxRevision == 0x4)
+                pDevice->Key.PlxRevision = 0xBB;
             break;
 
         case 0x6152:
-            switch (pNode->Key.PlxRevision)
+            switch (pDevice->Key.PlxRevision)
             {
                 case 0x13:
-                    pNode->Key.PlxRevision = 0xBA;
+                    pDevice->Key.PlxRevision = 0xBA;
                     break;
 
                 case 0x14:
-                    pNode->Key.PlxRevision = 0xCA;
+                    pDevice->Key.PlxRevision = 0xCA;
                     break;
 
                 case 0x15:
-                    pNode->Key.PlxRevision = 0xCC;
+                    pDevice->Key.PlxRevision = 0xCC;
                     break;
 
                 case 0x16:
-                    pNode->Key.PlxRevision = 0xDA;
+                    pDevice->Key.PlxRevision = 0xDA;
                     break;
             }
             break;
 
         case 0x6154:
-            if (pNode->Key.PlxRevision == 0x4)
-                pNode->Key.PlxRevision = 0xBB;
+            if (pDevice->Key.PlxRevision == 0x4)
+                pDevice->Key.PlxRevision = 0xBB;
             break;
 
         case 0x6350:
-            if (pNode->Key.PlxRevision == 0x20)
-                pNode->Key.PlxRevision = 0xAA;
+            if (pDevice->Key.PlxRevision == 0x20)
+                pDevice->Key.PlxRevision = 0xAA;
             break;
 
         case 0x6156:
-            if (pNode->Key.PlxRevision == 0x1)
-                pNode->Key.PlxRevision = 0xDA;
+            if (pDevice->Key.PlxRevision == 0x1)
+                pDevice->Key.PlxRevision = 0xDA;
             break;
 
         case 0x6254:
-            if (pNode->Key.PlxRevision == 0x4)
-                pNode->Key.PlxRevision = 0xBB;
+            if (pDevice->Key.PlxRevision == 0x4)
+                pDevice->Key.PlxRevision = 0xBB;
             break;
 
         case 0x6520:
-            if (pNode->Key.PlxRevision == 0x2)
-                pNode->Key.PlxRevision = 0xBB;
+            if (pDevice->Key.PlxRevision == 0x2)
+                pDevice->Key.PlxRevision = 0xBB;
             break;
 
         case 0x6540:
-            if (pNode->Key.PlxRevision == 0x2)
-                pNode->Key.PlxRevision = 0xBB;
+            if (pDevice->Key.PlxRevision == 0x2)
+                pDevice->Key.PlxRevision = 0xBB;
             break;
     }
 }

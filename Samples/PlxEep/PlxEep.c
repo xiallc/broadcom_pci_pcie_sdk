@@ -41,7 +41,7 @@ main(
     )
 {
     int               ExitCode;
-    S8                rc;
+    S16               rc;
     EEP_OPTIONS       EepOptions;
     PLX_STATUS        Plx_rc;
     PLX_DEVICE_KEY    Key;
@@ -122,7 +122,7 @@ main(
     }
 
     Cons_printf(
-        "Selected: %04x %04x [b:%02x s:%02x f:%02x]\n",
+        "Selected: %04x %04x [b:%02x s:%02x f:%x]\n\n",
         Key.DeviceId, Key.VendorId,
         Key.bus, Key.slot, Key.function
         );
@@ -293,11 +293,12 @@ ProcessCommandLine(
                         break;
                 }
             }
-            else if (((pOptions->LimitPlxChip & 0xFF00) != 0x8500) &&
+            else if (((pOptions->LimitPlxChip & 0xFF00) != 0x3300) &&
+                     ((pOptions->LimitPlxChip & 0xFF00) != 0x8500) &&
                      ((pOptions->LimitPlxChip & 0xFF00) != 0x8600) &&
                      ((pOptions->LimitPlxChip & 0xFF00) != 0x8700))
             {
-                // Remaining devices must be 8500/8600/8700
+                // Remaining devices must be 3300/8500/8600/8700
                 bChipTypeValid = FALSE;
             }
 
@@ -307,7 +308,7 @@ ProcessCommandLine(
                     "ERROR: Invalid PLX chip type.  Valid types are:\n"
                     "   6150, 6152, 6154, 6156, 6254, 6350, 6520, 6540,\n"
                     "   9050, 9030, 9080, 9054, 9056, 9656, 8311, 8111, 8112, 8114,\n"
-                    "   8500, 8600, or 8700 parts\n"
+                    "   3300, 8500, 8600, or 8700 parts\n"
                     );
                 return EXIT_CODE_CMD_LINE_ERR;
             }
@@ -565,7 +566,7 @@ DisplayHelp(
  *              -1,  if user cancelled the selection
  *
  ********************************************************************/
-S8
+S16
 SelectDevice(
     PLX_DEVICE_KEY *pKey,
     EEP_OPTIONS    *pOptions
@@ -593,7 +594,7 @@ SelectDevice(
         rc =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (rc == ApiSuccess)
@@ -601,7 +602,7 @@ SelectDevice(
             if (pOptions->bVerbose)
             {
                 Cons_printf(
-                    "App: Found device %04x %04x [b:%02x s:%02x f:%02x]\n",
+                    "App: Found device %04x %04x [b:%02x s:%02x f:%x]\n",
                     DevKey.DeviceId, DevKey.VendorId,
                     DevKey.bus, DevKey.slot, DevKey.function
                     );
@@ -702,7 +703,7 @@ SelectDevice(
                         Cons_printf("\n");
 
                     Cons_printf(
-                        "\t\t    %2d. %04x %04x  [%04X %02X - b:%02x s:%02x f:%02x]\n",
+                        "\t\t    %2d. %04x %04x  [%04X %02X - b:%02x s:%02x f:%x]\n",
                         NumDevices, DevKey.DeviceId, DevKey.VendorId,
                         DevKey.PlxChip, DevKey.PlxRevision,
                         DevKey.bus, DevKey.slot, DevKey.function
@@ -748,7 +749,7 @@ SelectDevice(
 
     Cons_printf("\n");
 
-    return (S8)NumDevices;
+    return (S16)NumDevices;
 }
 
 
@@ -768,7 +769,6 @@ EepFile(
     )
 {
     U8         EepPortSize;
-    U8         PlxRevision;
     U16        PlxChip;
     U16        EepSize;
     BOOLEAN    rc;
@@ -786,8 +786,8 @@ EepFile(
     // Attempt to set EEPROM address width if requested
     if (pOptions->EepWidthSet != 0)
     {
-        if (pOptions->bVerbose)
-            Cons_printf("App: Attempting to set EEPROM controller for %d-byte addressing\n", pOptions->EepWidthSet);
+        Cons_printf("Set address width..... ");
+        Cons_fflush( stdout );
 
         status =
             PlxPci_EepromSetAddressWidth(
@@ -798,21 +798,25 @@ EepFile(
         if (status != ApiSuccess)
         {
             Cons_printf(
-                "WARNING: Unable to configure EEPROM controller for %d-byte addressing\n",
+                "ERROR: Unable to set to %dB addressing\n",
                 pOptions->EepWidthSet
                 );
 
             if (pOptions->bIgnoreWarnings == FALSE)
                 return EXIT_CODE_EEP_WIDTH_ERR;
         }
+        else
+        {
+            Cons_printf("Ok (%d-byte)\n", pOptions->EepWidthSet);
+        }
     }
 
-    // Get the PLX chip type
-    PlxChip     = pDevice->Key.PlxChip;
-    PlxRevision = pDevice->Key.PlxRevision;
+    // Generalize by chip type
+    PlxChip = pDevice->Key.PlxChip;
 
-    // Generalize by device type
-    if (((PlxChip & 0xFF00) == 0x8600) ||
+    if (((PlxChip & 0xFF00) == 0x2300) ||
+        ((PlxChip & 0xFF00) == 0x3300) ||
+        ((PlxChip & 0xFF00) == 0x8600) ||
         ((PlxChip & 0xFF00) == 0x8700))
         PlxChip = PlxChip & 0xFF00;
 
@@ -826,7 +830,7 @@ EepFile(
     switch (PlxChip)
     {
         case 0x8114:
-            if (PlxRevision >= 0xBA)
+            if (pDevice->Key.PlxRevision >= 0xBA)
                 EepSize = 0x3EC;
             else
                 EepSize = 0x378;
@@ -856,14 +860,20 @@ EepFile(
         case 0x8533:
         case 0x8547:
         case 0x8548:
+        case 0x3300:
         case 0x8600:
         case 0x8700:
+            if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) ||
+                (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1))
+                bCrc = TRUE;
+
             // Process some 8000 devices differently
             if (pOptions->bLoadFile)
             {
                 return Plx8000_EepromFileLoad(
                     pDevice,
-                    pOptions
+                    pOptions,
+                    bCrc
                     );
             }
             else
@@ -871,7 +881,8 @@ EepFile(
                 return Plx8000_EepromFileSave(
                     pDevice,
                     pOptions,
-                    0           // 0 = Entire EEPROM
+                    0,          // 0 = Entire EEPROM
+                    bCrc
                     );
             }
 
@@ -974,7 +985,7 @@ S8
 Plx_EepromFileLoad(
     PLX_DEVICE_OBJECT *pDevice,
     EEP_OPTIONS       *pOptions,
-    U16                EepSize,
+    U32                EepSize,
     U8                 EepPortSize,
     BOOLEAN            bCrc,
     BOOLEAN            bEndianSwap
@@ -995,7 +1006,7 @@ Plx_EepromFileLoad(
     // Note start time
     start = clock();
 
-    Cons_printf("Load EEPROM file..........");
+    Cons_printf("Load EEPROM file............ ");
     Cons_fflush( stdout );
 
     pBuffer = NULL;
@@ -1006,7 +1017,7 @@ Plx_EepromFileLoad(
     if (pFile == NULL)
     {
         Cons_printf(
-            "ERROR: Unable to load file \"%s\"\n",
+            "ERROR: Unable to load \"%s\"\n",
             pOptions->FileName
             );
 
@@ -1052,7 +1063,7 @@ Plx_EepromFileLoad(
     // Default to successful operation
     rc = EXIT_CODE_SUCCESS;
 
-    Cons_printf("Program EEPROM............");
+    Cons_printf("Program EEPROM.............. ");
 
     // Write buffer into EEPROM
     for (offset=0; offset < FileSize; offset += sizeof(U32))
@@ -1117,7 +1128,7 @@ Plx_EepromFileLoad(
     // Update CRC if requested
     if (bCrc)
     {
-        Cons_printf("Calculate & update CRC....");
+        Cons_printf("Calculate & update CRC...... ");
         Cons_fflush( stdout );
         PlxPci_EepromCrcUpdate(
             pDevice,
@@ -1253,7 +1264,7 @@ Plx_EepromFileSave(
     // Close the file
     fclose( pFile );
 
-    Cons_printf("Ok (%d B)\n", (int)EepSize);
+    Cons_printf("Ok (%dB)\n", (int)EepSize);
 
     // Note completion time
     end = clock();
@@ -1279,14 +1290,17 @@ Plx_EepromFileSave(
 S8
 Plx8000_EepromFileLoad(
     PLX_DEVICE_OBJECT *pDevice,
-    EEP_OPTIONS       *pOptions
+    EEP_OPTIONS       *pOptions,
+    BOOLEAN            bCrc
     )
 {
     S8       rc;
     U8      *pBuffer;
-    U16      offset;
-    U16      value;
-    U16      Verify_Value;
+    U16      Verify_Value_16;
+    U32      value;
+    U32      Verify_Value;
+    U32      Crc;
+    U32      offset;
     U32      FileSize;
     FILE    *pFile;
     clock_t  start;
@@ -1298,8 +1312,8 @@ Plx8000_EepromFileLoad(
 
     pBuffer = NULL;
 
-    Cons_printf( "Load EEPROM file......" );
-    Cons_fflush( stdout );
+    Cons_printf("Load EEPROM file...... " );
+    Cons_fflush(stdout);
 
     // Open the file to read
     pFile = fopen( pOptions->FileName, "rb" );
@@ -1307,7 +1321,7 @@ Plx8000_EepromFileLoad(
     if (pFile == NULL)
     {
         Cons_printf(
-            "ERROR: Unable to load file \"%s\"\n",
+            "ERROR: Unable to load \"%s\"\n",
             pOptions->FileName
             );
 
@@ -1324,7 +1338,7 @@ Plx8000_EepromFileLoad(
     fseek( pFile, 0, SEEK_SET );
 
     // Allocate a buffer for the data
-    pBuffer = malloc(FileSize);
+    pBuffer = malloc( FileSize );
 
     if (pBuffer == NULL)
         return EXIT_CODE_EEP_FAIL;
@@ -1340,18 +1354,18 @@ Plx8000_EepromFileLoad(
     // Close the file
     fclose( pFile );
 
-    Cons_printf( "Ok (%d B)\n", (int)FileSize );
+    Cons_printf( "Ok (%dB)\n", (int)FileSize );
 
     // Default to successful operation
     rc = EXIT_CODE_SUCCESS;
 
-    Cons_printf( "Program EEPROM........" );
+    Cons_printf( "Program EEPROM........ " );
 
-    // Write buffer into EEPROM
-    for (offset=0; offset < FileSize; offset += sizeof(U16))
+    // Write 32-bit aligned buffer into EEPROM
+    for (offset=0; offset < (FileSize & ~0x3); offset += sizeof(U32))
     {
         // Periodically update status
-        if ((offset & 0xF) == 0)
+        if ((offset & 0x7) == 0)
         {
             // Display current status
             Cons_printf(
@@ -1361,22 +1375,17 @@ Plx8000_EepromFileLoad(
             Cons_fflush( stdout );
         }
 
-        // Store second 8-bit data
-        value = pBuffer[offset + sizeof(U8)];
+        // Get next value
+        value = *(U32*)(pBuffer + offset);
 
-        // Shift second data
-        value <<= 8;
-
-        // Store first 8-bit data
-        value |= pBuffer[offset];
-
-        PlxPci_EepromWriteByOffset_16(
+        // Write value & read back to verify
+        PlxPci_EepromWriteByOffset(
             pDevice,
             offset,
             value
             );
 
-        PlxPci_EepromReadByOffset_16(
+        PlxPci_EepromReadByOffset(
             pDevice,
             offset,
             &Verify_Value
@@ -1385,10 +1394,8 @@ Plx8000_EepromFileLoad(
         if (Verify_Value != value)
         {
             Cons_printf(
-                "ERROR: offset:%02X  wrote:%04X  read:%04X\n",
-                offset,
-                value,
-                Verify_Value
+                "ERROR: offset:%02X  wrote:%08X  read:%08X\n",
+                offset, value, Verify_Value
                 );
 
             rc = EXIT_CODE_EEP_FAIL;
@@ -1396,7 +1403,49 @@ Plx8000_EepromFileLoad(
         }
     }
 
+    // Write any remaing 16-bit unaligned value
+    if (offset < FileSize)
+    {
+        // Get next value
+        value = *(U16*)(pBuffer + offset);
+
+        // Write value & read back to verify
+        PlxPci_EepromWriteByOffset_16(
+            pDevice,
+            offset,
+            (U16)value
+            );
+
+        PlxPci_EepromReadByOffset_16(
+            pDevice,
+            offset,
+            &Verify_Value_16
+            );
+
+        if (Verify_Value_16 != (U16)value)
+        {
+            Cons_printf(
+                "ERROR: offset:%02X  wrote:%04X  read:%04X\n",
+                offset, value, Verify_Value_16
+                );
+            goto _Exit_File_Load_8000;
+        }
+    }
+
     Cons_printf( "Ok \n" );
+
+    // Update CRC if requested
+    if (bCrc)
+    {
+        Cons_printf("Calculate & update CRC.... ");
+        Cons_fflush( stdout );
+        PlxPci_EepromCrcUpdate(
+            pDevice,
+            &Crc,
+            TRUE
+            );
+        Cons_printf("Ok (CRC=%08X)\n", (int)Crc);
+    }
 
 _Exit_File_Load_8000:
     // Release the buffer
@@ -1428,12 +1477,13 @@ S8
 Plx8000_EepromFileSave(
     PLX_DEVICE_OBJECT *pDevice,
     EEP_OPTIONS       *pOptions,
-    U32                ByteCount
+    U32                ByteCount,
+    BOOLEAN            bCrc
     )
 {
     U8      *pBuffer;
-    U16      offset;
     U16      value;
+    U32      offset;
     U32      EepSize;
     FILE    *pFile;
     clock_t  start;
@@ -1443,7 +1493,7 @@ Plx8000_EepromFileSave(
     // Note start time
     start = clock();
 
-    Cons_printf( "Determine EEPROM data size...." );
+    Cons_printf( "Get EEPROM data size.. " );
 
     pBuffer = NULL;
 
@@ -1454,7 +1504,7 @@ Plx8000_EepromFileSave(
     else
     {
         // Start with EEPROM header size
-        EepSize = sizeof(U16);
+        EepSize = sizeof(U32);
 
         // Get EEPROM register count
         PlxPci_EepromReadByOffset_16(
@@ -1463,65 +1513,85 @@ Plx8000_EepromFileSave(
             &value
             );
 
-        // Get byte count
-        value = value & 0xFF;
-
         // Add register byte count
-        EepSize += sizeof(U16);
-
-        // Add register data
         EepSize += (U16)value;
 
-        // Add shared memory for 8111/8112
-        if ((pDevice->Key.PlxChip & 0xFF00) == 0x8100)
+        // Get Shared(811x)/8051(MIRA) memory count
+        if ((pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCIE_P2P) ||
+            (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA))
         {
             // Get Shared memory count
             PlxPci_EepromReadByOffset_16(
                 pDevice,
-                (U16)EepSize,
+                EepSize,
                 &value
                 );
 
             // Get byte count
             value = value & 0xFF;
 
-            // Add shared mem byte count
+            // Add mem byte count
             EepSize += sizeof(U16);
 
-            // Add shared mem data
+            // Add mem data
             EepSize += (U16)value;
         }
+
+        // Add CRC count if supported
+        if (bCrc)
+            EepSize += sizeof(U32);
     }
 
-    Cons_printf( "Ok (%d B)\n", EepSize );
+    Cons_printf(
+        "Ok (%dB%s",
+        EepSize,
+        (bCrc) ? " inc 32-bit CRC" : ""
+        );
 
-    Cons_printf( "Read EEPROM data.............." );
+    if (pOptions->ExtraBytes)
+    {
+        Cons_printf(" + %dB extra", pOptions->ExtraBytes);
+
+        // Adjust for extra bytes
+        EepSize += pOptions->ExtraBytes;
+
+        // Make sure size aligned on 16-bit boundary
+        EepSize = (EepSize + 1) & ~(U32)0x1;
+    }
+    Cons_printf(")\n");
+
+
+    Cons_printf( "Read EEPROM data...... " );
     Cons_fflush( stdout );
 
     // Allocate a buffer for the EEPROM data
-    pBuffer = malloc(EepSize);
+    pBuffer = malloc( EepSize );
 
     if (pBuffer == NULL)
         return EXIT_CODE_EEP_FAIL;
 
-    // Read EEPROM into buffer
-    for (offset=0; offset < EepSize; offset += sizeof(U16))
+    // Read 32-bit aligned EEPROM data into buffer
+    for (offset=0; offset < (EepSize & ~0x3); offset += sizeof(U32))
+    {
+        PlxPci_EepromReadByOffset(
+            pDevice,
+            offset,
+            (U32*)(pBuffer + offset)
+            );
+    }
+
+    // Read any remaining 16-bit aligned byte
+    if (offset < EepSize)
     {
         PlxPci_EepromReadByOffset_16(
             pDevice,
             offset,
-            &value
+            (U16*)(pBuffer + offset)
             );
-
-        // Store first 8-bit data
-        pBuffer[offset] = (U8)value;
-
-        // Store second 8-bit data
-        pBuffer[offset + sizeof(U8)] = (U8)(value >> 8);
     }
     Cons_printf( "Ok\n" );
 
-    Cons_printf( "Write EEPROM data to file....." );
+    Cons_printf( "Write data to file.... " );
     Cons_fflush( stdout );
 
     // Open the file to write
@@ -1541,14 +1611,11 @@ Plx8000_EepromFileSave(
     // Close the file
     fclose( pFile );
 
-    Cons_printf(
-        "Ok (\"%s\")\n",
-        pOptions->FileName
-        );
-
     // Release the buffer
     if (pBuffer != NULL)
         free(pBuffer);
+
+    Cons_printf( "Ok (%s)\n", pOptions->FileName );
 
     // Note completion time
     end = clock();

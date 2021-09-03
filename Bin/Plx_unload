@@ -5,99 +5,88 @@
 #
 #-----------------------------------------------------------------------------
 
-clear
 
 # Remove comment to display script commands as it runs
 #set -x
 
-# Path to the driver nodes
-path=/dev/plx
 
+# Set default driver name
+plx_drv_name=$1
 
 # Verify command-line
-if [ "$1" = "" ]; then
-    plx_error=1
-else
-    plx_error=1
+case "$1" in
+    8000n) plx_drv_name=8000_NT  ;;
+    8000d) plx_drv_name=8000_DMA ;;
+    6000n) plx_drv_name=6000_NT  ;;
+    9050)  ;;
+    9030)  ;;
+    9080)  ;;
+    9054)  ;;
+    9056)  ;;
+    9656)  ;;
+    8311)  ;;
+    Svc)   bServiceDriver=1 ;;
 
-    if [ "$1" = "9050" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9030" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9080" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9054" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9056" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "9656" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "8311" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "6000" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "8000" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "Dma" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "EoPCIe" ]; then
-        plx_error=0
-    fi
-
-    if [ "$1" = "Svc" ]; then
-        plx_error=0
-    fi
-fi
-
-if [ "${plx_error}" == "1" ]; then
+    *)
     echo
     echo "PLX Linux module unload script"
     echo
-    echo "  Usage: Plx_unload {PLX_Chip} [DebugOption]"
+    echo "  Usage: Plx_unload {Driver} [DebugOption]"
     echo
-    echo "     PLX_Chip    = 6000       : PLX 6254/6540/6466 NT-mode PnP driver"
-    echo "                   8000       : PLX 8000 NT-mode PnP driver"
-    echo "                   9050       : PLX 9050/9052 PnP driver"
-    echo "                   9030       : PLX 9030 PnP driver"
-    echo "                   9080       : PLX 9080 PnP driver"
-    echo "                   9054       : PLX 9054 PnP driver"
-    echo "                   9056       : PLX 9056 PnP driver"
-    echo "                   9656       : PLX 9656 PnP driver"
-    echo "                   8311       : PLX 8311 PnP driver"
-    echo "                   Dma        : PLX 8600 DMA Controller PnP driver"
+    echo "     Driver      = 8000n      : PLX 8000 NT-mode driver"
+    echo "                   8000d      : PLX 8000 DMA Controller driver"
+    echo "                   9050       : PLX 9050/9052 driver"
+    echo "                   9030       : PLX 9030 driver"
+    echo "                   9080       : PLX 9080 driver"
+    echo "                   9054       : PLX 9054 driver"
+    echo "                   9056       : PLX 9056 driver"
+    echo "                   9656       : PLX 9656 driver"
+    echo "                   8311       : PLX 8311 driver"
+    echo "                   6000n      : PLX 6254/6540/6466 NT-mode driver"
     echo "                   Svc        : PLX PCI/PCIe Service driver"
     echo
     echo "     DebugOption = <none>     : Unload Release build of module"
     echo "                   'd'        : Unload Debug build of module"
     echo
     echo "  E.g.: Plx_unload 9054 d   - Unload 9054 module debug version"
-    echo "        Plx_unload 8000     - Unload 8000 NT module release version"
+    echo "        Plx_unload 8000n    - Unload 8000 NT module release version"
+    echo
+    exit
+    ;;
+esac
+
+
+# Verify superuser access
+if [ `id -u` != 0 ]; then
+    echo
+    echo "   ***************************************************"
+    echo "   * NOTE: You must be superuser, logged in as root, *"
+    echo "   *       or have sufficient rights to unload       *"
+    echo "   *       modules or this script will not work.     *"
+    echo "   ***************************************************"
+    echo
+    echo "  ---- ERROR: Admin rights not detected, halting ----"
     echo
     exit
 fi
 
-# PLX Chip to load module for
-plx_chip=$1
+
+# Verify rmmod is found
+if [ -f /sbin/rmmod ]; then
+    RmMod=/sbin/rmmod
+fi
+if [ -f /usr/sbin/rmmod ]; then
+    RmMod=/usr/sbin/rmmod
+fi
+if [ "$RmMod" = "" ]; then
+    echo "ERROR: 'rmmod' not found in /sbin or /usr/sbin"
+    echo
+    exit
+fi
+
+
+# Path to the driver nodes
+path=/dev/plx
 
 # Check for debug version
 if [ "$2" != "" ]; then
@@ -105,36 +94,52 @@ if [ "$2" != "" ]; then
 fi
 
 # Registered name of driver
-name=Plx${plx_chip}
+name=Plx$plx_drv_name
 
-# Name of module to unload
-module=${name}${debug}.ko
+# Name of module
+module=$name$debug
 
 
 echo
-echo "   ****************************************************"
-echo "   * NOTE:  You must be superuser, logged in as root, *"
-echo "   *        or have sufficient rights to remove       *"
-echo "   *        modules or this script will not work.     *"
-echo "   ****************************************************"
-echo
-echo
-echo -n "Clear existing device nodes..... "
-rm -f $path/${name}*
-echo "Ok (${path}/${name})"
+echo Remove: $module
 
-# Delete the directory only if empty
-if [ -d ${path} ]; then
-    echo -n "Delete device node path......... "
-    rmdir --ignore-fail-on-non-empty ${path}
-    echo "Ok (${path})"
+# Get module load status
+drv_Name=`lsmod | awk "\\$1==\"$module\" {print \\$1}"`
+
+echo -n "  Unload module................... "
+if [ "$drv_Name" = "" ]; then
+    echo ERROR: \'$module\' not loaded
+    echo
+    exit
 fi
 
-echo -n "Remove module................... "
-/sbin/rmmod $module
-echo "Ok ($module)"
+# Generate temp file name
+TmpFile=/tmp/_Plx_Rmmod_$module.tmp
 
-echo
-echo Module unload complete.
-echo
+# Remove module & capture output
+$RmMod $module 2> $TmpFile
+Rm_mod=`cat $TmpFile | awk "\\$1==\"ERROR:\" {print \\$1}"`
+
+# Check for error
+if [ "$Rm_mod" = "ERROR:" ]; then
+    echo ERROR: Unable to remove module
+    echo "      \-- Msg: `cat $TmpFile`"
+    echo
+    rm $TmpFile
+    exit
+else
+    echo "Ok ($module)"
+    rm $TmpFile
+fi
+
+echo -n "  Clear device nodes.............. "
+rm -f $path/$name*
+echo "Ok ($path/$name)"
+
+# Delete the directory only if empty
+if [ -d $path ]; then
+    echo -n "  Delete device node path......... "
+    rmdir --ignore-fail-on-non-empty ${path}
+    echo "Ok ($path)"
+fi
 echo

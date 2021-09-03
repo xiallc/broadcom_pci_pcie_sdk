@@ -35,7 +35,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  *****************************************************************************/
 
@@ -45,48 +45,72 @@
 #endif
 
 
-// Only allow 2.4 and 2.6 kernels
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
-    #error "Linux kernel versions before v2.4 not supported"
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,7,0)
-    #error "Linux kernel versions greater than v2.6 not supported"
-#endif
-
-
-// Missing definitions in 2.4
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-    #define __user
-    #define __GFP_NOWARN                0
-    #define DMA_TO_DEVICE               1
-    #define DMA_FROM_DEVICE             2
-    #define iminor(inode)               MINOR((inode)->i_rdev)
-    #define imajor(inode)               MAJOR((inode)->i_rdev)
-    #define pgprot_noncached(x)         (x)
-
-    // ISR returns nothing in kernel 2.4
-    #define irqreturn_t                 void
-    #define PLX_IRQ_RETVAL(value)
-#else
-    #define PLX_IRQ_RETVAL              IRQ_RETVAL
+// Only allow 2.6 and higher kernels
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+    #error "ERROR: Linux kernel versions prior to v2.6 not supported"
 #endif
 
 
 
 
 /***********************************************************
- * INIT_WORK
+ * IORESOURCE_MEM_64
+ *
+ * This flag specifies whether a PCI BAR space is 64-bit. The
+ * definition wasn't added until 2.6.31.
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
+    #define IORESOURCE_MEM_64           0x00100000
+#endif
+
+
+
+
+/***********************************************************
+ * VM_RESERVED
+ *
+ * This flag was removed starting with 3.7. The recommended
+ * replacement is a combination of two flags.
+ **********************************************************/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0))
+    #define VM_RESERVED                 (VM_DONTEXPAND | VM_DONTDUMP)
+#endif
+
+
+
+
+/***********************************************************
+ * INIT_WORK & INIT_DELAYED_WORK
  *
  * This macro initializes a work structure with the function
  * to call.  In kernel 2.6.20, the 3rd parameter was removed.
  * It used to be the parameter to the function, but now, the
  * function is called with a pointer to the work_struct itself.
+ * INIT_DELAYED_WORK was introduced to init the delayed_work struct.
  **********************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
     #define PLX_INIT_WORK                     INIT_WORK
+    // Red Hat pre-defines this
+    #if !defined(RED_HAT_LINUX_KERNEL)
+        #define INIT_DELAYED_WORK             INIT_WORK
+    #endif
 #else
     #define PLX_INIT_WORK(work, func, data)   INIT_WORK((work), (func))
+#endif
+
+
+
+
+/***********************************************************
+ * ioremap_prot
+ *
+ * This function is supported after 2.6.27. PLX drivers only
+ * used it for probing ACPI tables. In newer kernels, calls
+ * to ioremap() for ACPI locations report errors since the
+ * default flags conflict with kernel mappings.
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27))
+    #define ioremap_prot(addr,size,flags)     ioremap((addr), (size))
 #endif
 
 
@@ -182,7 +206,6 @@
 /***********************************************************
  * pci_enable_msi   - Added in 2.6.1
  * pci_disable_msi  - Added in 2.6.8
- *
  **********************************************************/
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,1))
     #define Plx_pci_enable_msi(pDev)    (-1)
@@ -200,6 +223,24 @@
 
 
 /***********************************************************
+ * is_virtfn field in pci_dev   - Added in 2.6.30
+ *
+ * For SR-IOV devices, there is an 'is_virtfn' field in the
+ * pci_dev structure to report whether the device is a VF. This
+ * field is was also added to updated RedHat kernels.
+ **********************************************************/
+#if (defined(CONFIG_PCI_IOV) || \
+     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30)) || \
+     ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)) && defined(RED_HAT_LINUX_KERNEL)))
+    #define Plx_pcie_is_virtfn(pDev)    (pDev->is_virtfn)
+#else
+    #define Plx_pcie_is_virtfn(pDev)    (FALSE)
+#endif
+
+
+
+
+/***********************************************************
  * readq / writeq 
  *
  * These functions are used to perform 64-bit accesses to
@@ -209,30 +250,29 @@
  * NOTE: This is still incomplete for non-x86 32-bit architectures
  *       where readq/writeq are not yet defined.
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-    #if defined(CONFIG_X86_32)
-        // x86 64-bit I/O access functions
-        static inline __u64 readq(const volatile void __iomem *addr)
-        {
-            const volatile u32 __iomem *p = addr;
-            u64 value;
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29)) && defined(CONFIG_X86_32))
+    // x86 64-bit I/O access functions
+    static inline __u64 readq(const volatile void __iomem *addr)
+    {
+        const volatile u32 __iomem *p = addr;
+        u64 value;
 
-            value  = readl(p);
-            value += ((u64)readl(p + 1) << 32);
+        value  = readl(p);
+        value += ((u64)readl(p + 1) << 32);
 
-            return value;
-        }
+        return value;
+    }
 
-        static inline void writeq(__u64 val, volatile void __iomem *addr)
-        {
-            writel(val, addr);
-            writel(val >> 32, addr+4);
-        }
-    #elif !defined(CONFIG_64BIT)
-        // DBG - Work in-progress. Functions may not be available on platform
-        #define readq                   readl
-        #define writeq                  writel
-    #endif
+    static inline void writeq(__u64 val, volatile void __iomem *addr)
+    {
+        writel(val, addr);
+        writel(val >> 32, addr+4);
+    }
+
+#elif !defined(CONFIG_64BIT) && !defined(CONFIG_X86_32)
+    // Revert to 32-bit accesses for non-x86/x64 platforms
+    #define readq                   readl
+    #define writeq                  writel
 #endif
 
 
@@ -424,9 +464,9 @@
  *
  * remap_pfn_range, however, does not seem to exist in all
  * kernel 2.6 distributions.  remap_page_range was officially
- * removed in 2.6.11.  To keep things simple, this driver
- * will default to using remap_page_range unless the kernel
- * version is 2.6.11 or greater.
+ * removed in 2.6.11 but declared deprecated in 2.6.10. To keep
+ * things simple, this driver will default to remap_page_range
+ * unless the kernel version is 2.6.10 or greater.
  *
  * For 2.4 kernels, remap_pfn_range obviously does not exist.
  * Although remap_page_range() may be used instead, there
@@ -444,11 +484,11 @@
  *  2.4.0  -> 2.4.19              remap_page_range (no VMA param)
  *  2.4.20 -> 2.5.2  (non-RedHat) remap_page_range (no VMA param)
  *  2.4.20 -> 2.5.2  (RedHat)     remap_page_range (with VMA param)
- *  2.5.3  -> 2.6.10              remap_page_range (with VMA param)
- *  2.6.11 & up                   remap_pfn_range
+ *  2.5.3  -> 2.6.9               remap_page_range (with VMA param)
+ *  2.6.10 & up                   remap_pfn_range
  *
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,11))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10))
     #if ( (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)) || \
          ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20)) && defined(RED_HAT_LINUX_KERNEL)) )
 
@@ -538,69 +578,6 @@
 #else
     // Function already defined
     #define Plx_io_remap_pfn_range      io_remap_pfn_range
-#endif
-
-
-
-
-/**********************************************************
- * The following implements an interruptible wait_event
- * with a timeout for older kernels.  This is used instead
- * of the function interruptible_sleep_on_timeout() since
- * this is susceptible to race conditions.
- *
- *    retval == 0; timed out
- *    retval >  0; condition met or task signaled
- *                 ret=jiffies remaining before timeout
- *    retval <  0; error condition or interrupted by signal
- *********************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-    #define Plx_wait_event_interruptible_timeout(wq, condition, timeout) \
-    ({                                                   \
-        int __ret = timeout;                             \
-                                                         \
-        if (!(condition))                                \
-        {                                                \
-            __Plx__wait_event_interruptible_timeout(     \
-                wq,                                      \
-                condition,                               \
-                __ret                                    \
-                );                                       \
-        }                                                \
-        __ret;                                           \
-    })
-
-
-    #define __Plx__wait_event_interruptible_timeout(wq, condition, ret) \
-    do                                               \
-    {                                                \
-        wait_queue_t __wait;                         \
-                                                     \
-        init_waitqueue_entry(&__wait, current);      \
-                                                     \
-        add_wait_queue(&wq, &__wait);                \
-        for (;;)                                     \
-        {                                            \
-            set_current_state(TASK_INTERRUPTIBLE);   \
-            if (condition)                           \
-                break;                               \
-            if (!signal_pending(current))            \
-            {                                        \
-                ret = schedule_timeout(ret);         \
-                if (!ret)                            \
-                    break;                           \
-                continue;                            \
-            }                                        \
-            ret = -ERESTARTSYS;                      \
-            break;                                   \
-        }                                            \
-        current->state = TASK_RUNNING;               \
-        remove_wait_queue(&wq, &__wait);             \
-    }                                                \
-    while (0)
-
-#else
-    #define Plx_wait_event_interruptible_timeout     wait_event_interruptible_timeout
 #endif
 
 

@@ -86,7 +86,11 @@
 #if 0
     #define API_NAME                     "aardvark"
 #else
+  #if defined(_WIN64) || (PLX_CPU_BITS == 64)
+    #define API_NAME                     "PlxI2cAa_x64"
+  #else
     #define API_NAME                     "PlxI2cAa"
+  #endif
 #endif
 #define API_DEBUG                    AA_DEBUG
 #define API_OK                       AA_OK

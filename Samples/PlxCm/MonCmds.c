@@ -26,6 +26,22 @@
 
 /**********************************************************
  *
+ * Function   :  Cmd_ConsClear
+ *
+ * Description:  Clear the console
+ *
+ *********************************************************/
+BOOLEAN Cmd_ConsClear( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+    Cons_clear();
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
  * Function   :  Cmd_Version
  *
  * Description:  Display monitor version information
@@ -70,7 +86,7 @@ BOOLEAN Cmd_Version( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Display driver version
     if (pDevice == NULL)
     {
-        Cons_printf( "PLX Driver: N/A\n");
+        Cons_printf( "PLX Driver: N/A (No device selected)\n");
     }
     else
     {
@@ -143,32 +159,40 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     Cons_printf("\n");
     Cons_printf("       -----------  General Commands  -----------\n");
     Cons_printf(" cls       Clear terminal display\n");
-    Cons_printf(" screen    Change the screen size (25, 43, or 50 lines)\n");
+    Cons_printf(" screen    Display or change screen height\n");
     Cons_printf(" ver       Display monitor version information\n");
-    Cons_printf(" history   Display (or select command from) history\n");
+    Cons_printf(" history   Display or select command from history\n");
     Cons_printf(" help      Display help screen\n");
-    Cons_printf(" exit/quit Exits the application\n");
+    Cons_printf(" exit/quit Exit the application\n");
 
     Cons_printf("\n");
     Cons_printf("       ------------  Device Access  -------------\n");
     Cons_printf(" dev       Display device list or select new device\n");
+    Cons_printf(" i2c       Probe for PLX devices using I2C\n");
     Cons_printf(" set_chip  Force current device to a PLX chip type\n");
-    Cons_printf(" pcr       Display PCI Configuration Registers\n");
-    Cons_printf(" reg       Generic register access\n");
+
+    Cons_printf("\n");
+    Cons_printf("       ------------- PCI/PCIe Info --------------\n");
+    Cons_printf(" pci_cap   Display PCI/PCIe device extended capability list\n");
+    Cons_printf(" portinfo  Display PCI Express port properties\n");
+    Cons_printf(" scan      Scan for all possible PCI devices\n");
+//    Cons_printf(" tree      Display PCI/PCIe device tree heirarchy\n");
+
+    Cons_printf("\n");
+    Cons_printf("       -----------  Register Access  ------------\n");
+    Cons_printf(" dp        Dump PCI registers\n");
+    Cons_printf(" dr        Dump PLX-specific registers\n");
+    Cons_printf(" pcr       Access PCI Configuration registers\n");
+    Cons_printf(" reg       Generic register access [within port]\n");
+    Cons_printf(" mmr       Generic register access [ignore port #]\n");
     Cons_printf(" lcr       Access Local Configuration Regs\n");
-    Cons_printf(" rtr       Access Run-Time Registers\n");
+    Cons_printf(" rtr       Access Run-Time registers\n");
     Cons_printf(" dma       Access DMA Registers\n");
     Cons_printf(" mqr       Access Message Queue Registers\n");
 
     Cons_printf("\n");
-    Cons_printf("       ------------   Device Info   -------------\n");
-    Cons_printf(" pci_cap   Display PCI/PCIe device extended capability list\n");
-    Cons_printf(" portinfo  Display PCI Express port properties\n");
-    Cons_printf(" tree      Display PCI/PCIe device tree heirarchy\n");
-
-    Cons_printf("\n");
     Cons_printf("       ------------  EEPROM Access  -------------\n");
-    Cons_printf(" eep       Display EEPROM values\n");
+    Cons_printf(" eep       Display or modify EEPROM values\n");
     Cons_printf(" eep_load  Load EEPROM values from a file\n");
     Cons_printf(" eep_save  Save EEPROM values to a file\n");
 
@@ -194,11 +218,10 @@ BOOLEAN Cmd_Help( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     Cons_printf("\n");
     Cons_printf("       ------------  Miscellaneous  -------------\n");
-    Cons_printf(" scan      Scan all PCI buses\n");
     Cons_printf(" vars      Display variable table\n");
     Cons_printf(" set       Add, update, or delete a user variable\n");
     Cons_printf(" buff      Display DMA buffer properties\n");
-    Cons_printf(" reset     Reset the selected device\n");
+    Cons_printf(" reset     Reset the selected device (if supported)\n");
     Cons_printf(" sleep     Delay for a specified amount of time (in milliseconds)\n");
 
     Cons_printf("\n");
@@ -678,6 +701,9 @@ BOOLEAN Cmd_SetChip( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Update device node chip type
     pNode->Key.PlxChip     = pDevice->Key.PlxChip;
     pNode->Key.PlxRevision = pDevice->Key.PlxRevision;
+    pNode->Key.PlxFamily   = pDevice->Key.PlxFamily;
+
+    Cons_printf("Ok\n");
 
     return TRUE;
 }
@@ -749,7 +775,7 @@ BOOLEAN Cmd_Dev( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     Cons_printf(
-        "b:%02x s:%02x f:%02x]\n",
+        "b:%02x s:%02x f:%x]\n",
         pNode->Key.bus,
         pNode->Key.slot,
         pNode->Key.function
@@ -775,10 +801,12 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     return TRUE;
 #else
 
-    U8             i;
-    BOOLEAN        bError;
-    PLXCM_ARG     *pArg;
-    PLX_MODE_PROP  ModeProp;
+    U16             i;
+    BOOLEAN         bError;
+    BOOLEAN         bReselect;
+    PLXCM_ARG      *pArg;
+    PLX_MODE_PROP   ModeProp;
+    PLX_DEVICE_KEY  Key;
 
 
     bError = FALSE;
@@ -847,7 +875,17 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         return TRUE;
     }
 
-    Cons_printf("Scanning for I2C devices...\n");
+    bReselect = FALSE;
+
+    // If already connected over I2C, must release current open device
+    if ((pDevice != NULL) && (pDevice->Key.ApiMode == PLX_API_MODE_I2C_AARDVARK))
+    {
+        bReselect = TRUE;
+        RtlCopyMemory( &Key, &pDevice->Key, sizeof(PLX_DEVICE_KEY) );
+        PlxPci_DeviceClose( pDevice );
+    }
+
+    Cons_printf("Scanning for I2C devices (ESC to halt)...\n");
 
     // Build device list
     i =
@@ -855,6 +893,13 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             PLX_API_MODE_I2C_AARDVARK,
             &ModeProp
             );
+
+    // Check if user canceled
+    if (i & (1 << 7))
+    {
+        Cons_printf(" -- User aborted scan --   ");
+        i &= ~(U8)(1 << 7);
+    }
 
     if (i == 0)
         Cons_printf(" - No I2C devices added -\n");
@@ -864,10 +909,12 @@ BOOLEAN Cmd_I2cConnect( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
         // Select first device if none previously selected
         if (pDevice == NULL)
-        {
             DeviceSelectByIndex( 0 );
-        }
     }
+
+    // Reselect previously selected I2C device
+    if (bReselect)
+        PlxPci_DeviceOpen( &Key, pDevice );
 
     Cons_printf("\n");
 
@@ -1073,6 +1120,34 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         strcpy( szCapability, "Latency Tolerance Reporting (LTR)" );
                         break;
 
+                    case PCIE_CAP_ID_SECONDARY_PCI_EXPRESS:
+                        strcpy( szCapability, "Secondary PCI Express" );
+                        break;
+
+                    case PCIE_CAP_ID_PROTOCOL_MULTIPLEX:
+                        strcpy( szCapability, "Protocol Multiplexing (PMUX)" );
+                        break;
+
+                    case PCIE_CAP_ID_PROCESS_ADDR_SPACE_ID:
+                        strcpy( szCapability, "Process Address Space ID (PASID)" );
+                        break;
+
+                    case PCIE_CAP_ID_LTWT_NOTIF_REQUESTER:
+                        strcpy( szCapability, "Lightweight Notification Requester (LNR)" );
+                        break;
+
+                    case PCIE_CAP_ID_DS_PORT_CONTAINMENT:
+                        strcpy( szCapability, "Downstream Port Containment (DPC)" );
+                        break;
+
+                    case PCIE_CAP_ID_L1_PM_SUBSTRATES:
+                        strcpy( szCapability, "L1 Power Management Substrates (L1PM)" );
+                        break;
+
+                    case PCIE_CAP_ID_PRECISION_TIME_MEAS:
+                        strcpy( szCapability, "Precision Time Measurement (PTM)" );
+                        break;
+
                     default:
                         strcpy( szCapability, "?Unknown?" );
                         break;
@@ -1159,19 +1234,19 @@ BOOLEAN Cmd_PciCapList( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                         break;
 
                     default:
-                        strcpy( szCapability, "?Unknown?" );
+                        strcpy( szCapability, "?Unknown? capability" );
                         break;
                 }
             }
 
             // Display information
             Cons_printf(
-                "  %3X : [%02d] %s capability",
+                "  %3X : [%02d] %s",
                 Offset_Cap, (U8)RegValue, szCapability
                 );
 
             if (bPciExpress)
-                Cons_printf(" (ver %d)\n", CapVersion);
+                Cons_printf(" (v%d)\n", CapVersion);
             else
                 Cons_printf("\n");
         }
@@ -1249,7 +1324,7 @@ BOOLEAN Cmd_PortProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             break;
 
         case PLX_PORT_ENDPOINT:  // PLX_PORT_NON_TRANS
-            Cons_printf("(Endpoint or NT port)\n");
+            Cons_printf("(Endpoint)\n");
             break;
 
         case PLX_PORT_UPSTREAM:
@@ -1289,65 +1364,30 @@ BOOLEAN Cmd_PortProp( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             break;
     }
 
-    // Port Number
-    Cons_printf("    Port Number : ");
     if (PortProp.bNonPcieDevice)
-        Cons_printf("--\n");
-    else
-        Cons_printf("%02d\n", PortProp.PortNumber);
+    {
+        Cons_printf("      --- PCIe not supported ---\n");
+        return TRUE;
+    }
+
+    // Port Number
+    Cons_printf("    Port Number : %02d\n", PortProp.PortNumber);
 
     // Max Payload
-    Cons_printf("    Max Payload : ");
-    if (PortProp.bNonPcieDevice)
-        Cons_printf("--\n");
-    else
-        Cons_printf(
-            "%02d bytes  (Max supported=%02d bytes)\n",
-            PortProp.MaxPayloadSize, PortProp.MaxPayloadSupported
-            );
+    Cons_printf(
+        "    Max Payload : %02dB / %02dB\n",
+        PortProp.MaxPayloadSize, PortProp.MaxPayloadSupported
+        );
 
     // Max Read Req Size
-    Cons_printf("    Max Read Req: ");
-    if (PortProp.bNonPcieDevice)
-        Cons_printf("--\n");
-    else
-        Cons_printf("%02d bytes\n", PortProp.MaxReadReqSize);
+    Cons_printf("    Max Read Req: %02dB\n", PortProp.MaxReadReqSize);
 
-    // Link width
-    Cons_printf("    Link Width  : ");
-    if (PortProp.bNonPcieDevice)
-        Cons_printf("--\n");
-    else
-        Cons_printf(
-            "x%d (Max=x%d)\n",
-            PortProp.LinkWidth, PortProp.MaxLinkWidth
-            );
-
-    // Link speed
-    Cons_printf("    Link Speed  : ");
-    if (PortProp.bNonPcieDevice)
-        Cons_printf("--\n");
-    else
-    {
-        if (PortProp.LinkSpeed == PLX_PCIE_GEN_3_0)
-            Cons_printf("Gen 3 (8 Gbps)");
-        else if (PortProp.LinkSpeed == PLX_PCIE_GEN_2_0)
-            Cons_printf("Gen 2 (5 Gbps)");
-        else if (PortProp.LinkSpeed == PLX_PCIE_GEN_1_0)
-            Cons_printf("Gen 1 (2.5 Gbps)");
-        else
-            Cons_printf("Gen %d (?? Gbps)", PortProp.LinkSpeed);
-
-        Cons_printf(" [Max=");
-        if (PortProp.MaxLinkSpeed == PLX_PCIE_GEN_3_0)
-            Cons_printf("Gen 3 (8 Gbps)]\n");
-        else if (PortProp.MaxLinkSpeed == PLX_PCIE_GEN_2_0)
-            Cons_printf("Gen 2 (5 Gbps)]\n");
-        else if (PortProp.MaxLinkSpeed == PLX_PCIE_GEN_1_0)
-            Cons_printf("Gen 1 (2.5 Gbps)]\n");
-        else
-            Cons_printf("Gen %d (?? Gbps)]\n", PortProp.MaxLinkSpeed);
-    }
+    // PCIe Link
+    Cons_printf(
+        "    PCIe Link   : Gen%d x%d / Gen%d x%d\n",
+        PortProp.LinkSpeed, PortProp.LinkWidth,
+        PortProp.MaxLinkSpeed, PortProp.MaxLinkWidth
+        );
 
     return TRUE;
 }
@@ -1491,9 +1531,9 @@ BOOLEAN Cmd_VarDisplay( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             if ((pVar->strName[0] == 'v') || (pVar->strName[0] == 'V'))
                 Cons_printf( "BAR %c virtual address", pVar->strName[1] );
             else if (Plx_strcasecmp(pVar->strName, "hbuf") == 0)
-            {
                 Cons_printf( "PLX DMA buffer virtual address" );
-            }
+            else if (Plx_strcasecmp(pVar->strName, "RetVal") == 0)
+                Cons_printf( "Last command return value" );
         }
 
         Cons_printf("\n");
@@ -1556,7 +1596,8 @@ BOOLEAN Cmd_VarSet( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         !Plx_strcasecmp(pArgVar->ArgString, "v3") ||
         !Plx_strcasecmp(pArgVar->ArgString, "v4") ||
         !Plx_strcasecmp(pArgVar->ArgString, "v5") ||
-        !Plx_strcasecmp(pArgVar->ArgString, "hbuf"))
+        !Plx_strcasecmp(pArgVar->ArgString, "hbuf") ||
+        !Plx_strcasecmp(pArgVar->ArgString, "RetVal"))
     {
         Cons_printf(
             "Error: Variable '%s' is reserved for system use\n",
@@ -1632,6 +1673,7 @@ _Exit_Cmd_VarSet:
 BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
     PLXCM_VAR        *pVar;
+    PLXCM_ARG        *pArg;
     PLX_PHYSICAL_MEM  PciBuffer;
 
 
@@ -1650,6 +1692,7 @@ BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     if (PciBuffer.Size == 0)
     {
         Cons_printf("Error: Host DMA buffer is not enabled or not available\n");
+        Gbl_LastRetVal = 0;
     }
     else
     {
@@ -1668,10 +1711,37 @@ BOOLEAN Cmd_ShowBuffer( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         // Get buffer address from variable table
         pVar = CmdLine_VarLookup( "hbuf" );
 
-        if (pVar == NULL)
-            Cons_printf(" -- Not mapped --\n" );
+        Cons_printf(
+            "%s\n",
+            (pVar == NULL) ? " -- Not mapped --\n" : pVar->strValue
+            );
+
+        // Check for specific return value request
+        pArg = CmdLine_ArgGet( pCmd, 0 );
+
+        if (pArg == NULL)
+        {
+            Gbl_LastRetVal = 0;
+        }
+        else if ((Plx_strcasecmp( pArg->ArgString, "/p" ) == 0) ||
+                 (Plx_strcasecmp( pArg->ArgString, "-p" ) == 0))
+        {
+            // Return physical address
+            Gbl_LastRetVal = PciBuffer.PhysicalAddr;
+        }
+        else if ((Plx_strcasecmp( pArg->ArgString, "/s" ) == 0) ||
+                 (Plx_strcasecmp( pArg->ArgString, "-s" ) == 0))
+        {
+            // Return 
+            Gbl_LastRetVal = PciBuffer.Size;
+        }
         else
-            Cons_printf( "%s\n", pVar->strValue );
+        {
+            if (pVar == NULL)
+                Gbl_LastRetVal = 0;
+            else
+                Gbl_LastRetVal = htol( pVar->strValue );
+        }
     }
 
     return TRUE;
@@ -1693,7 +1763,7 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     int         x;
     int         CharsToPrint;
     int         SpacesToInsert;
-    char        buffer[20];
+    U8          buffer[20];
     U8          size;
     U8         *pEndAddr;
     static U8  *pCurrAddr = NULL;
@@ -1734,7 +1804,7 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     // Check for count
-    if (pCmd->NumArgs == 1)
+    if (pCmd->NumArgs <= 1)
     {
         // Set default count to 80h
         pEndAddr = (U8*)0x80;
@@ -1781,8 +1851,13 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
                 // Set initial Spaces to insert
                 SpacesToInsert = (U8)((((size * 2) + 1) * (16 / size)) + 3);
+                SpacesToInsert--;
 
-                Cons_printf("%08x: ", (PLX_UINT_PTR)pCurrAddr);
+                Cons_printf(
+                    "%s%08x: ",
+                    (sizeof(PLX_UINT_PTR) == sizeof(U64)) ? ".." : "",
+                    (PLX_UINT_PTR)pCurrAddr
+                    );
             }
 
             switch (size)
@@ -1800,11 +1875,6 @@ BOOLEAN Cmd_MemRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 case sizeof(U32):
                     CurrValue = PlxCm_MemRead_32(pCurrAddr);
                     Cons_printf("%08x ", CurrValue);
-                    break;
-
-                case sizeof(U64):
-                    CurrValue = PlxCm_MemRead_64(pCurrAddr);
-                    Cons_printf("%08x%08x ", PLX_64_HIGH_32(CurrValue), PLX_64_LOW_32(CurrValue));
                     break;
             }
 
@@ -1977,10 +2047,6 @@ BOOLEAN Cmd_MemWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                     case sizeof(U32):
                         PlxCm_MemWrite_32(pAddr, (U32)pArg->ArgIntHex);
                         break;
-
-                    case sizeof(U64):
-                        PlxCm_MemWrite_64(pAddr, (U64)pArg->ArgIntHex);
-                        break;
                 }
 
                 pAddr += size;
@@ -2013,7 +2079,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     int         x;
     int         CharsToPrint;
     int         SpacesToInsert;
-    char        buffer[20];
+    U8          buffer[20];
     U8          size;
     U64         EndAddr;
     static U64  CurrAddr = 0;
@@ -2058,7 +2124,7 @@ BOOLEAN Cmd_IoRead( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     }
 
     // Check for count
-    if (pCmd->NumArgs == 1)
+    if (pCmd->NumArgs <= 1)
     {
         // Set default count to 80h
         EndAddr = 0x80;
@@ -2280,8 +2346,9 @@ BOOLEAN Cmd_IoWrite( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     {
         Cons_printf(
             "Error: Missing parameter(s)\n"
-            "Usage:\n:"
-            "   e<b,w,l,q> <IO_Port> <value1> [value2 value3 ... valueN]\n"
+            "Usage:\n"
+            "   o%c <IO_Port> <value1> [value2 value3 ... valueN]\n",
+            pCmd->szCmd[1]
             );
 
         return TRUE;
@@ -2528,6 +2595,9 @@ BOOLEAN Cmd_RegPci( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             value = PlxPci_PciRegisterReadFast( pDevice, offset, NULL );
             Cons_printf( " %03x: %08x", offset, value );
 
+            // Store last value in return code
+            Gbl_LastRetVal = value;
+
             // Display description if available
             pStr = RegSet_DescrGetByOffset( RegSet, offset );
             if (pStr != NULL)
@@ -2574,6 +2644,7 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     U32           value;
     U32           PlxChip;
     BOOLEAN       bRead;
+    BOOLEAN       bAdjustForPort;
     PLXCM_ARG    *pArg;
     PLX_STATUS    status;
     REGISTER_SET *RegSet;
@@ -2635,7 +2706,9 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Generalize by chip type
     PlxChip = pDevice->Key.PlxChip;
 
-    if (((PlxChip & 0xFF00) == 0x8500) ||
+    if (((PlxChip & 0xFF00) == 0x2300) ||
+        ((PlxChip & 0xFF00) == 0x3300) ||
+        ((PlxChip & 0xFF00) == 0x8500) ||
         ((PlxChip & 0xFF00) == 0x8600) ||
         ((PlxChip & 0xFF00) == 0x8700))
     {
@@ -2646,8 +2719,9 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         PlxChip = PlxChip & 0xF000;
     }
 
-    if ((Plx_strcasecmp( pCmd->szCmd, "lcr" ) == 0) ||
-        (Plx_strcasecmp( pCmd->szCmd, "reg" ) == 0))
+    if ((Plx_strcasecmp( pCmd->szCmd, "reg" ) == 0) ||
+        (Plx_strcasecmp( pCmd->szCmd, "mmr" ) == 0) ||
+        (Plx_strcasecmp( pCmd->szCmd, "lcr" ) == 0))
         Regs = REGS_LCR;
     else if (Plx_strcasecmp( pCmd->szCmd, "rtr" ) == 0)
         Regs = REGS_RTR;
@@ -2744,6 +2818,8 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             }
             break;
 
+        case 0x2300:
+        case 0x3300:
         case 0x8114:
         case 0x8500:
         case 0x8600:
@@ -2782,6 +2858,12 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     else
         bRead = FALSE;
 
+    // Check if offset should be adjusted for port
+    if (Plx_strcasecmp( pCmd->szCmd, "mmr" ) == 0)
+        bAdjustForPort = FALSE;
+    else
+        bAdjustForPort = TRUE;
+
     // Enable throttle output
     ConsoleIoThrottle(TRUE);
 
@@ -2801,8 +2883,15 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         // Access device
         if (bRead)
         {
-            value = PlxPci_PlxRegisterRead( pDevice, offset, &status );
+            if (bAdjustForPort)
+                value = PlxPci_PlxRegisterRead( pDevice, offset, &status );
+            else
+                value = PlxPci_PlxMappedRegisterRead( pDevice, offset, &status );
+
             Cons_printf(" %03x: %08x", offset, value );
+
+            // Store last value in return code
+            Gbl_LastRetVal = value;
 
             // Display description if available
             pStr = RegSet_DescrGetByOffset( RegSet, offset );
@@ -2813,7 +2902,10 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         }
         else
         {
-            PlxPci_PlxRegisterWrite( pDevice, offset, value );
+            if (bAdjustForPort)
+                PlxPci_PlxRegisterWrite( pDevice, offset, value );
+            else
+                PlxPci_PlxMappedRegisterWrite( pDevice, offset, value );
         }                
 
         // Jump to next item or quit
@@ -2825,6 +2917,184 @@ BOOLEAN Cmd_RegPlx( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     while (1);
 
 _Exit_Cmd_RegPlx:
+    // Disable throttle output
+    ConsoleIoThrottle(FALSE);
+
+    return TRUE;
+}
+
+
+
+
+/**********************************************************
+ *
+ * Function   :  Cmd_RegDump
+ *
+ * Description:  Dumps PLX registers
+ *
+ *********************************************************/
+BOOLEAN Cmd_RegDump( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
+{
+    int         i;
+    U32         CurrValue;
+    U32         OffsetEnd;
+    static U32  OffsetCurr = 0;
+    BOOLEAN     bDone;
+    BOOLEAN     bRepeat;
+    BOOLEAN     bPciRegs;
+    BOOLEAN     bEndLine;
+    PLXCM_ARG  *pArg;
+    PLX_STATUS  status;
+
+
+    if (pDevice == NULL)
+    {
+        Cons_printf("Error: No device selected\n");
+        return FALSE;
+    }
+
+    // Determine register set to access
+    if (pCmd->szCmd[1] == 'p')
+        bPciRegs = TRUE;
+    else if (pCmd->szCmd[1] == 'r')
+        bPciRegs = FALSE;
+    else
+        return FALSE;
+
+    // Set current address
+    if (pCmd->NumArgs >= 1)
+    {
+        // Get starting offset
+        pArg = CmdLine_ArgGet( pCmd, 0 );
+
+        // Verify argument
+        if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
+        {
+            Cons_printf("Error: '%s' is not a valid offset\n", pArg->ArgString);
+            return FALSE;
+        }
+
+        // Set current offset
+        OffsetCurr = (U32)pArg->ArgIntHex;
+    }
+
+    if (OffsetCurr & 0x3)
+    {
+        Cons_printf("Error: Starting offset must be a multiple of 4B\n");
+        return FALSE;
+    }
+
+    // Check for count
+    if (pCmd->NumArgs <= 1)
+    {
+        // Set default count to 80h
+        OffsetEnd = 0x80;
+    }
+    else
+    {
+        pArg = CmdLine_ArgGet( pCmd, 1 );
+
+        // Verify argument
+        if (pArg->ArgType != PLXCM_ARG_TYPE_INT)
+        {
+            Cons_printf("Error: '%s' is not a valid byte count\n", pArg->ArgString);
+            return FALSE;
+        }
+
+        // Set byte count
+        OffsetEnd = (U32)pArg->ArgIntHex;
+    }
+
+    if (OffsetEnd & 0x3)
+    {
+        Cons_printf("Error: Byte count must be a multiple of 4B\n");
+        return FALSE;
+    }
+
+    // Set final end offset
+    OffsetEnd = OffsetCurr + OffsetEnd;
+
+    bRepeat = FALSE;
+
+    // Enable throttle output
+    ConsoleIoThrottle(TRUE);
+
+    do
+    {
+        i        = 0;
+        bDone    = FALSE;
+        bEndLine = FALSE;
+
+        while (!bDone)
+        {
+            // Display offset
+            if (i == 0)
+                Cons_printf("%05x: ", OffsetCurr);
+
+            // Perform the register access
+            if (bPciRegs)
+                CurrValue = PlxPci_PciRegisterReadFast( pDevice, (U16)OffsetCurr, &status );
+            else
+                CurrValue = PlxPci_PlxMappedRegisterRead( pDevice, OffsetCurr, &status );
+
+            if (status != ApiSuccess)
+            {
+                Cons_printf("????????\n");
+                if (status == ApiInvalidOffset)
+                    Cons_printf("Error: Offset invalid or exceeds max register\n");
+                else if (status == ApiUnsupportedFunction)
+                    Cons_printf("Error: Device is not a PLX chip or doesn't have PLX-specific registers\n");
+                else
+                    Cons_printf("Error: Register access failed (status=%d)\n", status);
+                return FALSE;
+            }
+
+            // Store last value in return code
+            Gbl_LastRetVal = CurrValue;
+
+            // Display the value
+            Cons_printf("%08x ", CurrValue);
+
+            i          += sizeof(U32);
+            OffsetCurr += sizeof(U32);
+
+            if (OffsetCurr >= OffsetEnd)
+            {
+                bDone    = TRUE;
+                bEndLine = TRUE;
+            }
+
+            if (!bEndLine)
+            {
+                if (i == 8)
+                {
+                    Cons_printf("- ");
+                }
+                else if (i == 16)
+                {
+                    i        = 0;
+                    bEndLine = TRUE;
+                }
+            }
+
+            if (bEndLine)
+            {
+                bEndLine = FALSE;
+                Cons_printf("\n");
+
+                // Check for user cancel
+                if (Cons_kbhit())
+                {
+                    // Clear the character
+                    Cons_getch();
+                    Cons_printf(" - cancelled\n");
+                    break;
+                }
+            }
+        }
+    }
+    while (bRepeat);
+
     // Disable throttle output
     ConsoleIoThrottle(FALSE);
 
@@ -2885,7 +3155,9 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Generalize by chip type
     PlxChip = pDevice->Key.PlxChip;
 
-    if (((PlxChip & 0xFF00) == 0x8500) ||
+    if (((PlxChip & 0xFF00) == 0x2300) ||
+        ((PlxChip & 0xFF00) == 0x3300) ||
+        ((PlxChip & 0xFF00) == 0x8500) ||
         ((PlxChip & 0xFF00) == 0x8600) ||
         ((PlxChip & 0xFF00) == 0x8700))
     {
@@ -2932,6 +3204,8 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             RegSet = Eep8111;
             break;
 
+        case 0x2300:
+        case 0x3300:
         case 0x8114:
         case 0x8500:
         case 0x8600:
@@ -3001,6 +3275,12 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
                 &status
                 ) == PLX_EEPROM_STATUS_NONE)
         {
+            if (status == ApiUnsupportedFunction)
+            {
+                Cons_printf("Error: EEPROM access not supported for this device\n");
+                return TRUE;
+            }
+
             Cons_printf(
                 " -- The PLX chip reports no EEPROM present --\n"
                 "\n"
@@ -3029,6 +3309,8 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
         switch (PlxChip)
         {
+            case 0x2300:
+            case 0x3300:
             case 0x8111:
             case 0x8112:
             case 0x8505:
@@ -3073,11 +3355,17 @@ BOOLEAN Cmd_Eep( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             {
                 PlxPci_EepromReadByOffset_16( pDevice, offset, &value_16 );
                 Cons_printf( " %02x: %04x", offset, value_16 );
+
+                // Store last value in return code
+                Gbl_LastRetVal = value_16;
             }
             else
             {
                 PlxPci_EepromReadByOffset( pDevice, offset, &value_32 );
                 Cons_printf( " %03x: %08x", offset, value_32 );
+
+                // Store last value in return code
+                Gbl_LastRetVal = value_32;
             }
 
             // Display description if available
@@ -3126,75 +3414,71 @@ _Exit_Cmd_Eep:
  *********************************************************/
 BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
-    S16  count;
-    S16  ByteCount;
-    U16  port;
-    U16  Offset;
-    U16  Value;
-    U16  EepHeader;
-    U32  Data;
-    U32  PlxChip;
-    BOOL bConfigLoadEnabled;
-    BOOL bSharedMemLoadEnabled;
+    S16 count;
+    S16 ByteCount;
+    U16 port;
+    U16 Offset;
+    U16 Value_16;
+    U32 EepHeader;
+    U32 Data;
 
-
-    // Setup for correct EEPROM structure processing
-    PlxChip = pDevice->Key.PlxChip;
 
     // Enable throttle output
     ConsoleIoThrottle(TRUE);
 
     Cons_printf(
-        "     ------ %04X EEPROM Header ------\n",
+        "\n   ------ %04X EEPROM Header ------\n",
         pDevice->Key.PlxChip
         );
 
-    // Get EEPROM Header info
-    PlxPci_EepromReadByOffset_16(
-        pDevice,
-        0,
-        &EepHeader
-        );
+    // Get EEPROM header
+    PlxPci_EepromReadByOffset( pDevice, 0, &EepHeader );
 
-    bConfigLoadEnabled    = (EepHeader >> 8) & (1 << 0);
-    bSharedMemLoadEnabled = (EepHeader >> 8) & (1 << 1);
-
-    PlxPci_EepromReadByOffset_16(
-        pDevice,
-        2,
-        &Value
-        );
-
-    ByteCount = (U16)Value;
+    ByteCount = (U16)(EepHeader >> 16);
 
     // Diplay header information
     Cons_printf(
-        " Signature : %02X (%s)\n",
+        " Signature    : %02X [%s]\n",
         (U8)EepHeader, (U8)EepHeader == 0x5A ? "Valid" : "Invalid"
         );
 
-    if ((PlxChip & 0xFF00)== 0x8100)
+    if (pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCIE_P2P)
     {
         Cons_printf(
-            " Load Regs : %s\n"
-            " Load Mem  : %s\n",
-            bConfigLoadEnabled ? "Yes" : "No",
-            bSharedMemLoadEnabled ? "Yes" : "No"
+            " Load Regs    : %s\n"
+            " Load Sh Mem  : %s\n",
+            (EepHeader & (1 << 8)) ? "Yes" : "No",
+            (EepHeader & (1 << 9)) ? "Yes" : "No"
+            );
+    }
+    else if (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA)
+    {
+        Cons_printf(
+            " Load Regs    : %s\n"
+            " Load 8051 Mem: %s\n"
+            " Start 8051   : %s\n",
+            (EepHeader & (1 << 8)) ? "Yes" : "No",
+            (EepHeader & (1 << 9)) ? "Yes" : "No",
+            (EepHeader & (1 << 10)) ? "Yes" : "No"
+            );
+    }
+    else if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) ||
+             (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1))
+    {
+        Cons_printf(
+            " CRC          : %s\n",
+            (EepHeader & (1 << 15)) ? "ENABLED" : "DISABLED"
             );
     }
 
-    Cons_printf(
-        "\n"
-        "     ----- Registers (%d bytes) -----\n"
-        "\n",
-        ByteCount
-        );
+    Cons_printf( " Registers    : %d bytes (%d regs)\n", ByteCount, ByteCount / 6 );
 
     if (ByteCount != 0)
     {
         Cons_printf(
-            "  Port   Offset   Value\n"
-            " --------------------------\n"
+            "\n"
+            "   #    Port     Offset     Value\n"
+            " -----------------------------------\n"
             );
     }
 
@@ -3203,139 +3487,179 @@ BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 
     while (ByteCount > 0)
     {
-        // Get next register offset
-        PlxPci_EepromReadByOffset_16(
-            pDevice,
-            Offset,
-            &Value
-            );
+        // Display count
+        Cons_printf(" %3d", (Offset - 4) / 6);
+
+        // Get register port & offset
+        PlxPci_EepromReadByOffset_16( pDevice, Offset, &Value_16 );
+
+        // Get bits [15:10] for port number
+        port = (Value_16 >> 10) & 0x3F;
 
         // Display port
-        if ((PlxChip & 0xFF00) == 0x8100)
+        switch (pDevice->Key.PlxFamily)
         {
-            Cons_printf("   --     ");
-        }
-        else
-        {
-            // Get bits [15:10] for port number
-            port = (Value >> 10) & 0x3F;
+            case PLX_FAMILY_BRIDGE_PCIE_P2P:
+                Cons_printf("     --       ");
+                break;
 
-            switch (PlxChip)
-            {
-                case 0x8505:
-                case 0x8509:
-                case 0x8525:
-                case 0x8533:
-                case 0x8547:
-                case 0x8548:
-                    // Port numbers are 1:1 correspondence except for 12 & higher
-                    if (port >= 16)
-                        port = port - 4;
+            case PLX_FAMILY_ALTAIR:
+            case PLX_FAMILY_ALTAIR_XL:
+                // Port numbers are 1:1 correspondence except for 12 & higher
+                if (port >= 16)
+                    port = port - 4;
 
-                    Cons_printf("   %02d     ", port);
-                    break;
+                Cons_printf("     %02d       ", port);
+                break;
 
-                case 0x8612:
-                case 0x8616:
-                case 0x8624:
-                case 0x8632:
-                case 0x8647:
-                case 0x8648:
-                    // If [15:10] is 11_1xxxb, then this is NT Link-side
-                    if ((port & 0x38) == 0x38)
-                    {
-                        Cons_printf(" NT Link  ");
-                    }
+            case PLX_FAMILY_DENEB:
+                if ((port & 0x3F) == 0x38)      // [15:10]=11_1000b - NT Link
+                    Cons_printf("  NT Link     ");
+                else
+                {
+                    port = ((port & ~0x7) >> 1) + (port & 0x3); // Transparent ports
+                    Cons_printf("     %02d       ", port);
+                }
+                break;
+
+            case PLX_FAMILY_SIRIUS:
+                if ((port & 0x3F) == 0x30)      // [15:10]=11_0000b - NT Link
+                    Cons_printf("  NT Link     ");
+                else if ((port & 0x3F) == 0x31) // [15:10]=11_0001b - NT P2P
+                    Cons_printf("  NT P2P      ");
+                else if ((port & 0x3F) == 0x32) // [15:10]=11_0010b - DMA
+                    Cons_printf("    DMA       ");
+                else if ((port & 0x3F) == 0x33) // [15:10]=11_0011b - DMA RAM
+                    Cons_printf("  DMA RAM     ");
+                else
+                    Cons_printf("     %02d       ", port); // Transparent ports are 1:1
+                break;
+
+            case PLX_FAMILY_CYGNUS:
+                if ((port & 0x3F) == 0x30)      // [15:10]=11_0000b - NT Virtual
+                    Cons_printf("  NT Virtual  ");
+                else if ((port & 0x3F) == 0x38) // [15:10]=11_1000b - NT Link
+                    Cons_printf("  NT Link     ");
+                else
+                {
+                    port = ((port & ~0x7) >> 1) + (port & 0x7); // Transparent ports
+                    Cons_printf("     %02d       ", port);
+                }
+                break;
+
+            case PLX_FAMILY_MIRA:
+            case PLX_FAMILY_SCOUT:
+                Cons_printf("     %02d       ", port); // Transparent ports are 1:1
+                break;
+
+            case PLX_FAMILY_DRACO_1:
+            case PLX_FAMILY_DRACO_2:
+                if ((port & 0x38) == 0x28)      // [15:10]=10_1xxxb - DMA channels
+                {
+                    // Lower 3 bits are DMA channel # or descriptor RAM (4)
+                    if ((port & 0x7) == 4)
+                        Cons_printf("  DMA RAM     ");
                     else
-                    {
-                        // Determine the actual port number
-                        port = ((port & ~0x7) >> 1) + (port & 0x7);
+                        Cons_printf("   DMA %d      ", (port & 0x7));
+                }
+                else if ((port & 0x3C) == 0x20) // [15:10]=10_00xxb - ALUT RAM
+                {
+                    // Lower 2 bits are ALUT #
+                    Cons_printf(" ALUT RAM %d   ", (port & 0x3));
+                }
+                else if ((port & 0x38) == 0x30) // [15:10]=11_0xxxb - VS station-specific
+                {
+                    // Lower 3 bits are station #
+                    Cons_printf(" VS Mode S%dP0 ", (port & 0x7));
+                }
+                else if ((port & 0x38) == 0x38) // [15:10]=11_1xxxb - NT ports
+                {
+                    // Port[1]=NT # & Port[0]=Virtual(1)/Link(0)
+                    Cons_printf(
+                        "  NT%d %s ",
+                        ((port >> 1) & 1),
+                        (port & (1 << 0)) ? "Virtual" : "Link   "
+                        );
+                }
+                else
+                {
+                    Cons_printf("     %02d       ", port); // Transparent ports are 1:1
+                }
+                break;
 
-                        Cons_printf("   %02d     ", port);
-                    }
-                    break;
+            case PLX_FAMILY_CAPELLA_1:
+                if ((port & 0x3C) == 0x2C)      // [15:10]=10_11xxb - ALUT
+                {
+                    // Lower 2 bits are ALUT #
+                    Cons_printf(" ALUT RAM %d   ", (port & 0x3));
+                }
+                else if ((port & 0x38) == 0x30) // [15:10]=11_0xxxb - VS station-specific
+                {
+                    // Lower 3 bits are station #
+                    Cons_printf(" VS Mode S%dP0 ", (port & 0x7));
+                }
+                else if ((port & 0x38) == 0x38) // [15:10]=11_1xxxb - NT ports
+                {
+                    // Bit 1 is NT# & bit 0 is NT port (0=NTV, 1=NTL)
+                    Cons_printf(
+                        "  NT%d %s ",
+                        ((port >> 1) & 1),
+                        (port & (1 << 0)) ? "Virtual" : "Link   "
+                        );
+                }
+                else
+                {
+                    port = ((port & ~0x7) >> 1) + (port & 0x7); // Transparent ports
+                    Cons_printf("     %02d       ", port);
+                }
+                break;
 
-                case 0x8604:
-                case 0x8606:
-                case 0x8608:
-                case 0x8614:
-                case 0x8618:
-                default:
-                    // If [15:10] is 11_xxxxb, then this is NT Link-side
-                    if ((port & 0x30) == 0x30)
-                    {
-                        Cons_printf(" NT Link  ");
-                    }
-                    else
-                    {
-                        // Port numbers are 1:1 correspondence
-                        Cons_printf("   %02d     ", port);
-                    }
-                    break;
-            }
-
+            default:
+                Cons_printf("  UNKNOWN     ");
+                break;
         }
+
+        // DWORD index (not offset) is [9:0]
+        if (pDevice->Key.PlxFamily != PLX_FAMILY_BRIDGE_PCIE_P2P)
+            Value_16 = (Value_16 & 0x3FF) << 2;
 
         // Display register offset
-        if ((PlxChip & 0xFF00) != 0x8100)
-        {
-            // Offset DWORD index is [9:0]
-            Value = (Value & 0x3FF) << 2;
-        }
-
-        Cons_printf("%04X   ", Value);
+        Cons_printf("%04X     ", Value_16);
 
         // Go to reg data (lower 16-bits)
         Offset += sizeof(U16);
 
-        // Get next register data (lower 16-bits)
-        PlxPci_EepromReadByOffset_16(
-            pDevice,
-            Offset,
-            &Value
-            );
-
-        Data = (U16)Value;
-
-        // Go to reg data (upper 16-bits)
+        // Get lower 16-bits of data
+        PlxPci_EepromReadByOffset_16( pDevice, Offset, &Value_16 );
+        Data    = Value_16;
         Offset += sizeof(U16);
 
-        // Get next register data (upper 16-bits)
-        PlxPci_EepromReadByOffset_16(
-            pDevice,
-            Offset,
-            &Value
-            );
-
-        Data |= Value << 16;
+        // Get upper 16-bits of data
+        PlxPci_EepromReadByOffset_16( pDevice, Offset, &Value_16 );
+        Data   |= ((U32)Value_16) << 16;
+        Offset += sizeof(U16);
 
         // Update byte count
         ByteCount -= (sizeof(U16) + sizeof(U32));
 
         Cons_printf("%08X\n", Data);
-
-        // Go to next reg offset
-        Offset += sizeof(U16);
     }
 
     // Display shared memory
-    if (((PlxChip & 0xFF00) == 0x8100) && bSharedMemLoadEnabled)
+    if ( ((pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCIE_P2P) ||
+          (pDevice->Key.PlxFamily == PLX_FAMILY_MIRA)) &&
+          (EepHeader & (1 << 9)) )
     {
         // Get shared mem size
-        PlxPci_EepromReadByOffset_16(
-            pDevice,
-            Offset,
-            &Value
-            );
-
-        ByteCount = (U16)Value;
+        PlxPci_EepromReadByOffset_16( pDevice, Offset, (U16*)&ByteCount );
 
         // Go to next data
         Offset += sizeof(U16);
 
         Cons_printf(
-            "\n"
-            "     --- Shared Memory (%d bytes) ---",
+            "\n\n"
+            "   --- %s Memory (%d bytes) ---",
+            (pDevice->Key.PlxFamily == PLX_FAMILY_BRIDGE_PCIE_P2P) ? "Shared" : "8051",
             ByteCount
             );
 
@@ -3345,24 +3669,12 @@ BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         {
             // Display start of line
             if ((count & 0xF) == 0)
-            {
-                Cons_printf(
-                    "\n %03X:",
-                    count
-                    );
-            }
+                Cons_printf("\n %03X:", count);
 
             // Get next data
-            PlxPci_EepromReadByOffset_16(
-                pDevice,
-                Offset,
-                &Value
-                );
+            PlxPci_EepromReadByOffset_16( pDevice, Offset, &Value_16 );
 
-            Cons_printf(
-                " %04X",
-                (U16)Value
-                );
+            Cons_printf(" %04X", Value_16);
 
             // Adjust count
             ByteCount -= sizeof(U16);
@@ -3372,7 +3684,16 @@ BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             Offset += sizeof(U16);
         }
 
-        Cons_printf("\n");
+        Cons_printf("\n\n");
+    }
+
+    // Display CRC for devices that support it
+    if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) ||
+        (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1))
+    {
+        // Get CRC & status
+        PlxPci_EepromCrcGet( pDevice, &Data, NULL );
+        Cons_printf("\n Current CRC: %08X (offset=%02X)\n", Data, Offset);
     }
 
     Cons_printf("\n");
@@ -3395,13 +3716,16 @@ BOOLEAN Cmd_Eep8000( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
  *********************************************************/
 BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
 {
+    U8         i;
     U8         EepPortSize;
     U16        EepSize;
     U32        PlxChip;
     BOOLEAN    bCrc;
     BOOLEAN    bLoadFile;
     BOOLEAN    bEndianSwap;
+    BOOLEAN    bBypassVerify;
     PLXCM_ARG *pArg;
+    PLXCM_ARG *pArgFile;
 
 
     if (pDevice == NULL)
@@ -3410,15 +3734,49 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         return FALSE;
     }
 
-    // Get file name argument
-    if (pCmd->NumArgs == 0)
+    // Default not to bypass data verification
+    bBypassVerify = FALSE;
+
+    // Flag file name not set
+    pArgFile = NULL;
+
+    i = 0;
+    while (i < pCmd->NumArgs)
+    {
+        // Get next param
+        pArg = CmdLine_ArgGet( pCmd, i );
+
+        if ((Plx_strcasecmp( pArg->ArgString, "/b" ) == 0) ||
+            (Plx_strcasecmp( pArg->ArgString, "-b" ) == 0))
+        {
+            bBypassVerify = TRUE;
+        }
+        else if ((pArg->ArgString[1] != '\0') &&
+                 ((pArg->ArgString[0] == '/') || (pArg->ArgString[0] == '-')))
+        {
+            Cons_printf("WARNING: Ignoring invalid parameter - '%s'\n", pArg->ArgString);
+        }
+        else
+        {
+            // Parameter is a file name
+            if (pArgFile != NULL)
+            {
+                Cons_printf("ERROR: File name already specified\n");
+                return FALSE;
+            }
+            pArgFile = pArg;
+        }
+
+        // Jump to next parameter
+        i++;
+    }
+
+    // Verify file name
+    if (pArgFile == NULL)
     {
         Cons_printf("ERROR: File name not specified\n");
         return FALSE;
     }
-
-    // Get file name
-    pArg = CmdLine_ArgGet( pCmd, 0 );
 
     // Determine load or save file
     if (Plx_strcasecmp( pCmd->szCmd, "eep_load" ) == 0)
@@ -3435,7 +3793,9 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
     // Generalize by chip type
     PlxChip = pDevice->Key.PlxChip;
 
-    if (((PlxChip & 0xFF00) == 0x8600) ||
+    if (((PlxChip & 0xFF00) == 0x2300) ||
+        ((PlxChip & 0xFF00) == 0x3300) ||
+        ((PlxChip & 0xFF00) == 0x8600) ||
         ((PlxChip & 0xFF00) == 0x8700))
         PlxChip = PlxChip & 0xFF00;
 
@@ -3471,6 +3831,8 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
             bCrc    = TRUE;
             break;
 
+        case 0x2300:
+        case 0x3300:
         case 0x8111:
         case 0x8112:
         case 0x8505:
@@ -3481,20 +3843,27 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         case 0x8548:
         case 0x8600:
         case 0x8700:
+            if ((pDevice->Key.PlxFamily == PLX_FAMILY_DRACO_2) ||
+                (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1))
+                bCrc = TRUE;
+
             // Process some 8000 devices differently
             if (bLoadFile)
             {
                 Plx8000_EepromFileLoad(
                     pDevice,
-                    pArg->ArgString      // File name
+                    pArgFile->ArgString,     // File name
+                    bCrc,
+                    bBypassVerify
                     );
             }
             else
             {
                 Plx8000_EepromFileSave(
                     pDevice,
-                    pArg->ArgString,    // File name
-                    0                   // 0 = Entire EEPROM
+                    pArgFile->ArgString,    // File name
+                    0,                      // 0 = Entire EEPROM
+                    bCrc
                     );
             }
             return TRUE;
@@ -3553,10 +3922,11 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         // Load file into EEPROM
         Plx_EepromFileLoad(
             pDevice,
-            pArg->ArgString,
+            pArgFile->ArgString,
             EepSize,
             EepPortSize,
             bCrc,
+            bBypassVerify,
             bEndianSwap
             );
     }
@@ -3568,7 +3938,7 @@ BOOLEAN Cmd_EepFile( PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
         // Save EEPROM to file
         Plx_EepromFileSave(
             pDevice,
-            pArg->ArgString,
+            pArgFile->ArgString,
             EepSize,
             EepPortSize,
             bCrc,

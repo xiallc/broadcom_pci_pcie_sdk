@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      10-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -281,7 +281,7 @@ PlxPciBarResourceMap(
     pdx->PciBar[BarIndex].pVa = NULL;
 
     // Request and Map space
-    if (pdx->PciBar[BarIndex].Properties.bIoSpace)
+    if (pdx->PciBar[BarIndex].Properties.Flags & PLX_BAR_FLAG_IO)
     {
         // Request I/O port region
         if (request_region(
@@ -351,7 +351,7 @@ PlxPciBarResourcesUnmap(
         // Unmap the space from Kernel space if previously mapped
         if (pdx->PciBar[i].Properties.Physical != 0)
         {
-            if (pdx->PciBar[i].Properties.bIoSpace)
+            if (pdx->PciBar[i].Properties.Flags & PLX_BAR_FLAG_IO)
             {
                 // Release I/O port region if it was claimed
                 if (pdx->PciBar[i].bResourceClaimed)
@@ -560,23 +560,11 @@ Plx_dma_buffer_alloc(
         ));
 
     DebugPrintf((
-        "    Size         : "
+        "    Size         : %8X (%d %s)\n",
+        pMemObject->Size,
+        (pMemObject->Size < (10 << 10)) ? pMemObject->Size : (pMemObject->Size >> 10),
+        (pMemObject->Size < (10 << 10)) ? "bytes" : "KB"
         ));
-
-    if (pMemObject->Size >= (10 << 10))
-    {
-        DebugPrintf_Cont((
-            "%d Kb\n",
-            (pMemObject->Size >> 10)
-            ));
-    }
-    else
-    {
-        DebugPrintf_Cont((
-            "%d bytes\n",
-            pMemObject->Size
-            ));
-    }
 
     // Return the kernel virtual address of the allocated block
     return pMemObject->pKernelVa;
@@ -620,109 +608,17 @@ Plx_dma_buffer_free(
         );
 
     DebugPrintf((
-        "Released physical memory at %08lx ",
-        (PLX_UINT_PTR)pMemObject->CpuPhysical
+        "Released physical memory at %08llx (%d %s)\n",
+        pMemObject->CpuPhysical,
+        (pMemObject->Size < (10 << 10)) ? pMemObject->Size : (pMemObject->Size >> 10),
+        (pMemObject->Size < (10 << 10)) ? "bytes" : "KB"
         ));
-
-    if (pMemObject->Size >= (10 << 10))
-    {
-        DebugPrintf_Cont((
-            "(%d Kb)\n",
-            (pMemObject->Size >> 10)
-            ));
-    }
-    else
-    {
-        DebugPrintf_Cont((
-            "(%d bytes)\n",
-            pMemObject->Size
-            ));
-    }
 
     // Clear memory object properties
     RtlZeroMemory(
         pMemObject,
         sizeof(PLX_PHYS_MEM_OBJECT)
         );
-}
-
-
-
-
-/*******************************************************************************
- *
- * Function   :  IsSupportedDevice
- *
- * Description:  Determine if device is supported by the driver
- *
- ******************************************************************************/
-BOOLEAN
-IsSupportedDevice(
-    DRIVER_OBJECT  *pDriverObject,
-    struct pci_dev *pDev
-    )
-{
-    U8  i;
-    U32 DevVenID;
-
-
-    // Check for empty list
-    if (pDriverObject->SupportedIDs[0] == '\0')
-        return FALSE;
-
-    i = 0;
-
-    // Compare device with list of supported IDs
-    do
-    {
-        DevVenID = 0;
-
-        // Get next ID
-        while ((pDriverObject->SupportedIDs[i] != '\0') &&
-               (pDriverObject->SupportedIDs[i] != ' '))
-        {
-            // Shift in next character
-            DevVenID <<= 4;
-
-            if ((pDriverObject->SupportedIDs[i] >= 'A') &&
-                (pDriverObject->SupportedIDs[i] <= 'F'))
-            {
-                DevVenID |= (pDriverObject->SupportedIDs[i] - 'A' + 0xA);
-            }
-            else if ((pDriverObject->SupportedIDs[i] >= 'a') &&
-                     (pDriverObject->SupportedIDs[i] <= 'f'))
-            {
-                DevVenID |= (pDriverObject->SupportedIDs[i] - 'a' + 0xA);
-            }
-            else
-            {
-                DevVenID |= (pDriverObject->SupportedIDs[i] - '0');
-            }
-
-            // Jump to next character
-            i++;
-        }
-
-        // Make sure the PCI Header type is 0
-        if (pDev->hdr_type == 0)
-        {
-            // Compare ID with PCI device
-            if ( (pDev->vendor == (DevVenID & 0xffff)) &&
-                 (pDev->device == (DevVenID >> 16)) )
-            {
-                // Device IDs match
-                return TRUE;
-            }
-        }
-
-        // Skip over space character
-        if (pDriverObject->SupportedIDs[i] == ' ')
-            i++;
-    }
-    while (DevVenID != 0);
-
-    // No match
-    return FALSE;
 }
 
 
@@ -781,7 +677,6 @@ PlxSglDmaTransferComplete(
     U32          i;
     U32          BusAddr;
     U32          BlockSize;
-    U32          BytesRemaining;
     PLX_UINT_PTR VaSgl;
 
 
@@ -792,9 +687,6 @@ PlxSglDmaTransferComplete(
     }
 
     DebugPrintf(("Unlocking user-mode buffer used for SGL DMA transfer...\n"));
-
-    // Get original buffer size
-    BytesRemaining = pdx->DmaInfo[channel].BufferSize;
 
     // Get pointer to SGL list
     VaSgl = (PLX_UINT_PTR)pdx->DmaInfo[channel].SglBuffer.pKernelVa;
@@ -1092,8 +984,8 @@ PlxLockBufferAndBuildSgl(
     BusSgl = (U32)pdx->DmaInfo[channel].SglBuffer.BusPhysical;
 
     // Make sure addresses are aligned on next descriptor boundary
-    VaSgl  = (VaSgl + (SizeDescr - 1)) & ~((SizeDescr - 1));
-    BusSgl = (BusSgl + (SizeDescr - 1)) & ~((SizeDescr - 1));
+    VaSgl  = (VaSgl + (SizeDescr - 1)) & ~((PLX_UINT_PTR)SizeDescr - 1);
+    BusSgl = (BusSgl + (SizeDescr - 1)) & ~((PLX_UINT_PTR)SizeDescr - 1);
 
     // Store the starting address of the SGL for later return
     BusSglOriginal = BusSgl;

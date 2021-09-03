@@ -36,14 +36,6 @@
  ******************************************************************************/
 
 
-#include <asm/system.h>
-#include <linux/ptrace.h>
-#include <linux/sched.h>
-#include <linux/smp.h>
-#include <linux/spinlock.h>
-#include <linux/stddef.h>
-#include <linux/interrupt.h>  // Note: interrupt.h must be last to avoid compiler
-                              //       errors with some 2.4 kernel headers
 #include "PlxChipFn.h"
 #include "PlxInterrupt.h"
 #include "SuppFunc.h"
@@ -89,7 +81,7 @@ OnInterrupt(
     if ((RegPciInt & (1 << 6)) == 0)
     {
         spin_unlock( &(pdx->Lock_Isr) );
-        return PLX_IRQ_RETVAL(IRQ_NONE);
+        return IRQ_RETVAL(IRQ_NONE);
     }
 
     // Verify that an interrupt is truly active
@@ -119,7 +111,7 @@ OnInterrupt(
     if (InterruptSource == INTR_TYPE_NONE)
     {
         spin_unlock( &(pdx->Lock_Isr) );
-        return PLX_IRQ_RETVAL(IRQ_NONE);
+        return IRQ_RETVAL(IRQ_NONE);
     }
 
     // At this point, the device interrupt is verified
@@ -143,33 +135,17 @@ OnInterrupt(
 
     // If device is no longer started, do not schedule a DPC
     if (pdx->State != PLX_STATE_STARTED)
-        return PLX_IRQ_RETVAL(IRQ_HANDLED);
+        return IRQ_RETVAL(IRQ_HANDLED);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-    // Reset task structure
-    pdx->Task_DpcForIsr.sync = 0;
-
-    // Add task to system immediate queue
-    queue_task(
-        &(pdx->Task_DpcForIsr),
-        &tq_immediate
-        );
-
-    // Mark queue for Bottom-half processing
-    mark_bh(
-        IMMEDIATE_BH
-        );
-#else
     // Add task to system work queue
     schedule_work(
         &(pdx->Task_DpcForIsr)
         );
-#endif
 
     // Flag a DPC is pending
     pdx->bDpcPending = TRUE;
 
-    return PLX_IRQ_RETVAL(IRQ_HANDLED);
+    return IRQ_RETVAL(IRQ_HANDLED);
 }
 
 

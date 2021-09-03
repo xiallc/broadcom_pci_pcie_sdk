@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      09-01-10 : PLX SDK v6.40
+ *      02-01-13 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -64,7 +64,6 @@ Dispatch_open(
     struct file  *filp
     )
 {
-    int            rc;
     U8             i;
     DEVICE_OBJECT *fdo;
 
@@ -74,7 +73,7 @@ Dispatch_open(
 
     if (iminor(inode) == PLX_MNGMT_INTERFACE)
     {
-        DebugPrintf(("Opening Management interface...\n"));
+        DebugPrintf(("Open Management interface...\n"));
 
         // Store the driver object in the private data
         filp->private_data = pGbl_DriverObject;
@@ -95,32 +94,9 @@ Dispatch_open(
         }
 
         DebugPrintf((
-            "Opening device (%s)...\n",
+            "Open device (%s)...\n",
             fdo->DeviceExtension->LinkName
             ));
-
-        // Acquire open mutex
-        if (down_interruptible( &(fdo->DeviceExtension->Mutex_DeviceOpen) ) < 0)
-            return (-ERESTARTSYS);
-
-        // Attempt to start the device
-        rc =
-            StartDevice(
-                fdo
-                );
-
-        if (rc != 0)
-        {
-            // Release open mutex
-            up( &(fdo->DeviceExtension->Mutex_DeviceOpen) );
-            return rc;
-        }
-
-        // Increment open count for this device
-        fdo->DeviceExtension->OpenCount++;
-
-        // Release open mutex
-        up( &(fdo->DeviceExtension->Mutex_DeviceOpen) );
 
         // Store device object for future calls
         filp->private_data = fdo;
@@ -156,7 +132,7 @@ Dispatch_release(
 
     if (iminor(inode) == PLX_MNGMT_INTERFACE)
     {
-        DebugPrintf(("Closing Management interface...\n"));
+        DebugPrintf(("Close Management interface...\n"));
 
         // Clear the driver object from the private data
         filp->private_data = NULL;
@@ -167,7 +143,7 @@ Dispatch_release(
         fdo = (DEVICE_OBJECT *)(filp->private_data);
 
         DebugPrintf((
-            "Closing device (%s)...\n",
+            "Close device (%s)...\n",
             fdo->DeviceExtension->LinkName
             ));
 
@@ -189,24 +165,6 @@ Dispatch_release(
             fdo->DeviceExtension,
             filp
             );
-
-        // Acquire open mutex
-        if (down_interruptible( &(fdo->DeviceExtension->Mutex_DeviceOpen) ) < 0)
-            return (-ERESTARTSYS);
-
-        // Decrement open count for this device
-        fdo->DeviceExtension->OpenCount--;
-
-        // Stop the device if no longer used
-        if (fdo->DeviceExtension->OpenCount == 0)
-        {
-            StopDevice(
-                fdo
-                );
-        }
-
-        // Release open mutex
-        up( &(fdo->DeviceExtension->Mutex_DeviceOpen) );
     }
 
     DebugPrintf(("...device closed\n"));
@@ -256,7 +214,7 @@ Dispatch_mmap(
         case 4:
         case 5:
             // Verify space is not I/O
-            if (pdx->PciBar[offset].Properties.bIoSpace)
+            if (pdx->PciBar[offset].Properties.Flags & PLX_BAR_FLAG_IO)
             {
                 DebugPrintf((
                     "ERROR - PCI BAR %d is an I/O space, cannot map to user space\n",
@@ -267,7 +225,7 @@ Dispatch_mmap(
             }
 
             DebugPrintf((
-                "Mapping PCI BAR %d...\n",
+                "Map PCI BAR %d...\n",
                 (U8)offset
                 ));
 
@@ -376,9 +334,11 @@ Dispatch_mmap(
  * Description:  Processes the IOCTL messages sent to this device
  *
  ******************************************************************************/
-int 
+PLX_RET_IOCTL
 Dispatch_IoControl(
+  #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
     struct inode  *inode,
+  #endif
     struct file   *filp,
     unsigned int   cmd,
     unsigned long  args
@@ -394,7 +354,7 @@ Dispatch_IoControl(
     DebugPrintf_Cont(("\n"));
 
     // Get the device extension
-    if (iminor(inode) == PLX_MNGMT_INTERFACE)
+    if (iminor(filp->f_dentry->d_inode) == PLX_MNGMT_INTERFACE)
     {
         // Management interface node only supports some IOCTLS
         pdx = NULL;
@@ -473,7 +433,7 @@ Dispatch_IoControl(
                 PlxDeviceFind(
                     pdx,
                     &(pIoBuffer->Key),
-                    PLX_CAST_64_TO_8_PTR( &(pIoBuffer->value[0]) )
+                    PLX_CAST_64_TO_16_PTR( &(pIoBuffer->value[0]) )
                     );
             break;
 

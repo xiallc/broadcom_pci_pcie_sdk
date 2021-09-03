@@ -34,24 +34,24 @@
  *
  * Revision History:
  *
- *      06-01-08 : PLX SDK v6.00
+ *      07-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
 
-#if defined(PCI9050)
+#if (PLX_CHIP == 9050)
     #include "Reg9050.h"
-#elif defined(PCI9030)
+#elif (PLX_CHIP == 9030)
     #include "Reg9030.h"
-#elif defined(PCI9080)
+#elif (PLX_CHIP == 9080)
     #include "Reg9080.h"
-#elif defined(PCI9054)
+#elif (PLX_CHIP == 9054)
     #include "Reg9054.h"
-#elif defined(PCI9056)
+#elif (PLX_CHIP == 9056)
     #include "Reg9056.h"
-#elif defined(PCI9656)
+#elif (PLX_CHIP == 9656)
     #include "Reg9656.h"
-#elif defined(PCI8311)
+#elif (PLX_CHIP == 8311)
     #include "Reg8311.h"
 #endif
 
@@ -61,7 +61,7 @@
 /**********************************************
  *               Definitions
  *********************************************/
-#if defined(PCI9050)
+#if (PLX_CHIP == 9050)
 
     #define PLX_CHIP_TYPE                       0x9050
     #define PLX_DRIVER_NAME                     "Plx9050"
@@ -69,7 +69,7 @@
     #define MAX_PLX_REG_OFFSET                  PCI9050_MAX_REG_OFFSET   // Max PLX register offset
     #define DEFAULT_SIZE_COMMON_BUFFER          0                        // Default size of Common Buffer
 
-#elif defined(PCI9030)
+#elif (PLX_CHIP == 9030)
 
     #define PLX_CHIP_TYPE                       0x9030
     #define PLX_DRIVER_NAME                     "Plx9030"
@@ -77,7 +77,7 @@
     #define MAX_PLX_REG_OFFSET                  PCI9030_MAX_REG_OFFSET   // Max PLX register offset
     #define DEFAULT_SIZE_COMMON_BUFFER          0                        // Default size of Common Buffer
 
-#elif defined(PCI9080)
+#elif (PLX_CHIP == 9080)
 
     #define PLX_CHIP_TYPE                       0x9080
     #define PLX_DRIVER_NAME                     "Plx9080"
@@ -86,7 +86,7 @@
     #define DEFAULT_SIZE_COMMON_BUFFER          (64 * 1024)              // Default size of Common Buffer
     #define NUM_DMA_CHANNELS                    2                        // Total number of DMA Channels
 
-#elif defined(PCI9054)
+#elif (PLX_CHIP == 9054)
 
     #define PLX_CHIP_TYPE                       0x9054
     #define PLX_DRIVER_NAME                     "Plx9054"
@@ -95,7 +95,7 @@
     #define DEFAULT_SIZE_COMMON_BUFFER          (64 * 1024)              // Default size of Common Buffer
     #define NUM_DMA_CHANNELS                    2                        // Total number of DMA Channels
 
-#elif defined(PCI9056)
+#elif (PLX_CHIP == 9056)
 
     #define PLX_CHIP_TYPE                       0x9056
     #define PLX_DRIVER_NAME                     "Plx9056"
@@ -104,7 +104,7 @@
     #define DEFAULT_SIZE_COMMON_BUFFER          (64 * 1024)              // Default size of Common Buffer
     #define NUM_DMA_CHANNELS                    2                        // Total number of DMA Channels
 
-#elif defined(PCI9656)
+#elif (PLX_CHIP == 9656)
 
     #define PLX_CHIP_TYPE                       0x9656
     #define PLX_DRIVER_NAME                     "Plx9656"
@@ -113,7 +113,7 @@
     #define DEFAULT_SIZE_COMMON_BUFFER          (64 * 1024)              // Default size of Common Buffer
     #define NUM_DMA_CHANNELS                    2                        // Total number of DMA Channels
 
-#elif defined(PCI8311)
+#elif (PLX_CHIP == 8311)
 
     #define PLX_CHIP_TYPE                       0x8311
     #define PLX_DRIVER_NAME                     "Plx8311"

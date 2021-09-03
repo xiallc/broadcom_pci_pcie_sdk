@@ -11,7 +11,7 @@
  *
  * Revision History:
  *
- *      03-01-09 : PLX SDK v6.10
+ *      07-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -53,7 +53,7 @@ GroupDigitsWithTag(
     char *pStr
     );
 
-S8
+S16
 SelectDevice_8000(
     PLX_DEVICE_KEY *pKey
     );
@@ -75,7 +75,7 @@ main(
     void
     )
 {
-    S8                DeviceSelected;
+    S16               DeviceSelected;
     PLX_STATUS        rc;
     PLX_DEVICE_KEY    DeviceKey;
     PLX_DEVICE_OBJECT Device;
@@ -132,7 +132,7 @@ main(
     }
 
     Cons_printf(
-        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%02x]\n\n",
+        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
@@ -396,7 +396,7 @@ GroupDigitsWithTag(
  *              -1,  if user cancelled the selection
  *
  ********************************************************************/
-S8
+S16
 SelectDevice_8000(
     PLX_DEVICE_KEY *pKey
     )
@@ -426,7 +426,7 @@ SelectDevice_8000(
         rc =
             PlxPci_DeviceFind(
                 &DevKey,
-                (U8)i
+                (U16)i
                 );
 
         if (rc == ApiSuccess)
@@ -435,7 +435,9 @@ SelectDevice_8000(
             bAddDevice = TRUE;
 
             // Verify supported chip type
-            if (((DevKey.PlxChip & 0xFF00) != 0x8600) &&
+            if (((DevKey.PlxChip & 0xFF00) != 0x2300) &&
+                ((DevKey.PlxChip & 0xFF00) != 0x3300) &&
+                ((DevKey.PlxChip & 0xFF00) != 0x8600) &&
                 ((DevKey.PlxChip & 0xFF00) != 0x8700))
             {
                 bAddDevice = FALSE;
@@ -448,22 +450,28 @@ SelectDevice_8000(
                     &DevKey,
                     &Device
                     );
-            }
 
-            // Get port properties
-            if (bAddDevice)
-            {
+                // Get port properties
                 PlxPci_GetPortProperties(
                     &Device,
                     &PortProp
                     );
 
                 // Only certain port types are allowed
-                if ((PortProp.PortType != PLX_PORT_UPSTREAM) &&
+                if ((PortProp.PortType != PLX_PORT_UPSTREAM)   &&
                     (PortProp.PortType != PLX_PORT_DOWNSTREAM) &&
-                    (PortProp.PortType != PLX_PORT_ENDPOINT))
+                    (PortProp.PortType != PLX_PORT_ENDPOINT)   &&
+                    (PortProp.PortType != PLX_PORT_LEGACY_ENDPOINT))
                 {
                     bAddDevice = FALSE;
+                }
+
+                // For MIRA USB EP, PM only available in Legacy mode
+                if ((DevKey.PlxFamily == PLX_FAMILY_MIRA) &&
+                    (PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT))
+                {
+                    if (DevKey.DeviceMode == PLX_PORT_ENDPOINT)
+                        bAddDevice = FALSE;
                 }
 
                 // For endpoints, only NT virtual port is supported
@@ -483,14 +491,7 @@ SelectDevice_8000(
                     );
 
                 if (DriverProp.bIsServiceDriver == FALSE)
-                {
                     bAddDevice = FALSE;
-                }
-
-                if (DriverProp.bIsServiceDriver == FALSE)
-                {
-                    bAddDevice = FALSE;
-                }
             }
 
             // Close device
@@ -515,6 +516,10 @@ SelectDevice_8000(
                     Cons_printf("PLX Downstream port\n");
                 else if (DevKey.NTPortType == PLX_NT_PORT_VIRTUAL)
                     Cons_printf("PLX NT port\n");
+                else if (PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT)
+                    Cons_printf("PLX USB Controller\n");
+                else
+                    Cons_printf("**Unknown device**\n");
 
                 // Increment to next device
                 NumDevices++;
@@ -546,5 +551,5 @@ SelectDevice_8000(
     // Return selected device information
     *pKey = DevKey_US[i - 1];
 
-    return (S8)NumDevices;
+    return (S16)NumDevices;
 }

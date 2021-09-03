@@ -34,7 +34,7 @@
  *
  * Revision:
  *
- *      03-01-10 : PLX SDK v6.40
+ *      04-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -50,10 +50,10 @@ extern "C" {
 *               Definitions
 **********************************************/
 // SDK Version information
-#define PLX_SDK_VERSION_MAJOR            6
-#define PLX_SDK_VERSION_MINOR            40
-#define PLX_SDK_VERSION_STRING           "6.40"
-#define PLX_SDK_COPYRIGHT_STRING         "\251 PLX Technology, Inc. 2010"
+#define PLX_SDK_VERSION_MAJOR            7
+#define PLX_SDK_VERSION_MINOR            10
+#define PLX_SDK_VERSION_STRING           "7.10"
+#define PLX_SDK_COPYRIGHT_STRING         "\251 PLX Technology, Inc. 2013"
 
 #define MAX_PCI_BUS                      255            // Max PCI Buses
 #define MAX_PCI_DEV                      32             // Max PCI Slots
@@ -73,10 +73,6 @@ extern "C" {
 // Used for locating PCI devices
 #define PCI_FIELD_IGNORE                 (-1)
 
-// Constants for CRC status
-#define PLX_CRC_VALID                    TRUE
-#define PLX_CRC_INVALID                  FALSE
-
 // Used for VPD accesses
 #define VPD_COMMAND_MAX_RETRIES          5         // Max number VPD command re-issues
 #define VPD_STATUS_MAX_POLL              10        // Max number of times to read VPD status
@@ -94,7 +90,7 @@ extern "C" {
 #define PERF_MAX_BPS_GEN_2_0             ((U64)500000000)               // 500 MBps (5 Gbps * 80%)
 #define PERF_MAX_BPS_GEN_3_0             ((U64)1000000000)              //   1 GBps (8 Gbps)
 
-// Used for EEPROM file read/write
+// Endian swap macros
 #define EndianSwap32(value)              ( ((((value) >>  0) & 0xff) << 24) | \
                                            ((((value) >>  8) & 0xff) << 16) | \
                                            ((((value) >> 16) & 0xff) <<  8) | \
@@ -102,6 +98,13 @@ extern "C" {
 
 #define EndianSwap16(value)              ( ((((value) >>  0) & 0xffff) << 16) | \
                                            ((((value) >> 16) & 0xffff) <<  0) )
+
+// PCIe ReqID support macros
+#define Plx_PciToReqId(bus,slot,fn)     (((U16)bus << 8) | (slot << 3) | (fn << 0))
+#define Plx_ReqId_Bus(ReqId)            ((U8)(ReqId >> 8) & 0xFF)
+#define Plx_ReqId_Slot(ReqId)           ((U8)(ReqId >> 3) & 0x1F)
+#define Plx_ReqId_Fn(ReqId)             ((U8)(ReqId >> 0) & 0x7)
+
 
 // Device IDs of PLX reference boards
 #define PLX_9080RDK_960_DEVICE_ID        0x0960

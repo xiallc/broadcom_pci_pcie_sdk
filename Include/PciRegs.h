@@ -34,50 +34,31 @@
  *
  * Revision:
  *
- *      09-01-09 : PLX SDK v6.30
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
 
-// PCI offsets for Type 0 Header
-#define CFG_VENDOR_ID           0x000
-#define CFG_COMMAND             0x004
-#define CFG_REV_ID              0x008
-#define CFG_CACHE_SIZE          0x00C
-#define CFG_BAR0                0x010
-#define CFG_BAR1                0x014
-#define CFG_BAR2                0x018
-#define CFG_BAR3                0x01C
-#define CFG_BAR4                0x020
-#define CFG_BAR5                0x024
-#define CFG_CIS_PTR             0x028
-#define CFG_SUB_VENDOR_ID       0x02C
-#define CFG_EXP_ROM_BASE        0x030
-#define CFG_CAP_PTR             0x034
-#define CFG_RESERVED1           0x038
-#define CFG_INT_LINE            0x03C
-
-
 // PCI Extended Capability IDs
-#define CAP_ID_POWER_MAN        0x01
-#define CAP_ID_AGP              0x02
-#define CAP_ID_VPD              0x03
-#define CAP_ID_SLOT_ID          0x04
-#define CAP_ID_MSI              0x05
-#define CAP_ID_HOT_SWAP         0x06
-#define CAP_ID_PCIX             0x07
-#define CAP_ID_HYPER_TRANSPORT  0x08
-#define CAP_ID_VENDOR_SPECIFIC  0x09
-#define CAP_ID_DEBUG_PORT       0x0A
-#define CAP_ID_RESOURCE_CTRL    0x0B
-#define CAP_ID_HOT_PLUG         0x0C
-#define CAP_ID_BRIDGE_SUB_ID    0x0D
-#define CAP_ID_AGP_8X           0x0E
-#define CAP_ID_SECURE_DEVICE    0x0F
-#define CAP_ID_PCI_EXPRESS      0x10
-#define CAP_ID_MSI_X            0x11
-#define CAP_ID_SATA             0x12
-#define CAP_ID_ADV_FEATURES     0x13
+#define CAP_ID_POWER_MAN                       0x01
+#define CAP_ID_AGP                             0x02
+#define CAP_ID_VPD                             0x03
+#define CAP_ID_SLOT_ID                         0x04
+#define CAP_ID_MSI                             0x05
+#define CAP_ID_HOT_SWAP                        0x06
+#define CAP_ID_PCIX                            0x07
+#define CAP_ID_HYPER_TRANSPORT                 0x08
+#define CAP_ID_VENDOR_SPECIFIC                 0x09
+#define CAP_ID_DEBUG_PORT                      0x0A
+#define CAP_ID_RESOURCE_CTRL                   0x0B
+#define CAP_ID_HOT_PLUG                        0x0C
+#define CAP_ID_BRIDGE_SUB_ID                   0x0D
+#define CAP_ID_AGP_8X                          0x0E
+#define CAP_ID_SECURE_DEVICE                   0x0F
+#define CAP_ID_PCI_EXPRESS                     0x10
+#define CAP_ID_MSI_X                           0x11
+#define CAP_ID_SATA                            0x12
+#define CAP_ID_ADV_FEATURES                    0x13
 
 
 // PCI Express Extended Capability IDs
@@ -102,6 +83,13 @@
 #define PCIE_CAP_ID_DYNAMIC_POWER_ALLOC        0x016        // Dynamic Power Allocation
 #define PCIE_CAP_ID_TLP_PROCESSING_HINT        0x017        // TLP Processing Hint (TPH) Requester
 #define PCIE_CAP_ID_LATENCY_TOLERANCE_REPORT   0x018        // Latency Tolerance Reporting
+#define PCIE_CAP_ID_SECONDARY_PCI_EXPRESS      0x019        // Secondary PCI Express
+#define PCIE_CAP_ID_PROTOCOL_MULTIPLEX         0x01A        // Protocol Multiplexing (PMUX)
+#define PCIE_CAP_ID_PROCESS_ADDR_SPACE_ID      0x01B        // Process Address Space ID (PASID)
+#define PCIE_CAP_ID_LTWT_NOTIF_REQUESTER       0x01C        // Lightweight Notification Requester (LNR)
+#define PCIE_CAP_ID_DS_PORT_CONTAINMENT        0x01D        // Downstream Port Containment (DPC)
+#define PCIE_CAP_ID_L1_PM_SUBSTRATES           0x01E        // L1 Power Management Substrates (L1PM)
+#define PCIE_CAP_ID_PRECISION_TIME_MEAS        0x01F        // Precision Time Measurement (PTM)
 
 
 // Function codes for PCI BIOS operations

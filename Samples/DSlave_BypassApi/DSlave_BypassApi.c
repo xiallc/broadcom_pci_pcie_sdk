@@ -62,7 +62,7 @@ main(
     void
     )
 {
-    S8                DeviceSelected;
+    S16               DeviceSelected;
     PLX_STATUS        rc;
     PLX_DEVICE_KEY    DeviceKey;
     PLX_DEVICE_OBJECT Device;
@@ -109,7 +109,7 @@ main(
     }
 
     Cons_printf(
-        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%02x]\n\n",
+        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );

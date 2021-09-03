@@ -10,7 +10,7 @@
  *
  * Revision History:
  *
- *      04-01-10 : PLX SDK v6.40
+ *      05-01-13 : PLX SDK v7.10
  *
  ******************************************************************************/
 
@@ -47,49 +47,8 @@ ConsoleInitialize(
     void
     )
 {
-#if defined(PLX_LINUX)
-
-    int            ret;
-    struct winsize ConsoleWindow;
-
-
-    // Get current console size
-    ret = ioctl( STDIN_FILENO, TIOCGWINSZ, &ConsoleWindow );
-
-    if (ret == 0)
-    {
-        // Set the max line count based on current screen size
-        _Gbl_LineCountMax = ConsoleWindow.ws_row - SCREEN_THROTTLE_OFFSET;
-    }
-
-#elif defined(_WIN32) || defined(_WIN64)
-
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-
-
-    // Get the current console information
-    GetConsoleScreenBufferInfo(
-        GetStdHandle(STD_OUTPUT_HANDLE),
-        &csbi
-        );
-
-    // Set the max line count based on current window size
-    _Gbl_LineCountMax = ((csbi.srWindow.Bottom - csbi.srWindow.Top) + 1) - SCREEN_THROTTLE_OFFSET;
-
-#elif defined(PLX_DOS)
-
-    struct text_info screen_info;
-
-
-    // Get the current console information
-    gettextinfo(
-        &screen_info
-        );
-
-    // Set the max line count based on current screen size
-    _Gbl_LineCountMax = screen_info.screenheight - SCREEN_THROTTLE_OFFSET;
-
-#endif
+    ConsoleScreenHeightGet();
+    ConsoleCursorPropertiesSet( CONS_CURSOR_DEFAULT );
 }
 
 
@@ -107,6 +66,60 @@ ConsoleEnd(
     void
     )
 {
+}
+
+
+
+
+/******************************************************************
+ *
+ * Function   :  ConsoleScreenHeightSet
+ *
+ * Description:  Returns the current size of the console in number of lines
+ *
+ *****************************************************************/
+unsigned short ConsoleScreenHeightGet()
+{
+    unsigned short ConsoleSize;
+
+#if defined(PLX_LINUX)
+
+    int            ret;
+    struct winsize ConsoleWindow;
+
+
+    ret = ioctl( STDIN_FILENO, TIOCGWINSZ, &ConsoleWindow );
+    if (ret == 0)
+        ConsoleSize = (unsigned short)ConsoleWindow.ws_row;
+    else
+        ConsoleSize = DEFAULT_SCREEN_SIZE;
+
+#elif defined(PLX_MSWINDOWS)
+
+    CONSOLE_CURSOR_INFO        cci;
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+
+    GetConsoleScreenBufferInfo( GetStdHandle(STD_OUTPUT_HANDLE), &csbi );
+    ConsoleSize = (unsigned short)((csbi.srWindow.Bottom - csbi.srWindow.Top) + 1);
+
+    cci.dwSize   = 15;
+    cci.bVisible = TRUE;
+    SetConsoleCursorInfo( GetStdHandle(STD_OUTPUT_HANDLE), &cci );
+
+#elif defined(PLX_DOS)
+
+    struct text_info screen_info;
+
+
+    gettextinfo( &screen_info );
+    ConsoleSize = (unsigned short)screen_info.screenheight;
+    _setcursortype( _NORMALCURSOR );
+
+#endif
+
+    // Set the max line count based on current screen size
+    _Gbl_LineCountMax = ConsoleSize - SCREEN_THROTTLE_OFFSET;
+    return ConsoleSize;
 }
 
 
@@ -161,7 +174,7 @@ ConsoleScreenHeightSet(
     return ret;
   #endif
 
-#elif defined(_WIN32) || defined(_WIN64)
+#elif defined(PLX_MSWINDOWS)
 
     SMALL_RECT WindowSize;
 
@@ -215,24 +228,6 @@ ConsoleScreenHeightSet(
 
 /******************************************************************
  *
- * Function   :  ConsoleScreenHeightGet
- *
- * Description:  Returns the height of the current screen size
- *
- *****************************************************************/
-unsigned short
-ConsoleScreenHeightGet(
-    void
-    )
-{
-    return _Gbl_LineCountMax + SCREEN_THROTTLE_OFFSET;
-}
-
-
-
-
-/******************************************************************
- *
  * Function   :  ConsoleIoThrottle
  *
  * Description:  Toggle throttling of the console output
@@ -252,6 +247,46 @@ ConsoleIoThrottle(
         _Gbl_bPausePending  = FALSE;
         _Gbl_bOutputDisable = FALSE;
     }
+}
+
+
+
+
+/******************************************************************
+ *
+ * Function   :  ConsoleCursorPropertiesSet
+ *
+ * Description:  Sets cursor properties
+ *
+ *****************************************************************/
+void ConsoleCursorPropertiesSet( int size )
+{
+#if defined(PLX_LINUX)
+
+    // Not currently implemented for Linux
+
+#elif defined(PLX_MSWINDOWS)
+
+    CONSOLE_CURSOR_INFO cci;
+
+    cci.dwSize = size;
+    if (size == 0)
+        cci.bVisible = FALSE;
+    else
+        cci.bVisible = TRUE;
+    SetConsoleCursorInfo( GetStdHandle(STD_OUTPUT_HANDLE), &cci );
+
+#elif defined(PLX_DOS)
+
+    // Only 3 options available for DOS cursor
+    if (size == 0)
+        _setcursortype( _NOCURSOR );
+    else if (size > 50)
+        _setcursortype( _SOLIDCURSOR );
+    else
+        _setcursortype( _NORMALCURSOR );
+
+#endif
 }
 
 
@@ -441,6 +476,10 @@ Plx_printf(
             // Display current line
             Cons_fputs( pNextLine, stdout );
 
+            // Halt if console output disabled
+            if (_Gbl_bOutputDisable)
+                goto _Exit_Plx_printf;
+
             if (bNewLine)
             {
                 // Display newline character
@@ -485,7 +524,7 @@ _Exit_Plx_printf:
  *
  ************************************************/
 
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(PLX_MSWINDOWS)
 
 /******************************************************************
  *
@@ -540,7 +579,7 @@ Plx_clrscr(
         );
 }
 
-#endif // _WIN32 || _WIN64
+#endif // PLX_MSWINDOWS
 
 
 

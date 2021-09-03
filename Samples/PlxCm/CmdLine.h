@@ -29,9 +29,35 @@
  ************************************/
 #define MAX_CMDLN_LEN               512     // Max command-line length
 #define MAX_CMD_LEN                 30      // Max length of commands
-#define MAX_ARG_LEN                 25      // Max length of each argument
+#define MAX_ARG_LEN                 75      // Max length of each argument
 #define VAR_TABLE_SIZE              100     // Num entries in variable table
+#define CMD_FINAL                   0       // To mark final command in function table
 
+
+// Added to avoid compile error
+typedef struct _PLXCM_COMMAND *PTR_PLXCM_COMMAND;
+
+typedef
+BOOLEAN
+(CMD_ROUTINE)(
+    PLX_DEVICE_OBJECT     *pDevice,
+    struct _PLXCM_COMMAND *pCmd
+    );
+
+typedef struct _FN_TABLE
+{
+    U8           CmdId;                 // Command ID
+    U8           bAllowOps;             // Whether operation/variables are allowed
+    char         strCmd[MAX_CMD_LEN];   // Command string
+    CMD_ROUTINE *pCmdRoutine;           // Command routine
+} FN_TABLE;
+
+typedef struct _HELP_TABLE
+{
+    U8   CmdId;                         // Command ID
+    char strHelpUsage[80*2];            // Help usage text
+    char strHelpDetail[80*10];          // Help details
+} HELP_TABLE;
 
 typedef enum _PLXCM_ARG_TYPE
 {
@@ -71,24 +97,17 @@ typedef struct _PLXCM_ARG
 typedef struct _PLXCM_COMMAND
 {
     PLX_LIST_ENTRY         ListEntry;
-    struct _PLXCM_COMMAND *pNextCmd;
-    char                   szCmdLine[MAX_CMDLN_LEN];
-    char                   szCmd[MAX_CMD_LEN];
-    BOOLEAN                bParsed;
-    BOOLEAN                bContainString;
-    BOOLEAN                bErrorParse;
-    VOID                  *pCmdRoutine;
-    U8                     NumArgs;
-    PLX_LIST_ENTRY         List_Args;
+    struct _PLXCM_COMMAND *pNextCmd;                    // Next command in list
+    char                   szCmdLine[MAX_CMDLN_LEN];    // Full command line
+    char                   szCmd[MAX_CMD_LEN];          // Actual command text
+    BOOLEAN                bParsed;                     // Flag if command has been parsed
+    BOOLEAN                bContainString;              // Flag if variable parameters exist
+    BOOLEAN                bErrorParse;                 // Flag if parse error exists
+    BOOLEAN                bAllowOps;                   // Flag if command allows variables/operations
+    CMD_ROUTINE           *pCmdRoutine;                 // Pointer to the command routine
+    U8                     NumArgs;                     // Total number of parameters
+    PLX_LIST_ENTRY         List_Args;                   // Parameter list
 } PLXCM_COMMAND;
-
-
-typedef
-BOOLEAN
-(*CMD_ROUTINE) (
-    PLX_DEVICE_OBJECT *pDevice,
-    PLXCM_COMMAND     *pCmd
-    );
 
 
 
@@ -113,8 +132,9 @@ CmdLine_IsHexValue(
 
 void
 CmdLine_GetNextToken(
-    char **Args,
-    char  *buffer
+    char    **pStr,
+    char     *strToken,
+    BOOLEAN   bAllowOps
     );
 
 PLXCM_VAR*
@@ -147,7 +167,8 @@ CmdLine_VarDeleteAll(
 
 PLXCM_COMMAND*
 CmdLine_CmdAdd(
-    char *buffer
+    char     *buffer,
+    FN_TABLE *pFnTable
     );
 
 VOID
@@ -162,7 +183,14 @@ CmdLine_CmdExists(
 
 BOOLEAN
 CmdLine_CmdParse(
-    PLXCM_COMMAND *pCmd
+    PLXCM_COMMAND *pCmd,
+    FN_TABLE      *pFnTable
+    );
+
+BOOLEAN
+CmdLine_CmdLookup(
+    PLXCM_COMMAND *pCmd,
+    FN_TABLE      *pFnTable
     );
 
 PLXCM_ARG*
@@ -175,5 +203,6 @@ VOID
 CmdLine_ArgDeleteAll(
     PLXCM_COMMAND *pCmd
     );
+
 
 #endif

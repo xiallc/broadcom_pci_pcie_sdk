@@ -23,7 +23,7 @@
  *          Definitions
  ************************************/
 #define APP_VERSION_MAJOR           2       // Version information
-#define APP_VERSION_MINOR           0
+#define APP_VERSION_MINOR           6
 #define APP_VERSION_REVISION        0
 
 #define BOOLEAN_UNKNOWN             4
@@ -66,7 +66,7 @@ typedef struct _EEP_OPTIONS
 /*************************************
  *            Functions
  ************************************/
-S8
+S16
 SelectDevice(
     PLX_DEVICE_KEY *pKey,
     EEP_OPTIONS    *pOptions
@@ -94,7 +94,7 @@ S8
 Plx_EepromFileLoad(
     PLX_DEVICE_OBJECT *pDevice,
     EEP_OPTIONS       *pOptions,
-    U16                EepSize,
+    U32                EepSize,
     U8                 EepPortSize,
     BOOLEAN            bCrc,
     BOOLEAN            bEndianSwap
@@ -113,14 +113,16 @@ Plx_EepromFileSave(
 S8
 Plx8000_EepromFileLoad(
     PLX_DEVICE_OBJECT *pDevice,
-    EEP_OPTIONS       *pOptions
+    EEP_OPTIONS       *pOptions,
+    BOOLEAN            bCrc
     );
 
 S8
 Plx8000_EepromFileSave(
     PLX_DEVICE_OBJECT *pDevice,
     EEP_OPTIONS       *pOptions,
-    U32                ByteCount
+    U32                ByteCount,
+    BOOLEAN            bCrc
     );
 
 

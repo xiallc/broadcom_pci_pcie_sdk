@@ -40,4 +40,4 @@ PLX_OBJECTS += $(OBJ_DIR)/ConsFunc.o
 #=============================================================================
 # Include shared PLX makefile
 #=============================================================================
-include $(PLX_SDK_DIR)/Linux/Makefiles/PlxMake.def
+include $(PLX_SDK_DIR)/Makefiles/PlxMake.def

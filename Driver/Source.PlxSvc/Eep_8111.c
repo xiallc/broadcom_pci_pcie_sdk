@@ -31,7 +31,7 @@
  *
  * Revision History:
  *
- *      10-01-09 : PLX SDK v6.30
+ *      08-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -51,7 +51,7 @@
  ******************************************************************************/
 PLX_STATUS
 Plx8111_EepromPresent(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8              *pStatus
     )
 {
@@ -61,7 +61,7 @@ Plx8111_EepromPresent(
     // Get EEPROM Control/Status
     RegValue =
         PLX_8111_REG_READ(
-            pNode,
+            pdx,
             0x1004
             );
 
@@ -87,6 +87,82 @@ Plx8111_EepromPresent(
 
 /******************************************************************************
  *
+ * Function   :  Plx8111_EepromGetAddressWidth
+ *
+ * Description:  Returns the current EEPROM address width
+ *
+ ******************************************************************************/
+PLX_STATUS
+Plx8111_EepromGetAddressWidth(
+    PLX_DEVICE_NODE *pdx,
+    U8              *pWidth
+    )
+{
+    U32 RegValue;
+
+
+    // Set default return value
+    *pWidth = 0;
+
+    // Get EEPROM width (1004h[24:23])
+    RegValue =
+        PLX_8111_REG_READ(
+            pdx,
+            0x1004
+            );
+
+    *pWidth = (U8)((RegValue >> 23) & 0x3);
+
+    // If valid, update default byte addressing
+    if (*pWidth != 0)
+        pdx->Default_EepWidth = *pWidth;
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  Plx8111_EepromSetAddressWidth
+ *
+ * Description:  Sets a new EEPROM address width
+ *
+ ******************************************************************************/
+PLX_STATUS
+Plx8111_EepromSetAddressWidth(
+    PLX_DEVICE_NODE *pdx,
+    U8               width
+    )
+{
+    U32 RegValue;
+
+
+    // Get EEPROM width (1004h[24:23])
+    RegValue =
+        PLX_8111_REG_READ(
+            pdx,
+            0x1004
+            );
+
+    if (((RegValue >> 23) & 0x3) != 0)
+    {
+        DebugPrintf(("Error - EEPROM width already detected in controller\n"));
+        return ApiUnsupportedFunction;
+    }
+
+    // Update default byte addressing
+    pdx->Default_EepWidth = width;
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
  * Function   :  Plx8111_EepromReadByOffset_16
  *
  * Description:  Read a 16-bit value from the EEPROM at a specified offset
@@ -94,8 +170,8 @@ Plx8111_EepromPresent(
  ******************************************************************************/
 PLX_STATUS
 Plx8111_EepromReadByOffset_16(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U16             *pValue
     )
 {
@@ -109,7 +185,7 @@ Plx8111_EepromReadByOffset_16(
 
     // Wait until EEPROM is ready
     if (Plx8111_EepromWaitUntilReady(
-            pNode
+            pdx
             ) == FALSE)
     {
         return ApiWaitTimeout;
@@ -117,14 +193,14 @@ Plx8111_EepromReadByOffset_16(
 
     // Send EEPROM read command
     Plx8111_EepromDataWrite(
-        pNode,
+        pdx,
         PLX8111_EE_CMD_READ
         );
 
     // Get EEPROM width
     RegValue =
         PLX_8111_REG_READ(
-            pNode,
+            pdx,
             0x1004
             );
 
@@ -132,14 +208,14 @@ Plx8111_EepromReadByOffset_16(
 
     // For undefined EEPROM, use default byte addressing
     if (RegValue == 0)
-        RegValue = pNode->Default_EepWidth;
+        RegValue = pdx->Default_EepWidth;
 
     // Check for 3-byte addressing
     if (RegValue == 3)
     {
         // Send EEPROM address (byte 3)
         Plx8111_EepromDataWrite(
-            pNode,
+            pdx,
             0          // 3 byte addressing not supported
             );
     }
@@ -148,14 +224,14 @@ Plx8111_EepromReadByOffset_16(
     {
         // Send EEPROM address (byte 2)
         Plx8111_EepromDataWrite(
-            pNode,
+            pdx,
             (U8)(offset >> 8)
             );
     }
 
     // Send EEPROM address (byte 1)
     Plx8111_EepromDataWrite(
-        pNode,
+        pdx,
         (U8)offset
         );
 
@@ -164,7 +240,7 @@ Plx8111_EepromReadByOffset_16(
     {
         // Get EEPROM data
         Plx8111_EepromDataRead(
-            pNode,
+            pdx,
             &EepData
             );
 
@@ -177,7 +253,7 @@ Plx8111_EepromReadByOffset_16(
 
     // Disable EEPROM access
     PLX_8111_REG_WRITE(
-        pNode,
+        pdx,
         0x1004,
         0
         );
@@ -197,8 +273,8 @@ Plx8111_EepromReadByOffset_16(
  ******************************************************************************/
 PLX_STATUS
 Plx8111_EepromWriteByOffset_16(
-    PLX_DEVICE_NODE *pNode,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U16              value
     )
 {
@@ -208,7 +284,7 @@ Plx8111_EepromWriteByOffset_16(
 
     // Wait until EEPROM is ready
     if (Plx8111_EepromWaitUntilReady(
-            pNode
+            pdx
             ) == FALSE)
     {
         return ApiWaitTimeout;
@@ -216,27 +292,27 @@ Plx8111_EepromWriteByOffset_16(
 
     // Send EEPROM write-enable command
     Plx8111_EepromDataWrite(
-        pNode,
+        pdx,
         PLX8111_EE_CMD_WRITE_ENABLE
         );
 
     // Disable EEPROM access
     PLX_8111_REG_WRITE(
-        pNode,
+        pdx,
         0x1004,
         0
         );
 
     // Send EEPROM write command
     Plx8111_EepromDataWrite(
-        pNode,
+        pdx,
         PLX8111_EE_CMD_WRITE
         );
 
     // Get EEPROM width
     RegValue =
         PLX_8111_REG_READ(
-            pNode,
+            pdx,
             0x1004
             );
 
@@ -244,14 +320,14 @@ Plx8111_EepromWriteByOffset_16(
 
     // For undefined EEPROM, use default byte addressing
     if (RegValue == 0)
-        RegValue = pNode->Default_EepWidth;
+        RegValue = pdx->Default_EepWidth;
 
     // Check for 3-byte addressing
     if (RegValue == 3)
     {
         // Send EEPROM address (byte 3)
         Plx8111_EepromDataWrite(
-            pNode,
+            pdx,
             0          // 3 byte addressing not supported
             );
     }
@@ -261,14 +337,14 @@ Plx8111_EepromWriteByOffset_16(
     {
         // Send EEPROM address (byte 2)
         Plx8111_EepromDataWrite(
-            pNode,
+            pdx,
             (U8)(offset >> 8)
             );
     }
 
     // Send EEPROM address (byte 1)
     Plx8111_EepromDataWrite(
-        pNode,
+        pdx,
         (U8)offset
         );
 
@@ -277,7 +353,7 @@ Plx8111_EepromWriteByOffset_16(
     {
         // Write current byte
         Plx8111_EepromDataWrite(
-            pNode,
+            pdx,
             (U8)value
             );
 
@@ -287,7 +363,7 @@ Plx8111_EepromWriteByOffset_16(
 
     // Disable EEPROM access
     PLX_8111_REG_WRITE(
-        pNode,
+        pdx,
         0x1004,
         0
         );
@@ -307,7 +383,7 @@ Plx8111_EepromWriteByOffset_16(
  ******************************************************************************/
 BOOLEAN
 Plx8111_EepromWaitIdle(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     )
 {
     U32 Timeout;
@@ -322,7 +398,7 @@ Plx8111_EepromWaitIdle(
         // Get EEPROM control register
         RegValue =
             PLX_8111_REG_READ(
-                pNode,
+                pdx,
                 0x1004
                 );
 
@@ -349,7 +425,7 @@ Plx8111_EepromWaitIdle(
  ******************************************************************************/
 BOOLEAN
 Plx8111_EepromWaitUntilReady(
-    PLX_DEVICE_NODE *pNode
+    PLX_DEVICE_NODE *pdx
     )
 {
     U8  status;
@@ -364,19 +440,19 @@ Plx8111_EepromWaitUntilReady(
     {
         // Send EEPROM query status command
         Plx8111_EepromDataWrite(
-            pNode,
+            pdx,
             PLX8111_EE_CMD_READ_STATUS
             );
 
         // Get status
         Plx8111_EepromDataRead(
-            pNode,
+            pdx,
             &status
             );
 
         // Disable EEPROM access
         PLX_8111_REG_WRITE(
-            pNode,
+            pdx,
             0x1004,
             0
             );
@@ -406,7 +482,7 @@ Plx8111_EepromWaitUntilReady(
  ******************************************************************************/
 BOOLEAN
 Plx8111_EepromDataRead(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8              *pData
     )
 {
@@ -416,7 +492,7 @@ Plx8111_EepromDataRead(
 
     // Wait until EEPROM is idle
     if (Plx8111_EepromWaitIdle(
-            pNode
+            pdx
             ) == FALSE)
     {
         return FALSE;
@@ -428,7 +504,7 @@ Plx8111_EepromDataRead(
         (1 << 17);      // EEPROM read start
 
     PLX_8111_REG_WRITE(
-        pNode,
+        pdx,
         0x1004,
         RegValue
         );
@@ -436,7 +512,7 @@ Plx8111_EepromDataRead(
     // Wait until EEPROM is idle
     rc =
         Plx8111_EepromWaitIdle(
-            pNode
+            pdx
             );
 
     if (rc == TRUE)
@@ -444,7 +520,7 @@ Plx8111_EepromDataRead(
         // Get EEPROM data
         RegValue =
             PLX_8111_REG_READ(
-                pNode,
+                pdx,
                 0x1004
                 );
 
@@ -466,7 +542,7 @@ Plx8111_EepromDataRead(
  ******************************************************************************/
 BOOLEAN
 Plx8111_EepromDataWrite(
-    PLX_DEVICE_NODE *pNode,
+    PLX_DEVICE_NODE *pdx,
     U8               data
     )
 {
@@ -475,7 +551,7 @@ Plx8111_EepromDataWrite(
 
     // Wait until EEPROM is idle
     if (Plx8111_EepromWaitIdle(
-            pNode
+            pdx
             ) == FALSE)
     {
         return FALSE;
@@ -488,13 +564,13 @@ Plx8111_EepromDataWrite(
         data;           // EEPROM data
 
     PLX_8111_REG_WRITE(
-        pNode,
+        pdx,
         0x1004,
         RegValue
         );
 
     // Wait until EEPROM is idle
     return Plx8111_EepromWaitIdle(
-        pNode
+        pdx
         );
 }

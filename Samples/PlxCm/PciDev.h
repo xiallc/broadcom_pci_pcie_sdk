@@ -82,7 +82,7 @@ typedef struct _DEVICE_NODE
 /*************************************
  *            Functions
  ************************************/
-U8
+U16
 DeviceListCreate(
     PLX_API_MODE   ApiMode,
     PLX_MODE_PROP *pModeProp
@@ -137,6 +137,7 @@ Plx_EepromFileLoad(
     U16                EepSize,
     U8                 EepPortSize,
     BOOLEAN            bCrc,
+    BOOLEAN            bBypassVerify,
     BOOLEAN            bEndianSwap
     );
 
@@ -153,14 +154,17 @@ Plx_EepromFileSave(
 BOOLEAN
 Plx8000_EepromFileLoad(
     PLX_DEVICE_OBJECT *pDevice,
-    char              *pFileName
+    char              *pFileName,
+    BOOLEAN            bCrc,
+    BOOLEAN            bBypassVerify
     );
 
 BOOLEAN
 Plx8000_EepromFileSave(
     PLX_DEVICE_OBJECT *pDevice,
     char              *pFileName,
-    U32                ByteCount
+    U32                ByteCount,
+    BOOLEAN            bCrc
     );
 
 

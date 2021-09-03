@@ -34,7 +34,7 @@
  *
  * Revision History:
  *
- *      03-01-09 : PLX SDK v6.10
+ *      08-01-11 : PLX SDK v6.50
  *
  ******************************************************************************/
 
@@ -70,52 +70,72 @@ extern "C" {
 **********************************************/
 PLX_STATUS
 Plx8000_EepromPresent(
-    PLX_DEVICE_NODE *pDevice,
+    PLX_DEVICE_NODE *pdx,
     U8              *pStatus
     );
 
 PLX_STATUS
+Plx8000_EepromGetAddressWidth(
+    PLX_DEVICE_NODE *pdx,
+    U8              *pWidth
+    );
+
+PLX_STATUS
 Plx8000_EepromSetAddressWidth(
-    PLX_DEVICE_NODE *pDevice,
+    PLX_DEVICE_NODE *pdx,
     U8               width
     );
 
 PLX_STATUS
 Plx8000_EepromCrcGet(
-    PLX_DEVICE_NODE *pDevice,
+    PLX_DEVICE_NODE *pdx,
     U32             *pCrc,
     U8              *pCrcStatus
     );
 
 PLX_STATUS
 Plx8000_EepromCrcUpdate(
-    PLX_DEVICE_NODE *pDevice,
+    PLX_DEVICE_NODE *pdx,
     U32             *pCrc,
     BOOLEAN          bUpdateEeprom
     );
 
 PLX_STATUS
 Plx8000_EepromReadByOffset(
-    PLX_DEVICE_NODE *pDevice,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U32             *pValue
     );
 
 PLX_STATUS
 Plx8000_EepromWriteByOffset(
-    PLX_DEVICE_NODE *pDevice,
-    U16              offset,
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
     U32              value
+    );
+
+PLX_STATUS
+Plx8000_EepromReadByOffset_16(
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
+    U16             *pValue
+    );
+
+PLX_STATUS
+Plx8000_EepromWriteByOffset_16(
+    PLX_DEVICE_NODE *pdx,
+    U32              offset,
+    U16              value
     );
 
 BOOLEAN
 Plx8000_EepromWaitIdle(
-    PLX_DEVICE_NODE *pDevice
+    PLX_DEVICE_NODE *pdx
     );
 
 BOOLEAN
 Plx8000_EepromSendCommand(
-    PLX_DEVICE_NODE *pDevice,
+    PLX_DEVICE_NODE *pdx,
     U32              command
     );
 
@@ -123,6 +143,11 @@ VOID
 Plx8000_EepromComputeNextCrc(
     U32 *pCrc,
     U32  NextEepromValue
+    );
+
+U16
+Plx8000_EepromGetCtrlOffset(
+    PLX_DEVICE_NODE *pdx
     );
 
 

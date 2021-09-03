@@ -33,7 +33,7 @@
  *          Definitions
  ************************************/
 #define MONITOR_VERSION_MAJOR       2       // Version information
-#define MONITOR_VERSION_MINOR       0
+#define MONITOR_VERSION_MINOR       6
 #define MONITOR_VERSION_REVISION    0
 
 #define MONITOR_PROMPT              ">"     // The monitor prompt string
@@ -51,7 +51,8 @@
 /*************************************
  *            Globals
  ************************************/
-extern PLX_LIST_ENTRY  Gbl_ListCmds;
+extern PLX_LIST_ENTRY Gbl_ListCmds;
+extern U64            Gbl_LastRetVal;
 
 
 
@@ -59,6 +60,12 @@ extern PLX_LIST_ENTRY  Gbl_ListCmds;
 /*************************************
  *            Functions
  ************************************/
+S8
+ProcessMonitorParams(
+    int   argc,
+    char *argv[]
+    );
+
 VOID
 Monitor(
     VOID
@@ -99,7 +106,6 @@ VOID
 Mon_PostCommand(
     PLXCM_COMMAND *pCmd
     );
-
 
 
 #endif

@@ -10,7 +10,7 @@
  *
  * Revision History:
  *
- *      12-01-07 : PLX SDK v5.20
+ *      10-01-12 : PLX SDK v7.00
  *
  ******************************************************************************/
 
@@ -20,23 +20,23 @@
  * NOTE:
  *
  * This sample is provided to demonstrate the setup of a simple SGL DMA
- * transfer using the PLX API.  The PLX API is essentially bypassed except for
- * calls to access the provided PLX DMA buffer.  The SGL DMA is manually
+ * transfer using the PLX API. The PLX API is essentially bypassed except for
+ * calls to access the provided PLX DMA buffer. The SGL DMA is manually
  * setup and controlled by the application.
  *
  * Since PCI system memory is needed, the Common Buffer allocated by the PLX
  * driver is used.  The virtual address, physical address, and size of this
  * buffer are easily available.  The buffer is also contiguous in memory and
- * is reserved for use by PLX applications.  The PLX driver itself does not use
- * the buffer.  These properties make it a perfect candidate for DMA transfers.
+ * is reserved for use by PLX applications.
  *
- * Users will notice that the code presented here is somewhat complex.  This
- * is due to the fact that the PLX chip must be accessed at a register-level,
- * rather than at the API level.  Some portability of code is lost and the code
- * will not be as easily maintainable.
+ * Users will notice that the code presented here is not as elegant compared to
+ * using PLX API functions. This is a result of the need to access the PLX chip
+ * at a register-level rather than at the API level. Some portability of code is
+ * lost and the code will not be as easily maintainable.
  ******************************************************************************/
 
 
+#include <time.h>   // For time() function
 #include "PlxApi.h"
 
 #if defined(PLX_MSWINDOWS)
@@ -55,16 +55,50 @@
 /**********************************************
  *               Functions
  *********************************************/
-BOOLEAN
-SetupDmaDescriptors(
+S16
+SelectDevice_DMA(
+    PLX_DEVICE_KEY *pKey
+    );
+
+PLX_STATUS
+SetupDmaDescriptors_9000(
     PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
     U32               *pSglPciAddress
     );
 
-VOID
-PerformSglDmaTransfer(
+PLX_STATUS
+PerformSglDmaTransfer_9000(
     PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
     U32                SglPciAddress
+    );
+
+PLX_STATUS
+SetupDmaDescriptors_8000(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
+    U64               *pSglPciAddress
+    );
+
+PLX_STATUS
+PerformSglDmaTransfer_8000(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
+    U64                SglPciAddress
+    );
+
+VOID
+GenerateRandomData(
+    U8  *pBuffer,
+    U32  ByteCount
+    );
+
+U32
+CompareBuffers(
+    U8  *pBuffer_1,
+    U8  *pBuffer_2,
+    U32  ByteCount
     );
 
 
@@ -82,9 +116,12 @@ main(
     void
     )
 {
-    S8                DeviceSelected;
-    U32               SglPciAddress;
-    PLX_STATUS        rc;
+    U8                bLegacyDma;
+    U8               *pDmaBuffer;
+    S16               DeviceSelected;
+    U32               SglPciAddr_32;
+    U64               SglPciAddr_64;
+    PLX_STATUS        status;
     PLX_DEVICE_KEY    DeviceKey;
     PLX_DEVICE_OBJECT Device;
 
@@ -94,9 +131,25 @@ main(
     Cons_clear();
 
     Cons_printf(
-        "\n\n"
-        "\t\t        PLX SGL Sample Application\n"
-        "\t\t                January 2007\n\n"
+        "                                                    _______________________ \n"
+        "    PLX Manual SGL Sample Application          00h |   Descriptor 0 (16B)  |\n"
+        "                                                   |-----------------------|\n"
+        "  This sample demonstrates manual setup of     10h |   Descriptor 1 (16B)  |\n"
+        "  DMA SGL descriptors in the PLX DMA buffer.       |-----------------------|\n"
+        "  There will be 2 descriptors for 2 data           |         ...           |\n"
+        "  data blocks. The descriptors are placed          |-----------------------|\n"
+        "  at the start of the DMA buffer, followed    100h |  Buffer 0 (9000 DMA)  |\n"
+        "  by the buffers for the data.                     |  Source 0 (8000 DMA)  |\n"
+        "                              __________|\\         |-----------------------|\n"
+        "                             |             \\  200h |  Buffer 1 (9000 DMA)  |\n"
+        "  The DMA will resemble this |__________   /       |  Source 1 (8000 DMA)  |\n"
+        "                                        |/         |-----------------------|\n"
+        "                                              300h |   Dest 0 (8000 DMA)   |\n"
+        "                                                   |                       |\n"
+        "                                                   |-----------------------|\n"
+        "                                              400h |   Dest 1 (8000 DMA)   |\n"
+        "                                                   |                       |\n"
+        "                                                   |_______________________|\n"
         );
 
 
@@ -104,7 +157,7 @@ main(
     *         Select Device
     ************************************/
     DeviceSelected =
-        SelectDevice(
+        SelectDevice_DMA(
             &DeviceKey
             );
 
@@ -114,25 +167,23 @@ main(
         exit(0);
     }
 
-    rc =
+    status =
         PlxPci_DeviceOpen(
             &DeviceKey,
             &Device
             );
 
-    if (rc != ApiSuccess)
+    if (status != ApiSuccess)
     {
         Cons_printf("\n   ERROR: Unable to find or select a PLX device\n");
-        PlxSdkErrorDisplay(rc);
+        PlxSdkErrorDisplay(status);
         _Pause;
         ConsoleEnd();
         exit(-1);
     }
 
-    Cons_clear();
-
     Cons_printf(
-        "\nSelected: %04x %04x [b:%02x  s:%02x  f:%02x]\n\n",
+        "\nSelected: %04x %04x [b:%02x s:%02x f:%x]\n\n",
         DeviceKey.DeviceId, DeviceKey.VendorId,
         DeviceKey.bus, DeviceKey.slot, DeviceKey.function
         );
@@ -145,38 +196,86 @@ main(
         case 0x9056:
         case 0x9656:
         case 0x8311:
+            bLegacyDma = TRUE;
             break;
 
         default:
-            Cons_printf(
-                "ERROR: DMA not supported by the selected device (%04X)\n",
-                DeviceKey.PlxChip
-                );
-            goto _Exit_App;
+            if ((DeviceKey.PlxChip & 0xF000) == 0x8000)
+                bLegacyDma = FALSE;
+            else
+            {
+                Cons_printf(
+                    "ERROR: DMA not supported by the selected device (%04X)\n",
+                    DeviceKey.PlxChip
+                    );
+                goto _Exit_App;
+            }
+            break;
     }
 
 
 
     /*******************************************************
-     * First, setup The DMA descriptors in PCI memory
+     * Map the DMA buffer to user space
      ******************************************************/
-    if (SetupDmaDescriptors(
-            &Device,
-            &SglPciAddress
-            ) == FALSE)
+    Cons_printf("  Map DMA buffer to user space... ");
+    status = PlxPci_CommonBufferMap( &Device, (VOID**)&pDmaBuffer );
+    if (status != ApiSuccess)
     {
+        Cons_printf("*ERROR* - API failed\n");
+        PlxSdkErrorDisplay(status);
+        goto _Exit_App;
+    }
+    Cons_printf("Ok (VA=%p)\n", pDmaBuffer);
+
+
+
+    /*******************************************************
+     * Setup DMA descriptors in PCI memory
+     ******************************************************/
+    if (bLegacyDma)
+        status = SetupDmaDescriptors_9000( &Device, pDmaBuffer, &SglPciAddr_32 );
+    else
+        status = SetupDmaDescriptors_8000( &Device, pDmaBuffer, &SglPciAddr_64 );
+
+    if (status != ApiSuccess)
+    {
+        Cons_printf("\n   ERROR: Unable to setup DMA descriptors\n");
+        PlxSdkErrorDisplay(status);
         goto _Exit_App;
     }
 
 
 
     /*******************************************************
-     * Next, setup the DMA channel to transfer the SGL
+     * Setup the DMA channel & transfer the SGL
      ******************************************************/
-    PerformSglDmaTransfer(
-        &Device,
-        SglPciAddress
-        );
+    if (bLegacyDma)
+        status = PerformSglDmaTransfer_9000( &Device, pDmaBuffer, SglPciAddr_32 );
+    else
+        status = PerformSglDmaTransfer_8000( &Device, pDmaBuffer, SglPciAddr_64 );
+
+    if (status != ApiSuccess)
+    {
+        Cons_printf("\n   ERROR: Unable to perform SGL DMA\n");
+        PlxSdkErrorDisplay(status);
+        goto _Exit_App;
+    }
+
+
+
+    /*******************************************************
+     * Unmap the DMA buffer from user space
+     ******************************************************/
+    Cons_printf("  Unmap DMA buffer............... ");
+    status = PlxPci_CommonBufferUnmap( &Device, (VOID**)&pDmaBuffer );
+    if (status != ApiSuccess)
+    {
+        Cons_printf("*ERROR* - API failed\n");
+        PlxSdkErrorDisplay(status);
+        goto _Exit_App;
+    }
+    Cons_printf("Ok\n");
 
 
 
@@ -184,6 +283,7 @@ main(
      *        Close the Device
      ***********************************/
 _Exit_App:
+
     PlxPci_DeviceClose(
         &Device
         );
@@ -200,53 +300,172 @@ _Exit_App:
 
 
 
+/*********************************************************************
+ *
+ * Function   : SelectDevice_DMA
+ *
+ * Description: Asks the user which PLX DMA device to select
+ *
+ * Returns    : Total devices found
+ *              -1,  if user cancelled the selection
+ *
+ ********************************************************************/
+S16
+SelectDevice_DMA(
+    PLX_DEVICE_KEY *pKey
+    )
+{
+    S32               i;
+    S32               NumDevices;
+    BOOLEAN           bAddDevice;
+    PLX_STATUS        status;
+    PLX_DEVICE_KEY    DevKey;
+    PLX_DEVICE_KEY    DevKey_DMA[MAX_DEVICES_TO_LIST];
+    PLX_DRIVER_PROP   DriverProp;
+    PLX_DEVICE_OBJECT Device;
+
+
+    Cons_printf("\n");
+
+    i          = 0;
+    NumDevices = 0;
+
+    do
+    {
+        // Setup for next device
+        memset(&DevKey, PCI_FIELD_IGNORE, sizeof(PLX_DEVICE_KEY));
+
+        // Check if device exists
+        status =
+            PlxPci_DeviceFind(
+                &DevKey,
+                (U16)i
+                );
+
+        if (status == ApiSuccess)
+        {
+            // Default to add device
+            bAddDevice = TRUE;
+
+            if (bAddDevice)
+            {
+                // Verify supported chip type
+                switch (DevKey.PlxChip)
+                {
+                    case 0x9080:
+                    case 0x9054:
+                    case 0x9056:
+                    case 0x9656:
+                    case 0x8311:
+                        break;
+
+                    default:
+                        if ((DevKey.PlxChip & 0xF000) == 0x8000)
+                        {
+                            // DMA is always function 1 or higher
+                            if (DevKey.function == 0)
+                                bAddDevice = FALSE;
+                        }
+                        else
+                        {
+                            bAddDevice = FALSE;
+                        }
+                        break;
+                }
+            }
+
+            if (bAddDevice)
+            {
+                // Open device to get its properties
+                PlxPci_DeviceOpen(
+                    &DevKey,
+                    &Device
+                    );
+            }
+
+            // Verify driver used is PnP and not Service driver
+            if (bAddDevice)
+            {
+                PlxPci_DriverProperties(
+                    &Device,
+                    &DriverProp
+                    );
+
+                if (DriverProp.bIsServiceDriver)
+                {
+                    bAddDevice = FALSE;
+                }
+            }
+
+            // Close device
+            PlxPci_DeviceClose(
+                &Device
+                );
+
+            if (bAddDevice)
+            {
+                // Copy device key info
+                DevKey_DMA[NumDevices] = DevKey;
+
+                Cons_printf(
+                    "\t\t  %2d. %04x [b:%02x s:%02x f:%x]\n",
+                    (NumDevices + 1), DevKey.PlxChip,
+                    DevKey.bus, DevKey.slot, DevKey.function
+                    );
+
+                // Increment device count
+                NumDevices++;
+            }
+        }
+
+        // Go to next devices
+        i++;
+    }
+    while ((status == ApiSuccess) && (NumDevices < MAX_DEVICES_TO_LIST));
+
+    if (NumDevices == 0)
+        return 0;
+
+    Cons_printf(
+        "\t\t   0. Cancel\n\n"
+        );
+
+    do
+    {
+        Cons_printf("\t  Device Selection --> ");
+        Cons_scanf("%d", &i);
+    }
+    while (i > NumDevices);
+
+    if (i == 0)
+        return -1;
+
+    // Return selected device information
+    *pKey = DevKey_DMA[i - 1];
+
+    return (S16)NumDevices;
+}
+
+
+
+
 /******************************************************************************
  *
- * Function   :  SetupDmaDescriptors
+ * Function   :  SetupDmaDescriptors_9000
  *
- * Description:  This function sets up DMA SGL descriptors in the DMA common
- *               buffer provided by the PLX driver.  The goal here is to
- *               transfer 2 blocks of data, resulting in the need for 2
- *               SGL descriptors.  The descriptors are placed at the start
- *               of the common buffer, followed by the buffers for the data.
- *
- *               After this function completes, the common buffer should look
- *               similar to the following:
- *
- *
- *              Offset  __________________________
- *                     |                          |
- *                00h  |     First Descriptor     |
- *                     |        (16 bytes)        |
- *                     |--------------------------|
- *                     |                          |
- *                10h  |     Second Decriptor     |
- *                     |        (16 bytes)        |
- *                     |--------------------------|
- *                     |                          |
- *                      \/\/\/\/\/\/\/\/\/\/\/\/\/
- *
- *                      /\/\/\/\/\/\/\/\/\/\/\/\/\
- *                     |                          |
- *               100h  |     First data buffer    |
- *                     |        (256 bytes)       |
- *                     |--------------------------|
- *                     |                          |
- *               200h  |    Second data buffer    |
- *                     |        (256 bytes)       |
- *                     |__________________________| 
+ * Description:  Sets up DMA SGL descriptors in the DMA buffer for 9000 DMA
  *
  *****************************************************************************/
-BOOLEAN
-SetupDmaDescriptors(
+PLX_STATUS
+SetupDmaDescriptors_9000(
     PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
     U32               *pSglPciAddress
     )
 {
-    U8               *pBuffer;
+    U8               *pSgl;
     U32               LocalAddress;
-    VOID             *pDmaBuffer;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_PHYSICAL_MEM  PciBuffer;
 
 
@@ -256,19 +475,9 @@ SetupDmaDescriptors(
      *
      ***********************************************/
     Cons_printf(
-        "Description:\n"
-        "     This sample will demonstrate a manual SGL DMA transfer.\n"
-        "     It will transfer 2 blocks of data from the common buffer\n"
-        "     using DMA chaining and wait for the DMA interrupt.\n"
-        );
-
-    Cons_printf(
         "\n"
-        " WARNING: There is no safeguard mechanism to protect against invalid\n"
-        "          local bus addresses.  Please be careful when selecting local\n"
-        "          addresses to transfer data to/from.  System crashes will result\n"
-        "          if an invalid address is accessed.\n"
-        "\n\n"
+        " WARNING: Local bus addresses are not verified for validity\n"
+        "\n"
         );
 
     Cons_printf("Please enter a valid local address --> ");
@@ -284,45 +493,27 @@ SetupDmaDescriptors(
      ***********************************************/
     Cons_printf("  Get DMA buffer properties...... ");
 
-    rc =
-        PlxPci_CommonBufferProperties(
-            pDevice,
-            &PciBuffer
-            );
-
-    if (rc != ApiSuccess)
+    status = PlxPci_CommonBufferProperties( pDevice, &PciBuffer );
+    if (status != ApiSuccess)
     {
         *pSglPciAddress = 0;
         Cons_printf("*ERROR* - API failed\n");
-        PlxSdkErrorDisplay(rc);
-        return FALSE;
+        PlxSdkErrorDisplay(status);
+        return status;
     }
-    Cons_printf("Ok (PCI Addr=%08x)\n", PciBuffer.PhysicalAddr);
+    Cons_printf("Ok (PCI Addr=%08x)\n", (U32)PciBuffer.PhysicalAddr);
 
-
-    Cons_printf("  Map DMA buffer to user space... ");
-    rc =
-        PlxPci_CommonBufferMap(
-            pDevice,
-            &pDmaBuffer
-            );
-
-    if (rc != ApiSuccess)
-    {
-        *pSglPciAddress = 0;
-        Cons_printf("*ERROR* - API failed\n");
-        PlxSdkErrorDisplay(rc);
-        return FALSE;
-    }
-    Cons_printf("Ok (VA=%p)\n", pDmaBuffer);
 
     // Set starting address of buffer
-    pBuffer = pDmaBuffer;
+    pSgl = pDmaBuffer;
 
-    // Align buffer address to 16 byte boundary (required by DMA engine)
+    // Clear buffer region
+    memset( pSgl, 0, 0x500 );
+
+    // Align SGL start address to 16 byte boundary (required by DMA engine)
     while (PciBuffer.PhysicalAddr & 0xF)
     {
-        pBuffer                += 1;
+        pSgl                   += 1;
         PciBuffer.PhysicalAddr += 1;
     }
 
@@ -336,16 +527,16 @@ SetupDmaDescriptors(
     Cons_printf("  Write first DMA Descriptor..... ");
 
     // PCI physical address of data buffer
-    *(U32*)(pBuffer + 0x0) = PLX_LE_DATA_32((U32)PciBuffer.PhysicalAddr + 0x100);
+    *(U32*)(pSgl + 0x0) = PLX_LE_DATA_32((U32)PciBuffer.PhysicalAddr + 0x100);
 
     // Local address
-    *(U32*)(pBuffer + 0x4) = PLX_LE_DATA_32(LocalAddress);
+    *(U32*)(pSgl + 0x4) = PLX_LE_DATA_32(LocalAddress);
 
     // Number of bytes to transfer
-    *(U32*)(pBuffer + 0x8) = PLX_LE_DATA_32(0x100);
+    *(U32*)(pSgl + 0x8) = PLX_LE_DATA_32(0x100);
 
     // Next Desc Address & Local->PCI & Desc in PCI space
-    *(U32*)(pBuffer + 0xC) =
+    *(U32*)(pSgl + 0xC) =
         PLX_LE_DATA_32(
             (U32)(PciBuffer.PhysicalAddr + 0x10) |
             (1 << 3) | (1 << 0)
@@ -355,7 +546,7 @@ SetupDmaDescriptors(
 
 
     // Increment to next descriptor
-    pBuffer += (4 * sizeof(U32));
+    pSgl += (4 * sizeof(U32));
 
 
 
@@ -367,16 +558,16 @@ SetupDmaDescriptors(
     Cons_printf("  Write second DMA Descriptor.... ");
 
     // PCI physical address of data buffer
-    *(U32*)(pBuffer + 0x0) = PLX_LE_DATA_32((U32)PciBuffer.PhysicalAddr + 0x200);
+    *(U32*)(pSgl + 0x0) = PLX_LE_DATA_32((U32)PciBuffer.PhysicalAddr + 0x200);
 
     // Local address
-    *(U32*)(pBuffer + 0x4) = PLX_LE_DATA_32(LocalAddress + 0x100);
+    *(U32*)(pSgl + 0x4) = PLX_LE_DATA_32(LocalAddress + 0x100);
 
     // Number of bytes to transfer
-    *(U32*)(pBuffer + 0x8) = PLX_LE_DATA_32(0x100);
+    *(U32*)(pSgl + 0x8) = PLX_LE_DATA_32(0x100);
 
     // Next Desc Address & Local->PCI & End of chain & Desc in PCI space
-    *(U32*)(pBuffer + 0xC) =
+    *(U32*)(pSgl + 0xC) =
         PLX_LE_DATA_32(
             0x0 | (1 << 3) | (1 << 1) | (1 << 0)
             );
@@ -387,25 +578,7 @@ SetupDmaDescriptors(
     // Provide PCI address of first descriptor
     *pSglPciAddress = (U32)PciBuffer.PhysicalAddr;
 
-
-    Cons_printf("  Unmap DMA buffer............... ");
-    rc =
-        PlxPci_CommonBufferUnmap(
-            pDevice,
-            (VOID**)&pDmaBuffer
-            );
-
-    if (rc != ApiSuccess)
-    {
-        Cons_printf("*ERROR* - API failed\n");
-        PlxSdkErrorDisplay(rc);
-    }
-    else
-    {
-        Cons_printf("Ok\n");
-    }
-
-    return TRUE;
+    return ApiSuccess;
 }
 
 
@@ -413,19 +586,20 @@ SetupDmaDescriptors(
 
 /******************************************************************************
  *
- * Function   :  PerformSglDmaTransfer
+ * Function   :  PerformSglDmaTransfer_9000
  *
- * Description:  Initiates the SGL DMA transfer and waits for completion
+ * Description:  Initiates the 9000 SGL DMA transfer and waits for completion
  *
  *****************************************************************************/
-VOID
-PerformSglDmaTransfer(
+PLX_STATUS
+PerformSglDmaTransfer_9000(
     PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
     U32                SglPciAddress
     )
 {
     U32               RegValue;
-    PLX_STATUS        rc;
+    PLX_STATUS        status;
     PLX_INTERRUPT     PlxInterrupt;
     PLX_NOTIFY_OBJECT NotifyObject;
 
@@ -457,22 +631,14 @@ PerformSglDmaTransfer(
     memset(&PlxInterrupt, 0, sizeof(PLX_INTERRUPT));
 
     PlxInterrupt.DmaDone = (1 << 0);
-    rc =
-        PlxPci_NotificationRegisterFor(
-            pDevice,
-            &PlxInterrupt,
-            &NotifyObject
-            );
-
-    if (rc != ApiSuccess)
+    status = PlxPci_NotificationRegisterFor( pDevice, &PlxInterrupt, &NotifyObject );
+    if (status != ApiSuccess)
     {
         Cons_printf("*ERROR* - API failed\n");
-        PlxSdkErrorDisplay(rc);
+        PlxSdkErrorDisplay(status);
+        return status;
     }
-    else
-    {
-        Cons_printf("Ok\n");
-    }
+    Cons_printf("Ok\n");
 
 
 
@@ -484,18 +650,14 @@ PerformSglDmaTransfer(
     Cons_printf("  Enable DMA 0 & PCI interrupts.. ");
 
     PlxInterrupt.PciMain = 1;
-    rc =
-        PlxPci_InterruptEnable(
-            pDevice,
-            &PlxInterrupt
-            );
-    if (rc != ApiSuccess)
+    status = PlxPci_InterruptEnable( pDevice, &PlxInterrupt );
+    if (status != ApiSuccess)
     {
         Cons_printf("*ERROR* - API failed\n");
-        PlxSdkErrorDisplay(rc);
+        PlxSdkErrorDisplay(status);
+        return status;
     }
-    else
-        Cons_printf("Ok\n");
+    Cons_printf("Ok\n");
 
 
 
@@ -519,30 +681,17 @@ PerformSglDmaTransfer(
      *
      ***********************************************/
     Cons_printf("  Start DMA transfer............. ");
-    RegValue =
-        PlxPci_PlxRegisterRead(
-            pDevice,
-            0xA8,       // DMA command/status
-            NULL
-            );
 
-    // First enable the DMA channel
+    // Get DMA command/status
+    RegValue = PlxPci_PlxRegisterRead( pDevice, 0xA8, NULL );
+
+    // Enable the DMA channel
     RegValue |= (1 << 0);
-
-    PlxPci_PlxRegisterWrite(
-        pDevice,
-        0xA8,       // DMA command/status
-        RegValue
-        );
+    PlxPci_PlxRegisterWrite( pDevice, 0xA8, RegValue );
 
     // Start the transfer
     RegValue |= (1 << 1);
-
-    PlxPci_PlxRegisterWrite(
-        pDevice,
-        0xA8,       // DMA command/status
-        RegValue
-        );
+    PlxPci_PlxRegisterWrite( pDevice, 0xA8, RegValue );
 
     Cons_printf("Ok\n");
 
@@ -555,14 +704,9 @@ PerformSglDmaTransfer(
      ***********************************************/
     Cons_printf("  Wait for interrupt event....... ");
 
-    rc =
-        PlxPci_NotificationWait(
-            pDevice,
-            &NotifyObject,
-            10 * 1000
-            );
+    status = PlxPci_NotificationWait( pDevice, &NotifyObject, 10 * 1000 );
 
-    switch (rc)
+    switch (status)
     {
         case ApiSuccess:
             Cons_printf("Ok (DMA 0 Int received)\n");
@@ -577,30 +721,436 @@ PerformSglDmaTransfer(
             break;
 
         default:
-            Cons_printf(
-                "*ERROR* - API failed (rc=%s)\n",
-                PlxSdkErrorText(rc)
-                );
+            Cons_printf("*ERROR* - API failed (status=%s)\n", PlxSdkErrorText(status));
             break;
     }
 
     // Release the interrupt wait object
-    Cons_printf("  Cancelling Int Notification.... ");
-    rc =
-        PlxPci_NotificationCancel(
-            pDevice,
-            &NotifyObject
-            );
+    Cons_printf("  Cancel Int Notification........ ");
+    status = PlxPci_NotificationCancel( pDevice, &NotifyObject );
 
-    if (rc != ApiSuccess)
+    if (status != ApiSuccess)
+    {
+        Cons_printf("*ERROR* - status=%s\n", PlxSdkErrorText(status));
+        return status;
+    }
+    Cons_printf("Ok\n");
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  SetupDmaDescriptors_8000
+ *
+ * Description:  Sets up DMA SGL descriptors in the DMA buffer for 8000 DMA
+ *
+ *****************************************************************************/
+PLX_STATUS
+SetupDmaDescriptors_8000(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
+    U64               *pSglPciAddress
+    )
+{
+    U8               *pSgl;
+    U32               TmpValue;
+    U64               AddrSrc;
+    U64               AddrDest;
+    U64               MaskBits64;
+    PLX_STATUS        status;
+    PLX_PHYSICAL_MEM  PciBuffer;
+
+
+    /************************************************
+     *
+     *         Get DMA buffer properties
+     *
+     ***********************************************/
+    Cons_printf("  Get DMA buffer properties...... ");
+
+    status = PlxPci_CommonBufferProperties( pDevice, &PciBuffer );
+    if (status != ApiSuccess)
+    {
+        *pSglPciAddress = 0;
+        Cons_printf("*ERROR* - API failed\n");
+        PlxSdkErrorDisplay(status);
+        return status;
+    }
+    Cons_printf(
+        "Ok (PCI Addr=%08x_%08x)\n",
+        PLX_64_HIGH_32(PciBuffer.PhysicalAddr),
+        PLX_64_LOW_32(PciBuffer.PhysicalAddr)
+        );
+
+    // Calculate a mask to check if extended descriptors are needed
+    MaskBits64 = ~(((U64)1 << 48) - 1);
+    if (PciBuffer.PhysicalAddr & MaskBits64)
     {
         Cons_printf(
-            "*ERROR* - rc=%s\n",
-            PlxSdkErrorText(rc)
+            " -- ERROR: Address requires > 48-bit (Extended Descriptors not supported)\n"
             );
+        return ApiUnsupportedFunction;
+    }
+
+    // Set starting address of buffer
+    pSgl = pDmaBuffer;
+
+    // Clear buffer region
+    memset( pSgl, 0, 0x500 );
+
+    // Align SGL start address to 64 byte boundary (required by DMA engine)
+    while (PciBuffer.PhysicalAddr & 0x3F)
+    {
+        pSgl                   += 1;
+        PciBuffer.PhysicalAddr += 1;
+    }
+
+    // Fill source buffers with random data
+    GenerateRandomData( pSgl + 0x100, 0x100 );
+    GenerateRandomData( pSgl + 0x200, 0x100 );
+
+
+    /************************************************
+     *
+     *          Write first DMA descriptor
+     *
+     ***********************************************/
+    Cons_printf("  Write first DMA Descriptor..... ");
+
+    AddrSrc  = PciBuffer.PhysicalAddr + 0x100;
+    AddrDest = PciBuffer.PhysicalAddr + 0x300;
+
+    // Offset 00h - Valid bit & transfer count
+    TmpValue = PLX_LE_U32_BIT( 31 ) |       // Descriptor valid
+               PLX_LE_DATA_32( 0x100 );     // Transfer byte count
+    *(U32*)(pSgl + 0x0) = TmpValue;
+
+    // Offset 04h - Upper address bits of source & dest ([47:32])
+    TmpValue  = (PLX_64_HIGH_32( AddrSrc ) & 0x0000FFFF) << 16;
+    TmpValue |= (PLX_64_HIGH_32( AddrDest ) & 0x0000FFFF) << 0;
+    *(U32*)(pSgl + 0x4) = PLX_LE_DATA_32( TmpValue );
+
+    // Offset 08h - Low bits of destination address ([31:0])
+    TmpValue = PLX_64_LOW_32( AddrDest );
+    *(U32*)(pSgl + 0x8) = PLX_LE_DATA_32( TmpValue );
+
+    // Offset 0Ch - Low bits of source address ([31:0])
+    TmpValue = PLX_64_LOW_32( AddrSrc );
+    *(U32*)(pSgl + 0xC) = PLX_LE_DATA_32( TmpValue );
+
+    Cons_printf("Ok\n");
+
+
+    // Increment to next descriptor
+    pSgl += (4 * sizeof(U32));
+
+
+
+    /************************************************
+     *
+     *          Write second DMA descriptor
+     *
+     ***********************************************/
+    Cons_printf("  Write second DMA Descriptor.... ");
+
+    AddrSrc  = PciBuffer.PhysicalAddr + 0x200;
+    AddrDest = PciBuffer.PhysicalAddr + 0x400;
+
+    // Offset 00h - Valid bit & transfer count
+    TmpValue = PLX_LE_U32_BIT( 31 ) |       // Descriptor valid
+               PLX_LE_U32_BIT( 30 ) |       // Interrupt when done
+               PLX_LE_DATA_32( 0x100 );     // Transfer byte count
+    *(U32*)(pSgl + 0x0) = TmpValue;
+
+    // Offset 04h - Upper address bits of source & dest ([47:32])
+    TmpValue  = (PLX_64_HIGH_32( AddrSrc ) & 0x0000FFFF) << 16;
+    TmpValue |= (PLX_64_HIGH_32( AddrDest ) & 0x0000FFFF) << 0;
+    *(U32*)(pSgl + 0x4) = PLX_LE_DATA_32( TmpValue );
+
+    // Offset 08h - Low bits of destination address ([31:0])
+    TmpValue = PLX_64_LOW_32( AddrDest );
+    *(U32*)(pSgl + 0x8) = PLX_LE_DATA_32( TmpValue );
+
+    // Offset 0Ch - Low bits of source address ([31:0])
+    TmpValue = PLX_64_LOW_32( AddrSrc );
+    *(U32*)(pSgl + 0xC) = PLX_LE_DATA_32( TmpValue );
+
+    Cons_printf("Ok\n");
+   
+
+    // Provide PCI address of first descriptor
+    *pSglPciAddress = (U32)PciBuffer.PhysicalAddr;
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  PerformSglDmaTransfer_8000
+ *
+ * Description:  Initiates the 8000 SGL DMA transfer and waits for completion
+ *
+ *****************************************************************************/
+PLX_STATUS
+PerformSglDmaTransfer_8000(
+    PLX_DEVICE_OBJECT *pDevice,
+    U8                *pDmaBuffer,
+    U64                SglPciAddress
+    )
+{
+    U8                NumDescriptors;
+    U16               OffsetDmaBase;
+    U32               NumErrors;
+    U32               RegValue;
+    PLX_STATUS        status;
+    PLX_INTERRUPT     PlxInterrupt;
+    PLX_NOTIFY_OBJECT NotifyObject;
+
+
+    /************************************************
+     *
+     *    Register for DMA interrupt notification
+     *
+     ***********************************************/
+    Cons_printf("  Register for DMA int notify.... ");
+
+    // Clear interrupt fields
+    memset(&PlxInterrupt, 0, sizeof(PLX_INTERRUPT));
+
+    PlxInterrupt.DmaDone = (1 << 0);
+    status = PlxPci_NotificationRegisterFor( pDevice, &PlxInterrupt, &NotifyObject );
+    if (status != ApiSuccess)
+    {
+        Cons_printf("*ERROR* - API failed\n");
+        PlxSdkErrorDisplay(status);
+        return status;
+    }
+    Cons_printf("Ok\n");
+
+
+    /************************************************
+     *
+     *         Initialize for SGL DMA
+     *
+     ***********************************************/
+    // Sample uses only 2 descriptors
+    NumDescriptors = 2;
+
+    // Set DMA register base to channel 0
+    OffsetDmaBase = 0x200;
+
+    // Make sure DMA descriptors are set to external ([2] = 0)
+    if (pDevice->Key.PlxFamily == PLX_FAMILY_SIRIUS)
+    {
+        RegValue = PlxPci_PlxRegisterRead( pDevice, 0x1FC, NULL );
+        PlxPci_PlxRegisterWrite( pDevice, 0x1FC, RegValue & ~(1 << 2) );
+    }
+
+    // Make sure DMA prefetch doesn't exceed descriptor count & is a multiple of 4
+    if (NumDescriptors < 4)
+        RegValue = 1;
+    else if (NumDescriptors >= 256)
+        RegValue = 0;
+    else
+        RegValue = (NumDescriptors & (U8)~0x3);
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x34, RegValue );
+
+    // Clear all DMA registers
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x00, 0 );
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x04, 0 );
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x08, 0 );
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x0C, 0 );
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x10, 0 );
+
+    // Descriptor ring address
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x14, PLX_64_LOW_32(SglPciAddress) );
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x18, PLX_64_HIGH_32(SglPciAddress) );
+
+    // Current descriptor address
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x1C, PLX_64_LOW_32(SglPciAddress) );
+
+    // Descriptor ring size
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x20, NumDescriptors );
+
+    // Current descriptor transfer size
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x28, 0 );
+
+    // Disable invalid descriptor interrupt (x3C[1])
+    RegValue = PlxPci_PlxRegisterRead( pDevice, OffsetDmaBase + 0x3C, NULL );
+    RegValue &= ~(1 << 1);
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x3C, RegValue );
+
+    // Get DMA control/status
+    RegValue = PlxPci_PlxRegisterRead( pDevice, OffsetDmaBase + 0x38, NULL );
+
+    // Clear any active status bits ([31,12:8])
+    RegValue |= ((1 << 31) | (0x1F << 8));
+
+    // Enable SGL off-chip mode & descriptor fetch stops at end
+    if (pDevice->Key.PlxFamily == PLX_FAMILY_SIRIUS)
+    {
+        RegValue |= (1 << 5) | (1 << 4);        // SGL mode (4) & descriptor halt mode (5)
     }
     else
     {
-        Cons_printf("Ok\n");
+        RegValue &= ~(3 << 5);
+        RegValue |= (2 << 5) | (1 << 4);        // SGL mode ([6:5]) & descriptor halt mode (4)
     }
+
+
+
+    /************************************************
+     *
+     *              Start DMA engine
+     *
+     ***********************************************/
+    Cons_printf("  Start DMA transfer............. ");
+
+    // Start DMA (x38[3])
+    PlxPci_PlxRegisterWrite( pDevice, OffsetDmaBase + 0x38, RegValue | (1 << 3) );
+
+    Cons_printf("Ok\n");
+
+
+
+    /************************************************
+     *
+     *           Wait for DMA completion
+     *
+     ***********************************************/
+    Cons_printf("  Wait for interrupt event....... ");
+
+    status = PlxPci_NotificationWait( pDevice, &NotifyObject, 10 * 1000 );
+
+    switch (status)
+    {
+        case ApiSuccess:
+            Cons_printf("Ok (DMA 0 Int received)\n");
+            break;
+
+        case ApiWaitTimeout:
+            Cons_printf("*ERROR* - Timeout waiting for interrupt\n");
+            break;
+
+        case ApiWaitCanceled:
+            Cons_printf("*ERROR* - Interrupt event cancelled\n");
+            break;
+
+        default:
+            Cons_printf("*ERROR* - API failed (status=%s)\n", PlxSdkErrorText(status));
+            break;
+    }
+
+    // Release the interrupt wait object
+    Cons_printf("  Cancel Int Notification........ ");
+    status = PlxPci_NotificationCancel( pDevice, &NotifyObject );
+    if (status != ApiSuccess)
+    {
+        Cons_printf("*ERROR* - status=%s\n", PlxSdkErrorText(status));
+        return status;
+    }
+    Cons_printf("Ok\n");
+
+
+
+    /************************************************
+     *
+     *              Compare Buffers
+     *
+     ***********************************************/
+
+    Cons_printf("  Compare Source/Dest 1 data..... ");
+    NumErrors = CompareBuffers( pDmaBuffer + 0x100, pDmaBuffer + 0x300, 0x100 );
+    Cons_printf("%s\n", (NumErrors == 0) ? "Ok" : "");
+
+    Cons_printf("  Compare Source/Dest 2 data..... ");
+    NumErrors = CompareBuffers( pDmaBuffer + 0x200, pDmaBuffer + 0x400, 0x100 );
+    Cons_printf("%s\n", (NumErrors == 0) ? "Ok" : "");
+
+    return ApiSuccess;
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  GenerateRandomData
+ *
+ * Description:  Generates random data in the provided buffer
+ *
+ *****************************************************************************/
+VOID
+GenerateRandomData(
+    U8  *pBuffer,
+    U32  ByteCount
+    )
+{
+    U32 offset;
+
+
+    // Seed random number generator
+    srand( time(NULL) );
+
+    // Fill buffer with random data
+    offset = 0;
+    while (offset < ByteCount)
+    {
+        *(U16*)(pBuffer + offset) = rand();
+        offset += sizeof(U16);
+    }
+}
+
+
+
+
+/******************************************************************************
+ *
+ * Function   :  CompareBuffers
+ *
+ * Description:  Compares two buffers & returns number of errors found
+ *
+ *****************************************************************************/
+U32
+CompareBuffers(
+    U8  *pBuffer_1,
+    U8  *pBuffer_2,
+    U32  ByteCount
+    )
+{
+    U32 offset;
+    U32 NumErrors;
+
+
+    offset    = 0;
+    NumErrors = 0;
+
+    while (offset < ByteCount)
+    {
+        if (*(U32*)(pBuffer_1 + offset) !=
+            *(U32*)(pBuffer_2 + offset))
+        {
+            Cons_printf(
+                "\n\tERR - Wrote: %08xh   Read: %08xh",
+                *(U32*)(pBuffer_1 + offset),
+                *(U32*)(pBuffer_2 + offset)
+                );
+            NumErrors++;
+
+            // Halt on max errors
+            if (NumErrors > 10)
+                break;
+        }
+
+        offset += sizeof(U32);
+    }
+
+    return NumErrors;
 }

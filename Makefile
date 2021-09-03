@@ -1,19 +1,19 @@
 SUBDIRS	= \
-	  Linux/PlxApi                   \
-	  Linux/Samples/ApiTest          \
-	  Linux/Samples/DSlave           \
-	  Linux/Samples/DSlave_BypassApi \
-	  Linux/Samples/LocalToPciInt    \
-	  Linux/Samples/NT_DmaTest       \
-	  Linux/Samples/NT_LinkTest      \
-	  Linux/Samples/NT_Sample        \
-	  Linux/Samples/PerfMonitor      \
-	  Linux/Samples/PlxCm            \
-	  Linux/Samples/PlxDma           \
-	  Linux/Samples/PlxDmaPerf       \
-	  Linux/Samples/PlxDmaSglNoApi   \
-	  Linux/Samples/PlxEep           \
-	  Linux/Samples/PlxNotification
+	  PlxApi                   \
+	  Samples/ApiTest          \
+	  Samples/DSlave           \
+	  Samples/DSlave_BypassApi \
+	  Samples/LocalToPciInt    \
+	  Samples/NT_DmaTest       \
+	  Samples/NT_LinkTest      \
+	  Samples/NT_Sample        \
+	  Samples/PerfMonitor      \
+	  Samples/PlxCm            \
+	  Samples/PlxDma           \
+	  Samples/PlxDmaPerf       \
+	  Samples/PlxDmaSglNoApi   \
+	  Samples/PlxEep           \
+	  Samples/PlxNotification
 
 
 all:      $(SUBDIRS)

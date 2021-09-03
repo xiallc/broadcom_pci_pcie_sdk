@@ -5,29 +5,40 @@
 #
 #-----------------------------------------------------------------------------
 
+
+# Verify superuser access
+if [ `id -u` != 0 ]; then
+    echo
+    echo "   *********************************************"
+    echo "   * You must be superuser, logged in as root, *"
+    echo "   * or have sufficient rights to kill/start   *"
+    echo "   * daemons and view log messages.            *"
+    echo "   *********************************************"
+    echo
+    echo "  ---- ERROR: Admin rights not detected, halting ----"
+    echo
+    exit
+fi
+
 clear
-
 echo
-echo "   ****************************************************"
-echo "   * NOTE:  You must be superuser, logged in as root, *"
-echo "   *        or have sufficient rights to kill/start   *"
-echo "   *        daemons and view log messages.  This      *"
-echo "   *        script will not work, otherwise.          *"
-echo "   ****************************************************"
-echo
-
 
 # Determine which log daemon is installed
 SysLogd=syslogd
+sbin_dir=/sbin
 if [ -f /sbin/rsyslogd ]; then
     SysLogd=rsyslogd
+fi
+if [ -f /usr/sbin/rsyslogd ]; then
+    SysLogd=rsyslogd
+    sbin_dir=/usr/sbin
 fi
 
 
 # Stop kernel log daemon if running
 if [ -f /var/run/klogd.pid ]; then
     echo Stopping current klogd...
-    kill -s SIGTERM `cat /var/run/klogd.pid`
+    kill -s TERM `cat /var/run/klogd.pid`
     # Delay to let daemon halt
     sleep 1
 fi
@@ -36,14 +47,14 @@ fi
 # Stop current daemons if running
 if [ -f /var/run/rsyslogd.pid ]; then
     echo Stopping current rsyslogd...
-    kill -s SIGTERM `cat /var/run/rsyslogd.pid`
+    kill -s TERM `cat /var/run/rsyslogd.pid`
     # Delay to let daemon halt
     sleep 1
 fi
 
 if [ -f /var/run/syslogd.pid ]; then
     echo Stopping current syslogd...
-    kill -s SIGTERM `cat /var/run/syslogd.pid`
+    kill -s TERM `cat /var/run/syslogd.pid`
     # Delay to let daemon halt
     sleep 1
 fi
@@ -51,11 +62,21 @@ fi
 
 # Start new daemon only if 'syslogd'
 if [ "${SysLogd}" = "syslogd" ]; then
-    echo Starting new ${SysLogd}...
-    /sbin/${SysLogd}
+    if [ -f ${sbin_dir}/${SysLogd} ]; then
+        echo Starting new ${SysLogd}...
+        ${sbin_dir}/${SysLogd}
+    fi
 fi
 
-echo Starting log to console...
-echo ">>>>>"
-echo
-cat /proc/kmsg
+
+# Log to console or file if supplied
+if [ "$1" = "" ]; then
+    echo Start log to console...
+    echo ">>>>>"
+    echo
+    cat /proc/kmsg
+else
+    echo Start log to file \'$1\'...
+    echo ">>>>>"
+    cat /proc/kmsg > $1
+fi

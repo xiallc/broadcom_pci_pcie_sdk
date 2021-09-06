@@ -13,9 +13,38 @@ run into issues we'll do our best to help, but may recommend that you contact Br
 Users can obtain the original source code directly
 from [Broadcom](https://www.broadcom.com/products/pcie-switches-bridges/software-dev-kits).
 
-## Quick Links
+We've provided some simple [installation instructions](xia/doc/install.md). They're not meant to be
+comprehensive. The specific process may be different on your system.
 
-* [Installation](xia/doc/install.md)
+## Operating Systems
+A quick note about kernels and operating systems. We've evaluated the **compilation** of the kernel
+and library on various Linux operating systems. In cases where the compilation of the driver failed, 
+we attempted to find a solution to the issue with minor modifications. We only consider the most 
+recent release in the 7.X and 8.X lineages. 
+
+### 7.25
+
+| OS | Driver | Library | Kernel | Notes |
+|:---:|:---:|:---:|:---:|:---:|
+| CentOS 7 | Yes | Yes | 3.10.0-1160.41.1.el7.x86_64 |  |
+| CentOS 8 | No | Yes | 4.18.0-305.12.1.el8_4.x86_64 | Driver issue with `mm_segment_t` and `access_ok`. |
+| Debian 08 | Yes | Yes | 3.16.0-11-amd64 |  |
+| Debian 09 | No | Yes | 4.9.0-16-amd64 | Driver issue with `get_user_pages` |
+| Debian 10 | No | Yes | 4.19.0-17-cloud-amd64 | Driver issue with `mm_segment_t`, `copy_to_user`, and `copy_from_user`. |
+| Ubuntu 18.04 | No | Yes | 5.4.0-1055-aws | Driver issue with `mm_segment_t` and `access_ok`.  |
+| Ubuntu 20.04 | No | Yes | 5.11.0-1016-aws | Driver issue with `access_ok`.  |
+
+### 8.23
+
+| OS | Driver | Library | Kernel | Notes |
+|:---:|:---:|:---:|:---:|:---:|
+| CentOS 7 | Yes | Yes | 3.10.0-1160.41.1.el7.x86_64 |  |
+| CentOS 8 | Sorta | Yes | 4.18.0-305.12.1.el8_4.x86_64 | Driver needs a fix to `Plx_sysdep.h`, see centos8/8.23 branch. |
+| Debian 08 | Yes | Yes | 3.16.0-11-amd64 |  |
+| Debian 09 | Yes | Yes | 4.9.0-16-amd64 |  |
+| Debian 10 | Yes | Yes | 4.19.0-17-cloud-amd64 |  |
+| Ubuntu 18.04 | Yes | Yes | 5.4.0-1055-aws |  |
+| Ubuntu 20.04 | No | Yes | 5.11.0-1016-aws | Driver issues with `vermagic.h` being included. Fixing that leads to issue with `mmap_sem`. |
 
 ## Disclaimer
 

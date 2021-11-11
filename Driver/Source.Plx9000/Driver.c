@@ -47,6 +47,9 @@
  *
  *****************************************************************************/
 
+#ifndef INCLUDE_VERMAGIC
+#define INCLUDE_VERMAGIC
+#endif
 
 #include <linux/kernel.h>
 #include <linux/module.h>

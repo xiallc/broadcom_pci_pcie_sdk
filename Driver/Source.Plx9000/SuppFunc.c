@@ -953,7 +953,7 @@ PlxLockBufferAndBuildSgl(
     }
 
     // Obtain the mmap reader/writer semaphore
-    down_read( &current->mm->mmap_sem );
+    down_read( &current->mm->mmap_lock );
 
     // Attempt to lock the user buffer into memory
     rc =
@@ -966,7 +966,7 @@ PlxLockBufferAndBuildSgl(
             );
 
     // Release mmap semaphore
-    up_read( &current->mm->mmap_sem );
+    up_read( &current->mm->mmap_lock );
 
     if (rc != TotalDescr)
     {

@@ -953,7 +953,11 @@ PlxLockBufferAndBuildSgl(
     }
 
     // Obtain the mmap reader/writer semaphore
-    down_read( &current->mm->mmap_sem );
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
+        down_read( &current->mm->mmap_sem );
+    #else
+        mmap_read_lock( current->mm );
+    #endif
 
     // Attempt to lock the user buffer into memory
     rc =
@@ -966,7 +970,11 @@ PlxLockBufferAndBuildSgl(
             );
 
     // Release mmap semaphore
-    up_read( &current->mm->mmap_sem );
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
+        up_read( &current->mm->mmap_sem );
+    #else
+        mmap_read_unlock( current->mm );
+    #endif
 
     if (rc != TotalDescr)
     {

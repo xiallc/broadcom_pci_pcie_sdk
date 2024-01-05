@@ -793,7 +793,7 @@ Spi_WaitControllerReady(
         // Verify we don't exceed poll time
         gettimeofday( &endTime, NULL );
         timersub( &startTime, &endTime, &deltaTime);
-        elapsedTimeMs = (U32)( deltaTime.tv_sec*1000 + deltatTime.tv_usec/1000 );
+        elapsedTimeMs = (U32)( deltaTime.tv_sec*1000 + deltaTime.tv_usec/1000 );
         if (elapsedTimeMs >= SPI_MAX_WAIT_CTRL_READY_MS)
         {
             ErrorPrintf((

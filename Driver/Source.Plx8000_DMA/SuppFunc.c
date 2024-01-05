@@ -1012,6 +1012,7 @@ PlxLockBufferAndBuildSgl(
         up_read( &current->mm->mmap_sem );
     #else
         mmap_read_unlock( current->mm );
+    #endif
 
     if (rc != TotalDescr)
     {

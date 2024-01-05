@@ -53,7 +53,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>      // For kmalloc()
 #include <linux/version.h>
-#include <linux/vermagic.h>
+#include <generated/utsrelease.h>
 #include "Dispatch.h"
 #include "Driver.h"
 #include "PciFunc.h"

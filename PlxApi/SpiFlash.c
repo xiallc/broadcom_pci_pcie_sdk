@@ -49,7 +49,7 @@
 
 
 #include <string.h>     // For memset()/memcpy()
-#include <sys/timeb.h>  // For ftime()
+#include <sys/time.h>  // For getttimeofday()
 #include "SpiFlash.h"
 #include "PlxApiDebug.h"
 
@@ -764,12 +764,13 @@ Spi_WaitControllerReady(
     U32          regVal;
     U32          elapsedTimeMs;
     PLX_STATUS   status;
-    struct timeb endTime;
-    struct timeb startTime;
+    struct timeval endTime;
+    struct timeval startTime;
+    struct timeval deltaTime;
 
 
     // Note start time
-    ftime( &startTime );
+    gettimeofday( &startTime, NULL );
 
     // Wait until command valid is clear
     do
@@ -790,8 +791,9 @@ Spi_WaitControllerReady(
         }
 
         // Verify we don't exceed poll time
-        ftime( &endTime );
-        elapsedTimeMs = (U32)(PLX_DIFF_TIMEB( endTime, startTime ) * 1000);
+        gettimeofday( &endTime, NULL );
+        timersub( &startTime, &endTime, &deltaTime);
+        elapsedTimeMs = (U32)( deltaTime.tv_sec*1000 + deltaTime.tv_usec/1000 );
         if (elapsedTimeMs >= SPI_MAX_WAIT_CTRL_READY_MS)
         {
             ErrorPrintf((

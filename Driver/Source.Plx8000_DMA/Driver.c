@@ -52,7 +52,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/version.h>
-#include <linux/vermagic.h>
+#include <generated/utsrelease.h>
 #include "ApiFunc.h"
 #include "Dispatch.h"
 #include "Driver.h"

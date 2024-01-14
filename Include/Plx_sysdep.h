@@ -437,8 +437,18 @@
                     )                                   \
             )
 #else
-    #define Plx_get_user_pages          get_user_pages
+    #define Plx_get_user_pages(start, nr_pages, gup_flags, pages, vmas) \
+            (                                           \
+                get_user_pages(                         \
+                    (start),                            \
+                    (nr_pages),                         \
+                    ((gup_flags) & FOLL_WRITE) ? 1 : 0, \
+                    (pages)                             \
+                    )                                   \
+            )
 #endif
+// #else
+//    #define Plx_get_user_pages          get_user_pages // arun
 
 
 

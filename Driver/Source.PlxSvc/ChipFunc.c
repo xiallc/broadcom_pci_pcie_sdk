@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2020 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -43,7 +43,7 @@
  *
  * Revision History:
  *
- *     11-01-19: PCI/PCIe SDK v8.10
+ *     09-11-20 : PCI/PCIe SDK v9.00
  *
  ******************************************************************************/
 
@@ -232,7 +232,9 @@ PlxRegisterRead_8000(
             OffsetAdjustment = (pNode->PortProp.PortNumber * (4 * 1024));
 
             // Port-specific registers start at offset 8MB in Atlas
-            if (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS)
+            if ((pNode->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
             {
                 OffsetAdjustment += 0x800000;
             }
@@ -360,7 +362,9 @@ PlxRegisterWrite_8000(
             OffsetAdjustment = (pNode->PortProp.PortNumber * (4 * 1024));
 
             // Port-specific registers start at offset 8MB in Atlas
-            if (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS)
+            if ((pNode->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                (pNode->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
             {
                 OffsetAdjustment += 0x800000;
             }
@@ -933,6 +937,14 @@ _PlxChipAssignFamily:
         case 0xC012:
             pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS;
             break;
+
+        case 0xC030:
+            pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS_2;
+            break;
+
+        case 0xC034:
+            pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS2_LLC;
+            break;            
 
         case 0:
             pDevice->Key.PlxFamily = PLX_FAMILY_NONE;

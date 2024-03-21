@@ -1026,7 +1026,7 @@ Plx_EepromFileLoad(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     Cons_printf("Load EEPROM file....... ");
     Cons_fflush( stdout );
@@ -1153,7 +1153,7 @@ _Exit_File_Load:
     }
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
@@ -1191,7 +1191,7 @@ Plx_EepromFileSave(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     // Open the file to write
     pFile = fopen( pOptions->FileName, "wb" );
@@ -1274,7 +1274,7 @@ Plx_EepromFileSave(
     Cons_printf("Ok (%dB)\n", (int)EepSize);
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
@@ -1317,7 +1317,7 @@ Plx8000_EepromFileLoad(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     pBuffer   = NULL;
     EepHeader = 0;
@@ -1467,7 +1467,7 @@ _Exit_File_Load_8000:
     }
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",
@@ -1506,7 +1506,7 @@ Plx8000_EepromFileSave(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     Cons_printf( "Get EEPROM data size.. " );
 
@@ -1629,7 +1629,7 @@ Plx8000_EepromFileSave(
     Cons_printf( "Ok (%s)\n", pOptions->FileName );
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n",

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Avago Technologies
+ * Copyright 2013-2022 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -1841,6 +1841,215 @@ PlxPci_ChipGetPortMask(
             PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT1);
             PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT2 );
             PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_MPT3 );
+            break;
+
+        case 0x0072:    // Atlas2 72 Lane
+        case 0x0048:    // HW errata on Atlas2 A0; 0x0048 signifies 72lane SKU
+            // Stations 0-1, 5-6 (each with 8 x2 ports), Station 8 - 4 x2 ports
+            PtrFeat->StnCount = 5;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask = 0x163;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x55550000 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00005555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 4, 0x00000055 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT5 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT6 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT7 );
+            break;
+
+        case 0x0088:    // Atlas2 88 Lane
+        case 0x0064:    // HW errata on Atlas2 A0; 0x0064 signifies 88lane SKU
+            // Stations 0-2, 5-6 (each with 8 x2 ports), Station 8 - 4 x2 ports
+            PtrFeat->StnCount = 6;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask = 0x167;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0x00005555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x55550000 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x00005555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 4, 0x00000055 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT5 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT6 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT7 );
+            break;
+
+        case 0x0104:    // Atlas2 104 Lane
+        case 0x0080:    // HW errata on Atlas2 A0; 0x0048 signifies 104lane SKU
+            // Stations 0-2, 5-7 (each with 8 x2 ports), Station 8 - 4 x2 ports
+            PtrFeat->StnCount = 7;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask = 0x1E7;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0x00005555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x55550000 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 4, 0x00000055 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT5 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT6 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT7 );
+            break;
+
+        case 0x0136:    // Atlas2 136 Lane
+        case 0x0096:    // HW errata on Atlas2 A0; 0x0096 signifies 136lane SKU
+            // Station 0-7 (each with 8 x2 ports), Station 8 - 4 x2 ports
+            PtrFeat->StnCount    = 9;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x1FF;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 4, 0x00000055 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT5 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT6 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT7 );
+            break;
+
+        case 0x0144: // Atlas2 144 lanes
+        case 0x0128: // HW errata on Atlas2 A0; 0x0128 signifies 144lane SKU
+            // Station 0-8 (each with 8 x2 ports), Station 8 - 8 x2 ports
+            PtrFeat->StnCount    = 9;
+            PtrFeat->PortsPerStn = 16;
+            PtrFeat->StnMask     = 0x1FF;
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 0, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 1, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 2, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 3, 0x55555555 );
+            PEX_BITMASK_SET_DW( PtrFeat->PortMask, 4, 0x00005555 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_STN_REGS_S5 );
+
+            // Internal ports
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_MGMT );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_DS_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_8 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_12 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_INT_UP_16 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_GEP_DS );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT0 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT1 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT2 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT3 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT4 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT5 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT6 );
+            PEX_BITMASK_SET( PtrFeat->PortMask, PLX_FLAG_PORT_ATLAS2_MPT7 );
             break;
 
         default:

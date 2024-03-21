@@ -2,7 +2,7 @@
 #define __PLX_TYPES_H
 
 /*******************************************************************************
- * Copyright 2019-2020 Broadcom Inc.
+ * Copyright 2019-2022 Broadcom Inc.
  * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
@@ -47,16 +47,27 @@
  *
  * Revision:
  *
- *      01-01-20 : PCI/PCIe SDK v8.10
+ *     09-11-20 : PCI/PCIe SDK v9.00
  *
  ******************************************************************************/
-
 
 #include "Plx.h"
 #include "PlxDefCk.h"
 #include "PlxStat.h"
 #include "PciTypes.h"
+#if ((defined(PLX_LINUX) && !defined(PLX_LINUX_DRIVER)) ||	\
+	(defined(PLX_MSWINDOWS) && !defined(PLX_DRIVER)))
+#include <sys/timeb.h>
+#if defined(PLX_LINUX)
+#include <sys/time.h>
+#endif
+#endif
 
+#if (defined(PLX_LINUX_DRIVER))
+#ifndef LINUX_VERSION_CODE
+    #include <linux/version.h>
+#endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -160,9 +171,24 @@ extern "C" {
 #define PEX_P2_ROUND_UP( val, align )       ( ((val) + ((align) - 1)) & ~(align - 1) )
 #define PEX_P2_ROUND_DOWN( val, align )     ( (val) & ~((align) - 1) )
 
+#if ((defined(PLX_LINUX) && !defined(PLX_LINUX_DRIVER)) ||	\
+	(defined(PLX_MSWINDOWS) && !defined(PLX_DRIVER)))
+static __inline void Plx_ftime_get(struct timeb *tm) {
+#if defined(PLX_LINUX) && !defined(PLX_LINUX_DRIVER)
+	struct timeval  StartTime;
+	gettimeofday( &StartTime, NULL );
+	tm->time = (time_t) StartTime.tv_sec;
+	tm->millitm = (unsigned short)((long)StartTime.tv_usec/1000);
+#elif defined(PLX_MSWINDOWS) && !defined(PLX_DRIVER)
+	ftime(tm);
+#endif
+}
+#endif
+
 // Calculate time difference between 2 timeb structures
-#define PLX_DIFF_TIMEB(time1,time0)         ( ((double)((time1).time - (time0).time)) + \
-                                              (((double)(time1).millitm - (time0).millitm) / 1000) )
+
+#define PLX_DIFF_TIMEB(time1,time0)	( ((double)((time1).time - (time0).time)) + \
+  					(((double)(time1).millitm - (time0).millitm) / 1000) )
 
 #if defined(PLX_MSWINDOWS)
     #define PLX_TIMEOUT_INFINITE        INFINITE
@@ -321,6 +347,8 @@ typedef enum _PLX_CHIP_FAMILY
     PLX_FAMILY_CAPELLA_1,               // 8714,8718,8734,8750,8764,8780,8796
     PLX_FAMILY_CAPELLA_2,               // 9712,9716,9733,9749,9750,9765,9781,9797
     PLX_FAMILY_ATLAS,                   // C010,C011,C012
+    PLX_FAMILY_ATLAS_2,                 // C030
+    PLX_FAMILY_ATLAS2_LLC,              // C034
     PLX_FAMILY_LAST_ENTRY               // -- Must be final entry --
 } PLX_CHIP_FAMILY;
 
@@ -373,16 +401,26 @@ typedef enum _PLX_FLAG_PORT
     PLX_FLAG_PORT_INT_DS_4      = 225,  // Internal DS 4
     PLX_FLAG_PORT_INT_DS_8      = 226,  // Internal DS 8
     PLX_FLAG_PORT_INT_DS_12     = 227,  // Internal DS 12
+    PLX_FLAG_PORT_INT_DS_16     = 228,  // Internal DS 16
     PLX_FLAG_PORT_INT_UP_0      = 232,  // Internal UP 0
     PLX_FLAG_PORT_INT_UP_4      = 233,  // Internal UP 4
     PLX_FLAG_PORT_INT_UP_8      = 234,  // Internal UP 8
     PLX_FLAG_PORT_INT_UP_12     = 235,  // Internal UP 12
+    PLX_FLAG_PORT_INT_UP_16     = 236,  // Internal UP 16
     PLX_FLAG_PORT_GEP           = 251,  // GEP
     PLX_FLAG_PORT_GEP_DS        = 255,  // GEP parent DS
-    PLX_FLAG_PORT_MPT0          = 247,  // MPT0
-    PLX_FLAG_PORT_MPT1          = 248,  // MPT1
-    PLX_FLAG_PORT_MPT2          = 249,  // MPT2
-    PLX_FLAG_PORT_MPT3          = 250   // MPT3
+    PLX_FLAG_PORT_MPT0          = 247,  // MPT0 / Atlas2 MPT4
+    PLX_FLAG_PORT_MPT1          = 248,  // MPT1 / Atlas2 MPT5
+    PLX_FLAG_PORT_MPT2          = 249,  // MPT2 / Atlas2 MPT6
+    PLX_FLAG_PORT_MPT3          = 250,  // MPT3 / Atlas2 MPT7
+    PLX_FLAG_PORT_ATLAS2_MPT0   = 240,  // Atlas2 MPT0
+    PLX_FLAG_PORT_ATLAS2_MPT1   = 241,  // Atlas2 MPT1
+    PLX_FLAG_PORT_ATLAS2_MPT2   = 242,  // Atlas2 MPT2
+    PLX_FLAG_PORT_ATLAS2_MPT3   = 243,  // Atlas2 MPT3
+    PLX_FLAG_PORT_ATLAS2_MPT4   = 244,  // Atlas2 MPT4
+    PLX_FLAG_PORT_ATLAS2_MPT5   = 245,  // Atlas2 MPT5
+    PLX_FLAG_PORT_ATLAS2_MPT6   = 246,  // Atlas2 MPT6
+    PLX_FLAG_PORT_ATLAS2_MPT7   = 247   // Atlas2 MPT7
 } PLX_FLAG_PORT;
 
 
@@ -733,10 +771,10 @@ typedef struct _PLX_VERSION
 // Chip features & port mask
 typedef struct _PEX_CHIP_FEAT
 {
-    U8 StnCount;                     // Supported station count
-    U8 PortsPerStn;                  // Max number of ports per station
-    U8 StnMask;                      // Bitmask of enabled stations
-    PEX_BITMASK_T( PortMask, 256 );  // Bitmask for ports and special types
+    U8  StnCount;                     // Supported station count
+    U8  PortsPerStn;                  // Max number of ports per station
+    U16 StnMask;                      // Bitmask of enabled stations
+    PEX_BITMASK_T( PortMask, 256 );   // Bitmask for ports and special types
 } PEX_CHIP_FEAT;
 
 
@@ -843,7 +881,7 @@ typedef struct _PLX_DEVICE_KEY
     U8  PlxPortType;                 // PLX-specific port type (NT/DMA/Host/etc)
     U8  NTPortNum;                   // If NT port exists, store NT port number
     U8  DeviceMode;                  // Device mode used internally by API
-    U32 ApiInternal[2];              // Reserved for internal PLX API use
+    U32 ApiInternal[3];              // Reserved for internal PLX API use
 } PLX_DEVICE_KEY;
 
 
@@ -967,6 +1005,7 @@ typedef struct _PLX_DMA_PARAMS
 // Performance properties
 typedef struct _PLX_PERF_PROP
 {
+
     U32 IsValidTag;   // Magic number to determine validity
 
     // Chip properties
@@ -980,6 +1019,12 @@ typedef struct _PLX_PERF_PROP
     U8  StationPort;
 
     // Ingress counters
+#if (defined(PLX_LINUX_DRIVER))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0))
+struct_group(
+    CurCounters,
+#endif
+#endif
     U32 IngressPostedHeader;
     U32 IngressPostedDW;
     U32 IngressNonpostedHdr;
@@ -996,10 +1041,16 @@ typedef struct _PLX_PERF_PROP
     U32 EgressCplHeader;
     U32 EgressCplDW;
     U32 EgressDllp;
-
+#if (defined(PLX_LINUX_DRIVER))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0))
+    );
     // Storage for previous counter values
 
     // Previous Ingress counters
+struct_group(
+    PrevCounters,
+#endif
+#endif
     U32 Prev_IngressPostedHeader;
     U32 Prev_IngressPostedDW;
     U32 Prev_IngressNonpostedHdr;
@@ -1016,6 +1067,11 @@ typedef struct _PLX_PERF_PROP
     U32 Prev_EgressCplHeader;
     U32 Prev_EgressCplDW;
     U32 Prev_EgressDllp;
+#if (defined(PLX_LINUX_DRIVER))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0))
+    );
+#endif
+#endif
 } PLX_PERF_PROP;
 
 

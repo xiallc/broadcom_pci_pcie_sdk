@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom, Inc
+ * Copyright 2013-2023 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -47,6 +47,7 @@
 
 #include <sys/timeb.h>
 #include "PlxApi.h"
+#include "PciRegs.h"
 
 #if defined(PLX_MSWINDOWS)
     #include "..\\Shared\\ConsFunc.h"
@@ -238,7 +239,7 @@ PerformTest(
         );
 
     // Get starting time
-    ftime( &PrevTime );
+    Plx_ftime_get( &PrevTime );
 
     do
     {
@@ -252,7 +253,7 @@ PerformTest(
             );
 
         // Get end time
-        ftime( &EndTime );
+        Plx_ftime_get( &EndTime );
 
         // Calculate elapsed time in milliseconds
         ElapsedTime_ms = (((U32)EndTime.time * 1000) + EndTime.millitm) -
@@ -421,6 +422,8 @@ SelectDevice_8000(
 {
     S32               i;
     S32               NumDevices;
+    U32               RegValue;
+    U16               Offset_Cap, CapID;
     BOOLEAN           bAddDevice;
     PLX_STATUS        status;
     PLX_PORT_PROP     PortProp;
@@ -483,6 +486,14 @@ SelectDevice_8000(
                     bAddDevice = FALSE;
                 }
 
+                // For Atlas2, ignore special internal ports
+                if ( ((DevKey.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                      (DevKey.PlxFamily == PLX_FAMILY_ATLAS2_LLC)) &&
+                     (PortProp.PortNumber >= 144) )
+                {
+                    bAddDevice = FALSE;
+                }
+                
                 // For MIRA USB EP, PM only available in Legacy mode
                 if ( (DevKey.PlxFamily == PLX_FAMILY_MIRA) &&
                      (PortProp.PortType == PLX_PORT_LEGACY_ENDPOINT) )
@@ -499,6 +510,49 @@ SelectDevice_8000(
                 {
                     bAddDevice = FALSE;
                 }
+
+                // Synthetic mode devices are not supported.
+                if ( (DevKey.SubDeviceId == 0x100B) ||
+                     (DevKey.SubDeviceId == 0x4090) )   // HBA subystem dev ID
+                {
+                        bAddDevice = FALSE;
+                }
+
+
+                if ( (bAddDevice == TRUE) &&
+                     ((PortProp.PortType == PLX_PORT_UPSTREAM)   ||
+                      (PortProp.PortType == PLX_PORT_DOWNSTREAM)) &&
+                     ((DevKey.PlxFamily == PLX_FAMILY_ATLAS) ||
+                      (DevKey.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                      (DevKey.PlxFamily == PLX_FAMILY_ATLAS2_LLC)) )
+                {
+                        // Get offset of first capability
+                        RegValue = PlxPci_PciRegisterReadFast( &Device, PCI_REG_CAP_PTR, NULL );
+                        if ((RegValue != PCI_CFG_RD_ERR_VAL_32) && (RegValue != 0))
+                        {
+                            // Set first capability
+                            Offset_Cap = (U16)RegValue;
+                            while(1)
+                            {
+                                // Get next capability
+                                RegValue = PlxPci_PciRegisterReadFast( &Device, Offset_Cap, NULL );
+                                CapID  = (U16)(RegValue & 0xFF);
+                                if(CapID == PCI_CAP_ID_VENDOR_SPECIFIC)
+                                {
+                                    bAddDevice = FALSE;
+                                    break;
+                                }
+
+                                Offset_Cap = (U16)((RegValue >> 8) & 0xFF);
+                                // Check if reached end of list
+                                if ((Offset_Cap == 0) || ((U8)Offset_Cap == 0xFF))
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                }
+
             }
 
             // Verify driver used is Service driver

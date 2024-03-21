@@ -2,7 +2,7 @@
 #define __PLX_API_DIRECT_H
 
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2022 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -123,6 +123,11 @@ extern "C" {
 // Maverick
 #define ATLAS_REG_MAV_HOST_DIAG             0x08     // Maverick host diag reg
 #define ATLAS_MAV_HOST_DIAG_CPU_RESET_MASK  (1 << 1) // Hold CPU in reset
+
+// Define registers which are added/changed in Atlas 2 w.r.t Atlas 1
+#define ATLAS2_REG_CCR_UPSTREAM_PORT        _REG_CCR( 0x1A4 )
+#define ATLAS2_REG_PORT_CLOCK_EN_3          0x318    // Port clock enable for 96-127
+#define ATLAS2_REG_PORT_CLOCK_EN_4          0x324    // Port clock enable for 128-143
 
 
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2020 Broadcom, Inc
+ * Copyright 2013-2022 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -126,7 +126,11 @@
  *   Stn_Sel      S#  (Only ports 0-63) |     R[17:16]
  *   Port_Sel     P#                    |     R[15:12]
  *
- ******************************************************************************/
+ * Atlas2
+ * Access modes are no longer supported in Atlas2. Refer comment below.
+ * The complete 22-bit PEX register address will be part of the I2C command.
+ *
+  ******************************************************************************/
 
 /*******************************************************************************
  *
@@ -180,11 +184,22 @@
  *     | Resvd | I2C_Cmd | R | Mode | StnSel | PtSel | R | Byte_En |  DW_Offset |
  *      ------------------------------------------------------------------------
  *
- * Atlas
+ * Atlas 1
  *      31   27 26     24 23  22  21 20    19 18   15 14  13     10 9          0
  *      ------------------------------------------------------------------------
  *     | Resvd | I2C_Cmd | R | Mode | StnSel | PtSel | R | Byte_En |  DW_Offset |
  *      ------------------------------------------------------------------------
+ *
+ * Atlas 2
+ * Access modes are not supported in Atlas2.
+ * The complete 22-bit PEX register address that needs to be accessed is part
+ * of the Atlas2 I2C command format as described below. To access addresses
+ * beyond the PEX region (0x60800000-0x60BFFFFF), indexing method is used.
+ * 
+ *      31   27 26     24 23             14 13     10 9                0
+ *      ---------------------------------------------------------------
+ *     | Resvd | I2C_Cmd | Reg Addr[21:12] | Byte_En |  Reg Addr[11:2] |
+ *      ---------------------------------------------------------------
  *
  ******************************************************************************/
 
@@ -742,36 +757,56 @@ PlxI2c_PlxRegisterRead(
         return 0;
     }
 
-	/*********************************************************************
-	 * Atlas MPT 0 offset B0h exhibits chip issues when simply read via
-	 * I2C. The read operation returns a portion or all of a previously
-	 * read value from another register. Additionally, that value actually
-	 * gets written to B0 (can verify via SDB for example), which may
-	 * throw off software that reads it.
-	 *
-	 * The register value should always return 0000_4803h, which is the RO
-	 * PCI VPD capability ID header. So, the access is trapped here and a
-	 * hard-coded value is returned to bypass the I2C access.
-	 ********************************************************************/
+    /*********************************************************************
+     * Atlas/Atlas2 MPT 0 offset B0h exhibits chip issues when simply
+     * read via I2C. The read operation returns a portion or all of a
+     * previously read value from another register.
+     * Additionally, that value actually gets written to B0 (can verify
+     * via SDB for example), which may throw off software that reads it.
+     *
+     * The register value should always return 0000_4803h, which is the RO
+     * PCI VPD capability ID header. So, the access is trapped here and a
+     * hard-coded value is returned to bypass the I2C access.
+     ********************************************************************/
     if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
-	{
-		// Check for absolute or adjusted address of MPT 0 B0h
-		if ( ((bAdjustForPort == FALSE) && (offset == 0x608F70B0)) ||
-			 ((bAdjustForPort == TRUE) && (offset == 0xB0) &&
-			  (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT0)) )
-		{
-			if (pStatus != NULL)
-			{
-				*pStatus = PLX_STATUS_OK;
-			}
-			return 0x00004803;	// RO PCI VPD capability
-		}
-	}
+    {
+        // Check for absolute or adjusted address of MPT 0 B0h
+        if (((bAdjustForPort == FALSE) && (offset == 0x608F70B0)) ||
+            ((bAdjustForPort == TRUE) && (offset == 0xB0) &&
+            (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT0)))
+        {
+            if (pStatus != NULL)
+            {
+                *pStatus = PLX_STATUS_OK;
+            }
+            return 0x00004803;	// RO PCI VPD capability
+        }
+    }
 
-    // If outside PEX region (60800000-60FFFFFF), must use indexing method
-    if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
-         (bAdjustForPort == FALSE) &&
-         ((offset & I2C_PEX_BASE_ADDR_MASK) != ATLAS_REGS_AXI_BASE_ADDR) )
+    if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+        pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+    {
+        // Check for absolute or adjusted address of MPT 0 B0h
+        if (((bAdjustForPort == FALSE) && (offset == 0x608F00B0)) ||
+            ((bAdjustForPort == TRUE) && (offset == 0xB0) &&
+            (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT0)))
+        {
+            if (pStatus != NULL)
+            {
+                *pStatus = PLX_STATUS_OK;
+            }
+            return 0x00004803;	// RO PCI VPD capability
+        }
+    }
+
+    // If outside PEX region, must use indexing method
+    if ( ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+          (bAdjustForPort == FALSE) &&
+          ((offset & I2C_PEX_BASE_ADDR_MASK) != ATLAS_REGS_AXI_BASE_ADDR)) ||
+         ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+           pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) &&
+          (bAdjustForPort == FALSE) &&
+          ((offset & I2C_PEX_BASE_ADDR_ATLAS2_MASK) != ATLAS_REGS_AXI_BASE_ADDR)) )
     {
         // Set AXI address to read (1F0100h) if has changed
         if (offset != Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr)
@@ -804,7 +839,7 @@ PlxI2c_PlxRegisterRead(
                 FALSE,                    // Adjust for port?
                 (U8)(bRetryOnError != 0)  // Retry on error?
                 );
-
+        
         if (pStatus != NULL)
         {
             *pStatus = PLX_STATUS_OK;
@@ -862,7 +897,7 @@ PlxI2c_PlxRegisterRead(
                 (U8*)&command,                  // Write data
                 &nBytesWritten,                 // Bytes written
                 sizeof(U32),                    // Num bytes to read
-                (U8*)&regVal,                   // Read data buffer
+                (U8*)&regVal,                 // Read data buffer
                 &nBytesRead                     // Bytes read
                 );
 
@@ -968,10 +1003,14 @@ PlxI2c_PlxRegisterWrite(
         return PLX_STATUS_INVALID_OFFSET;
     }
 
-    // If outside PEX region (60800000-60FFFFFF), must use indexing method
-    if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
-         (bAdjustForPort == FALSE) &&
-         ((offset & I2C_PEX_BASE_ADDR_MASK) != ATLAS_REGS_AXI_BASE_ADDR) )
+    // If outside PEX region, must use indexing method
+    if ( ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+          (bAdjustForPort == FALSE) &&
+          ((offset & I2C_PEX_BASE_ADDR_MASK) != ATLAS_REGS_AXI_BASE_ADDR)) ||
+         ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+           pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) &&
+          (bAdjustForPort == FALSE) &&
+          ((offset & I2C_PEX_BASE_ADDR_ATLAS2_MASK) != ATLAS_REGS_AXI_BASE_ADDR)) )
     {
         // Set AXI address to write (1F0100h) if has changed
         if (offset != Gbl_I2cProp[pDevice->Key.ApiIndex].IdxLastAddr)
@@ -1004,7 +1043,7 @@ PlxI2c_PlxRegisterWrite(
                     );
         }
 
-        // Issue read command (1F0108h[1]=1)
+        // Issue write command (1F0108h[0]=1)
         if (status == PLX_STATUS_OK)
         {
             status =
@@ -2075,12 +2114,28 @@ PlxI2c_GenerateCommand(
         Address += pDevice->Key.ApiInternal[1];
     }
 
-    // If within PEX region (60800000-60FFFFFF), remove base address
+    // If within PEX region, remove base address
     if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
          (bAdjustForPort == FALSE) &&
          ((Address & I2C_PEX_BASE_ADDR_MASK) == ATLAS_REGS_AXI_BASE_ADDR) )
     {
         Address &= I2C_PEX_MAX_OFFSET_MASK;
+    }
+
+    if ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+         pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) &&
+        (bAdjustForPort == FALSE) &&
+        ((Address & I2C_PEX_BASE_ADDR_ATLAS2_MASK) == ATLAS_REGS_AXI_BASE_ADDR))
+    {
+        Address &= I2C_PEX_MAX_OFFSET_ATLAS2_MASK;
+    }
+
+    if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+        pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+    {
+        return PlxI2c_GenerateAtlas2Command(
+                I2cOperation,
+                Address);
     }
 
     // Determine port base address
@@ -2527,7 +2582,6 @@ PlxI2c_GenerateCommand(
                 portSel = (addr_Base >> 12) & 0xF; // Addr [15:12]
             }
             break;
-
         case 0:
             // Family not set yet but still need command during initial probe
             break;
@@ -2546,7 +2600,9 @@ PlxI2c_GenerateCommand(
         {
             // Set high address bits register (2CCh)
             highAddrOffset = I2C_HIGH_ADDR_OFFSET;
-            if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+            if ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
             {
                 // For Atlas, must specify PEX region (608x_xxxx)
                 highAddrOffset += ATLAS_REGS_AXI_BASE_ADDR;
@@ -3590,7 +3646,7 @@ PlxI2c_ProbeSwitch(
                 }
 
                 DebugPrintf((
-                    "I2C: Chip config: %d stn %d ports/stn StnMask=%02Xh\n",
+                    "I2C: Chip config: %d stn %d ports/stn StnMask=%04Xh\n",
                     chipFeat.StnCount,
                     chipFeat.PortsPerStn, chipFeat.StnMask
                     ));
@@ -4089,4 +4145,39 @@ PlxI2c_ProbeSwitch(
 
     DebugPrintf(("Criteria did not match any devices\n"));
     return PLX_STATUS_INVALID_OBJECT;
+}
+
+/******************************************************************************
+ *
+ * Function   :  PlxI2c_GenerateAtlas2Command
+ *
+ * Description:  Prepares the I2C command based on Atlas2 format.
+ *
+ *****************************************************************************/
+U32
+PlxI2c_GenerateAtlas2Command(
+    U8                 I2cOperation,
+    U32                Address
+)
+{
+    U32         addrLow, addrHigh;
+    U32         command;
+
+    /* Atlas2 does not support access mode for register access.
+     * The command format accommodates the entire register DW address
+     * that needs to be accessed.
+     */
+    addrLow = (Address & 0xFFF) >> 2;     // Address[11:2]
+    addrHigh = (Address >> 12) & 0x3FF;   // Address[12:21]
+    command =
+        (0              << 27) |  // Reserved [31:27]
+        (I2cOperation   << 24) |  // Register operation [26:24]
+        (addrHigh       << 14) |  // Register Address [23:14]
+        (0xF            << 10) |  // Byte enables [13:10]
+        (addrLow        << 0);    // Register Address [11:2]
+
+    // 32-bit command must be in BE format since byte 0 is MSB
+    command = PLX_BE_DATA_32(command);
+
+    return command;
 }

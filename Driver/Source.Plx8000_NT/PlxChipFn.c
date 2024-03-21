@@ -539,11 +539,6 @@ _PlxChipAssignFamily:
             pdx->Key.PlxFamily = PLX_FAMILY_CAPELLA_2;
             break;
 
-        case 0xC010:
-        case 0xC011:
-        case 0xC012:
-            pdx->Key.PlxFamily = PLX_FAMILY_ATLAS;
-
         case 0:
             pdx->Key.PlxFamily = PLX_FAMILY_NONE;
             break;

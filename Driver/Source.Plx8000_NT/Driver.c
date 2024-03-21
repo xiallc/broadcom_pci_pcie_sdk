@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2021 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -52,7 +52,20 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/version.h>
-#include <linux/vermagic.h>
+/***********************************************************
+ * vermagic.h
+ *
+ * Drivers use the UTS_RELEASE macro to print the current
+ * kernel version.
+ * The definition of UTS_RELEASE was included through header
+ * file vermagic.h. Starting from 5.8.0, this header cannot
+ * be included anymore. Include utsrelease.h directly.
+ **********************************************************/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,8,0))
+    #include <linux/vermagic.h>
+#else
+    #include <generated/utsrelease.h>
+#endif
 #include "ApiFunc.h"
 #include "Dispatch.h"
 #include "Driver.h"

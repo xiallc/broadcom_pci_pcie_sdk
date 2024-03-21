@@ -2,7 +2,7 @@
 #define __PLX_H
 
 /*******************************************************************************
- * Copyright 2013-2020 Broadcom, Inc.
+ * Copyright 2013-2023 Broadcom, Inc.
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -46,7 +46,7 @@
  *
  * Revision:
  *
- *     11-17-20 : PCI/PCIe SDK v8.23
+ *      12-18-23 : PCI/PCIe SDK v9.81
  *
  ******************************************************************************/
 
@@ -62,12 +62,12 @@ extern "C" {
 *               Definitions
 **********************************************/
 // SDK Version information
-#define PLX_SDK_VERSION_MAJOR            8
-#define PLX_SDK_VERSION_MINOR            23
-#define PLX_SDK_VERSION_STRING           "8.23"
+#define PLX_SDK_VERSION_MAJOR            9
+#define PLX_SDK_VERSION_MINOR            81
+#define PLX_SDK_VERSION_STRING           "9.81"
 #define PLX_SDK_PRODUCT_NAME_STRING      "Broadcom PCI/PCIe SDK"
 #define PLX_SDK_COMPANY_NAME_STRING      "Broadcom Ltd."
-#define PLX_SDK_COPYRIGHT_STRING         "\251 Broadcom 2020"
+#define PLX_SDK_COPYRIGHT_STRING         "\251 Broadcom 2022"
 
 // Device object validity codes
 #define PLX_TAG_VALID                    0x5F504C58     // "_PLX" in Hex
@@ -88,11 +88,11 @@ extern "C" {
 #define FIND_AMOUNT_MATCHED              80001
 
 // Max ports
-#define PEX_MAX_PORT                     128
+#define PEX_MAX_PORT                     144
 #define PEX_PORT_REGS_SIZE               (4 * 1024)
 
 // Used for performance counter calculations
-#define PERF_MAX_PORTS                   96                             // Max # ports in a switch
+#define PERF_MAX_PORTS                   144                             // Max # ports in a switch
 #define PERF_COUNTERS_PER_PORT           14                             // Number of counters per port
 #define PERF_TLP_OH_DW                   2                              // Overhead DW per TLP
 #define PERF_TLP_DW                      (3 + PERF_TLP_OH_DW)           // DW per TLP

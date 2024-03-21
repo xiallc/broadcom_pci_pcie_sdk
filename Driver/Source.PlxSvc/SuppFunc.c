@@ -633,7 +633,7 @@ PlxDeviceListBuild(
             if ((RegValue & 0x7) == 0)
             {
                 // Enable device but don't clear any PCI error status
-                RegValue = (RegValue & (~0x1F << 27)) | 0x7;
+                RegValue = (~(0x1F << 27) & RegValue) | 0x7;
                 PLX_PCI_REG_WRITE( pDevice, PCI_REG_CMD_STAT, RegValue );
             }
         }

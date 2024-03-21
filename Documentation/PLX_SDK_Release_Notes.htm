@@ -255,10 +255,10 @@ style='font-size:20.0pt'>Release Notes</span></p>
 <p class=MsoNormal align=center style='text-align:center'>&nbsp;</p>
 
 <p class=MsoNormal align=center style='text-align:center'><span
-style='font-size:14.0pt'>Version 8.23</span></p>
+style='font-size:14.0pt'>Version 9.81</span></p>
 
 <p class=MsoNormal align=center style='text-align:center'><span
-style='font-size:14.0pt'>November 2020</span></p>
+style='font-size:14.0pt'>Dec 2023</span></p>
 
 <div style='margin-left:5.75pt'>
 
@@ -337,6 +337,12 @@ Systems via Windows PCI/PCIe Service driver</a></p>
 <p class=MsoBodyText style='margin-left:.5in'>&nbsp;</p>
 
 <p class=MsoBodyText><b><i>Changes in SDK Versions:</i></b></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in'><a
+href="#_PCI/PCIe_SDK_9.00">PCI/PCIe SDK 9.00</a></p>
+
+<p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in'><a
+href="#_PCI/PCIe_SDK_8.30">PCI/PCIe SDK 8.30</a></p>
 
 <p class=MsoBodyText style='margin-left:.75in;text-indent:-.25in'><a
 href="#_PCI/PCIe_SDK_8.23">PCI/PCIe SDK 8.23</a></p>
@@ -455,7 +461,7 @@ href="#_Starting_with_SDK"><span style='color:windowtext'>Switch</span></a>es</h
 
 <p class=MsoBodyTextIndent>Beginning with SDK 5.20, an NDA key is required for
 complete software support of PLX PCI Express Switches (i.e. 8500 &amp; 8600
-parts).&nbsp; The NDA key only affects the PLX Device Editor utility (PDE) and
+parts).&nbsp; The NDA key only affects the PEX Device Editor utility (PDE) and
 will not affect any other portion of the SDK.&nbsp; Without an NDA key, access
 to PLX switch registers and EEPROM will be disabled in the PDE.&nbsp; Access to
 PLX chips through the PLXMon &amp; PlxCm utilities does not require an NDA key.</p>
@@ -465,7 +471,7 @@ contact the sales representative for your region.&nbsp; NDA keys are assigned
 based on the PLX switches used in the design.&nbsp; You may update your key
 anytime by re-starting the PLX SDK installation and selecting the “<b><i>Modify</i></b>”
 option.&nbsp; To find your PLX sales representative, please visit <a
-href="http://www.plxtech.com/about/contacts" target="_blank">http://www.plxtech.com/about/contacts</a>.</p>
+href="https://www.broadcom.com/company/contact" target="_blank">https://www.broadcom.com/company/contact</a>.</p>
 
 <h2><a name="_PLX_SDK_Installation_"></a><a name="_Issues_with_PEX_1"></a><a
 name="_Known_Issues_with"></a><a name="_Designating_a_Device"></a><a
@@ -710,7 +716,7 @@ name="_PLX_Debug_Tools"></a>5.<span style='font-size:7.0pt;font-family:"Times Ne
 </span>PCI/PCIe Debug Tools Per-chip Support</h2>
 
 <p class=MsoBodyTextIndent>The PCI/PCIe SDK provides various debug tools,
-including PLX Device Editor (PDE) GUI, PlxCm command-line tool, and PLXMon
+including PEX Device Editor (PDE) GUI, PlxCm command-line tool, and PLXMon
 GUI.&nbsp; Depending upon the chip being used, some features may or may not be
 supported in some tools.&nbsp; For legacy devices, including PCI 9000-series,
 PCI 6000-series, PCIe 8311, 8111/8112, &amp; 8114, please use either PLXMon GUI
@@ -1039,9 +1045,62 @@ name="_PLX_SDK_5.21"></a><a name="_PLX_SDK_5.22"></a><a name="_PLX_SDK_6.0"></a>
 name="_PLX_SDK_6.10"></a><a name="_PLX_SDK_6.20"></a><a name="_PLX_SDK_6.30"></a><a
 name="_PLX_SDK_6.40"></a><a name="_PLX_SDK_6.41"></a><a name="_PLX_SDK_6.50"></a><a
 name="_PLX_SDK_7.00"></a><a name="_PLX_SDK_7.20"></a><a name="_PLX_SDK_7.30"></a><a
-name="_PLX_SDK_7.24"></a><a name="_PLX_SDK_7.25"></a><a name="_PCI/PCIe_SDK_8.0"></a><a
-name="_PCI/PCIe_SDK_8.23"></a>PCI/PCIe SDK 8.23</h2>
+name="_PLX_SDK_7.24"></a><a name="_PLX_SDK_7.25"></a><a name="_PCI/PCIe_SDK_8.0"></a>
+</h2>
 
+<h2><a name="_PCI/PCIe_SDK_9.00"></a>PCI/PCIe SDK 9.00</h2>
+
+<p class=MsoBodyTextIndent style='margin-left:.75in;text-indent:-.25in'><a
+name="_PLX_SDK_7.25_1"></a><span style='font-family:Symbol'>·</span><span
+style='font-size:7.0pt;font-family:"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span><i>Windows Drivers</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:1.25in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>Added Support
+ for PEX 89000 Devices</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:.75in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>Linux
+Drivers</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:1.25in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>Added Support
+ for PEX 89000 Devices</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:.75in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>API</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:1.25in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>API Changes 
+ to Support PEX 89000 Devices</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:56.25pt;text-indent:-20.25pt'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span><i>PlxCm</i></p>
+
+<p class=MsoBodyTextIndent style='margin-left:1.25in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>API Changes
+ to Support PEX 89000 Devices</i></p>
+
+<h2><a name="_PCI/PCIe_SDK_8.30"></a>PCI/PCIe SDK 8.30</h2>
+<p class=MsoBodyTextIndent style='margin-left:56.25pt;text-indent:-20.25pt'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span>Linux Drivers</p>
+
+<p class=MsoBodyTextIndent style='margin-left:1.25in;text-indent:-.25in'><span
+style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
+"Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><i>Fix
+compilation on 5.0 and later kernels.</i></p>
+
+<h2><a name="_PCI/PCIe_SDK_8.23"></a>PCI/PCIe SDK 8.23</h2>
 <p class=MsoBodyTextIndent style='margin-left:56.25pt;text-indent:-20.25pt'><span
 style='font-family:Symbol'>·</span><span style='font-size:7.0pt;font-family:
 "Times New Roman","serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;

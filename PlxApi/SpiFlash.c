@@ -766,10 +766,9 @@ Spi_WaitControllerReady(
     PLX_STATUS   status;
     struct timeb endTime;
     struct timeb startTime;
-
-
-    // Note start time
-    ftime( &startTime );
+   
+    // Note start time 
+	Plx_ftime_get( &startTime );
 
     // Wait until command valid is clear
     do
@@ -790,7 +789,7 @@ Spi_WaitControllerReady(
         }
 
         // Verify we don't exceed poll time
-        ftime( &endTime );
+		Plx_ftime_get( &endTime );
         elapsedTimeMs = (U32)(PLX_DIFF_TIMEB( endTime, startTime ) * 1000);
         if (elapsedTimeMs >= SPI_MAX_WAIT_CTRL_READY_MS)
         {

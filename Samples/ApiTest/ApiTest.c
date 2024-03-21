@@ -1622,7 +1622,7 @@ TestPortInfo(
         );
 
     Cons_printf(
-        "      Link Speed : G%d / G%s\n",
+        "      Link Speed : G%d / G%d\n",
         PortProp.LinkSpeed, PortProp.MaxLinkSpeed
         );
 }

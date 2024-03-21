@@ -15,8 +15,9 @@ as a reference for writing custom software that utilizes the PLX API.
 
 Not all samples work with all PLX devices. The PLX API supports numerous
 PLX chip families in PCI/PCIe, including 6000-series PCI-to-PCI bridges,
-9000-series PCI-to-Local bus bridges, & 8000-series PCI/PCIe bridges &
-switches. Some samples are provided only for specific chip families.
+9000-series PCI-to-Local bus bridges, 8000-series PCI/PCIe bridges &
+switches, PEX88000 PCIe Switches, & PEX89000 PCIe Switches.
+Some samples are provided only for specific chip families.
 
 
 SAMPLES
@@ -28,7 +29,7 @@ the type of device selected.
 
 - DSlave
 Demonstrates how to read/write from a PLX 9000 PCI BAR space using the
-PLX API/driver to perform the data transer. This operation is often
+PLX API/driver to perform the data transfer. This operation is often
 referred to as "Direct Slave".
 
 - DSlave_BypassApi
@@ -59,9 +60,10 @@ PLX 8000 NT port.
 Demonstrates very basic NT communication by sending keystrokes from one system
 through a PLX 8000 NT port & displaying them on the other system.
 
-- PerfMonitor [8000-series switches with Performance Counter support]
+- PerfMonitor [PEX88000, PEX89000 & PLX 8000-series switches with Performance Counter support]
 Demonstrates use of the PLX Performance API to capture & display performance
-measurements from the chip.
+measurements from the chip. Note PerfMonitor does not support Synthetic mode of
+operation of PEX88000 & PEX89000 switches.
 
 - PlxCm
 The PLX Command-Line Monitor useful for debugging. Complete source is provided.

@@ -1,4 +1,5 @@
 /*******************************************************************************
+ * Copyright 2018-2023 Broadcom, Inc
  * Copyright 2013-2018 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
@@ -48,6 +49,7 @@
  ******************************************************************************/
 
 
+#include <linux/types.h>
 #include <linux/slab.h>     // For kmalloc()
 #include <linux/uaccess.h>  // For copy_to/from_user()
 #include "ApiFunc.h"
@@ -1984,6 +1986,8 @@ PlxPciPerformanceInitializeProperties(
 
         case PLX_FAMILY_SIRIUS:
         case PLX_FAMILY_ATLAS:
+		case PLX_FAMILY_ATLAS_2:
+		case PLX_FAMILY_ATLAS2_LLC:
             StnPortCount = 16;
             break;
 
@@ -2084,6 +2088,8 @@ PlxPciPerformanceMonitorControl(
             break;
 
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             pexBase        = ATLAS_PEX_REGS_BASE_OFFSET;
             Offset_Control = 0x3E0;
             break;
@@ -2160,6 +2166,8 @@ PlxPciPerformanceMonitorControl(
         case PLX_FAMILY_CAPELLA_1:
         case PLX_FAMILY_CAPELLA_2:
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             // Set device configuration
             if (pdx->Key.PlxFamily == PLX_FAMILY_CYGNUS)
             {
@@ -2176,7 +2184,9 @@ PlxPciPerformanceMonitorControl(
             }
             else if ((pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
                      (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) ||
-                     (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS))
+                     (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                     (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                     (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
             {
                 Bit_EgressEn    = 6;
                 StnCount        = 6;
@@ -2190,12 +2200,39 @@ PlxPciPerformanceMonitorControl(
                     StnPortCount = 16;
                 }
 
+                // Override station and station port count for Atlas2
+                if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2)
+                {
+                    StnCount = 9;
+                    StnPortCount = 16;
+                }
+
+                // Override station and station port count for Atlas2LLC
+                if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+                {
+                    StnCount = 3;
+                    StnPortCount = 16;
+                }
                 // Disable probe mode (350h[8]=0)
                 if (command == PLX_PERF_CMD_START)
                 {
+                    pdx->Key.ApiInternal[2] = PLX_8000_REG_READ(pdx, pexBase + Offset_Control);
+                    if ((pdx->Key.ApiInternal[2] & (1 << 31)) != 0)
+                    {
+                        return PLX_STATUS_OK;
+                    }
+
                     RegValue = PLX_8000_REG_READ( pdx, pexBase + 0x350 );
                     PLX_8000_REG_WRITE( pdx, pexBase + 0x350, RegValue & ~((U32)1 << 8) );
                 }
+                else
+                {
+                    if ((pdx->Key.ApiInternal[2] & (1 << 31)) != 0)
+                    {
+                        return PLX_STATUS_OK;
+                    }
+
+                }		
             }
 
             // For certain chips, set 3F0h[9:8]=3 to disable probe mode interval
@@ -2205,11 +2242,20 @@ PlxPciPerformanceMonitorControl(
                   (pdx->Key.PlxFamily == PLX_FAMILY_DRACO_2)   ||
                   (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
                   (pdx->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) ||
-                  (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)) )
+                  (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)))
             {
                 RegValue = PLX_8000_REG_READ( pdx, pexBase + 0x3F0 );
                 PLX_8000_REG_WRITE( pdx, pexBase + 0x3F0, RegValue | (3 << 8) );
             }
+
+            if ( (command == PLX_PERF_CMD_START) &&
+                 ((pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                  (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) ))
+            {
+                RegValue = PLX_8000_REG_READ( pdx, pexBase + 0x3F0 );
+                PLX_8000_REG_WRITE( pdx, pexBase + 0x3F0, RegValue | (7 << 0) );
+            }
+
 
             // Enable/Disable Performance Counter in each station (or ports if applicable)
             for (i = 0; i < (StnCount * StnPortCount); i++)
@@ -2238,7 +2284,9 @@ PlxPciPerformanceMonitorControl(
                     RegValue = PLX_8000_REG_READ( pdx, offset + 0xF30 );
 
                     // On Atlas, F30h[21] is egress credit enable but always reads 0, so ensure remains set
-                    if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+                    if ((pdx->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                        (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                        (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)) // TODO: Check if this is applicable to Atlas2 as well?
                     {
                         RegValue |= ((U32)1 << 21);
                     }
@@ -2318,6 +2366,8 @@ PlxPciPerformanceResetCounters(
             break;
 
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             Offset_Control = ATLAS_PEX_REGS_BASE_OFFSET + 0x3E0;
             break;
 
@@ -2338,6 +2388,16 @@ PlxPciPerformanceResetCounters(
         StnCount     = 6;
         StnPortCount = 16;
     }
+    else if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2)
+    {
+        StnCount = 9;
+        StnPortCount = 16;
+    }
+    else if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+    {
+        StnCount = 3;
+        StnPortCount = 16;
+    }    
     else
     {
         StnCount     = 1;
@@ -2591,6 +2651,192 @@ PlxPciPerformanceResetCounters(
  * 13C| PHY (always 0)  |
  *     -----------------
  *
+ *           Atlas2
+ *    -----------------------
+ *    14 counters/port
+ *    16 ports/station
+ *     9 stations (144 ports)
+ *
+ *   224 counters/station
+ * 2,016 counters (224 * 9)
+ *
+ *  off     Counter
+ *    -----------------
+ *   0| Port 0 IN PH    |
+ *   4| Port 0 IN PDW   |
+ *   8| Port 0 IN NPH   |
+ *   C| Port 0 IN NPDW  |
+ *  10| Port 0 IN CPLH  |
+ *  14| Port 0 IN CPLDW |
+ *    |-----------------|
+ *  18| Port 1 IN PH    |
+ *    |       :         |
+ *    |       :         |
+ *  2C| Port 1 IN CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ * 168| Port 15 IN PH   |
+ *    |       :         |
+ *    |       :         |
+ * 17C| Port 15 IN CPDW |
+ *    |-----------------|
+ * 180| Port 0 EG PH    |
+ * 184| Port 0 EG PDW   |
+ * 188| Port 0 EG NPH   |
+ * 18C| Port 0 EG NPDW  |
+ * 190| Port 0 EG CPLH  |
+ * 194| Port 0 EG CPLDW |
+ *    |-----------------|
+ * 198| Port 1 EG PH    |
+ *    |       :         |
+ *    |       :         |
+ * 1AC| Port 1 EG CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |-----------------|
+ * 2E8| Port 15 EG PH   |
+ *    |       :         |
+ *    |       :         |
+ * 2FC| Port 15 EG CPLDW|
+ *    |-----------------|
+ * 300| Port 0 IN DLLP  |
+ * 304| Port 1 IN DLLP  |
+ * 308| Port 2 IN DLLP  |
+ * 30C| Port 3 IN DLLP  |
+ * 310| Port 4 IN DLLP  |
+ * 314| Port 5 IN DLLP  |
+ * 318| Port 6 IN DLLP  |
+ * 31C| Port 7 IN DLLP  |
+ * 320| Port 8 IN DLLP  |
+ * 324| Port 9 IN DLLP  |
+ * 328| Port 10 IN DLLP |
+ * 32C| Port 11 IN DLLP |
+ * 330| Port 12 IN DLLP |
+ * 334| Port 13 IN DLLP |
+ * 338| Port 14 IN DLLP |
+ * 33C| Port 15 IN DLLP |
+ *    |-----------------|
+ * 340| Port 0 EG DLLP  |
+ * 344| Port 1 EG DLLP  |
+ * 348| Port 2 EG DLLP  |
+ * 34C| Port 3 EG DLLP  |
+ * 350| Port 4 EG DLLP  |
+ * 354| Port 5 EG DLLP  |
+ * 358| Port 6 EG DLLP  |
+ * 35C| Port 7 EG DLLP  |
+ * 360| Port 8 EG DLLP  |
+ * 364| Port 9 EG DLLP  |
+ * 368| Port 10 EG DLLP |
+ * 36C| Port 11 EG DLLP |
+ * 370| Port 12 EG DLLP |
+ * 374| Port 13 EG DLLP |
+ * 378| Port 14 EG DLLP |
+ * 37C| Port 15 EG DLLP |
+ *    |__ __ __ __ __ __|
+ *
+  *           Atlas2LLC
+ *    -----------------------
+ *    14 counters/port
+ *    16 ports/station
+ *     3 stations (48 ports)
+ *
+ *   224 counters/station
+ *   672 counters (224 * 3)
+ *
+ *  off     Counter
+ *    -----------------
+ *   0| Port 0 IN PH    |
+ *   4| Port 0 IN PDW   |
+ *   8| Port 0 IN NPH   |
+ *   C| Port 0 IN NPDW  |
+ *  10| Port 0 IN CPLH  |
+ *  14| Port 0 IN CPLDW |
+ *    |-----------------|
+ *  18| Port 1 IN PH    |
+ *    |       :         |
+ *    |       :         |
+ *  2C| Port 1 IN CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ * 168| Port 15 IN PH   |
+ *    |       :         |
+ *    |       :         |
+ * 17C| Port 15 IN CPDW |
+ *    |-----------------|
+ * 180| Port 0 EG PH    |
+ * 184| Port 0 EG PDW   |
+ * 188| Port 0 EG NPH   |
+ * 18C| Port 0 EG NPDW  |
+ * 190| Port 0 EG CPLH  |
+ * 194| Port 0 EG CPLDW |
+ *    |-----------------|
+ * 198| Port 1 EG PH    |
+ *    |       :         |
+ *    |       :         |
+ * 1AC| Port 1 EG CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |-----------------|
+ * 2E8| Port 15 EG PH   |
+ *    |       :         |
+ *    |       :         |
+ * 2FC| Port 15 EG CPLDW|
+ *    |-----------------|
+ * 300| Port 0 IN DLLP  |
+ * 304| Port 1 IN DLLP  |
+ * 308| Port 2 IN DLLP  |
+ * 30C| Port 3 IN DLLP  |
+ * 310| Port 4 IN DLLP  |
+ * 314| Port 5 IN DLLP  |
+ * 318| Port 6 IN DLLP  |
+ * 31C| Port 7 IN DLLP  |
+ * 320| Port 8 IN DLLP  |
+ * 324| Port 9 IN DLLP  |
+ * 328| Port 10 IN DLLP |
+ * 32C| Port 11 IN DLLP |
+ * 330| Port 12 IN DLLP |
+ * 334| Port 13 IN DLLP |
+ * 338| Port 14 IN DLLP |
+ * 33C| Port 15 IN DLLP |
+ *    |-----------------|
+ * 340| Port 0 EG DLLP  |
+ * 344| Port 1 EG DLLP  |
+ * 348| Port 2 EG DLLP  |
+ * 34C| Port 3 EG DLLP  |
+ * 350| Port 4 EG DLLP  |
+ * 354| Port 5 EG DLLP  |
+ * 358| Port 6 EG DLLP  |
+ * 35C| Port 7 EG DLLP  |
+ * 360| Port 8 EG DLLP  |
+ * 364| Port 9 EG DLLP  |
+ * 368| Port 10 EG DLLP |
+ * 36C| Port 11 EG DLLP |
+ * 370| Port 12 EG DLLP |
+ * 374| Port 13 EG DLLP |
+ * 378| Port 14 EG DLLP |
+ * 37C| Port 15 EG DLLP |
+ *    |__ __ __ __ __ __|
+ *
  ******************************************************************************/
 PLX_STATUS
 PlxPciPerformanceGetCounters(
@@ -2693,6 +2939,7 @@ PlxPciPerformanceGetCounters(
             break;
 
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
             Offset_RamCtrl   = ATLAS_PEX_REGS_BASE_OFFSET + 0x3F0;
             Offset_Fifo      = ATLAS_PEX_REGS_BASE_OFFSET + 0x3E4;
             NumCounters      = 14;
@@ -2700,6 +2947,18 @@ PlxPciPerformanceGetCounters(
             StnPortCount     = 16;
             bStationBased    = TRUE;
             InEgPerPortCount = 6;    // Non-Posted header count added
+
+            // Atlas2 support 9 stations
+            if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2)
+            {
+                StnCount = 9;
+            }
+            
+            // Atlas2LLC support 3 stations
+            if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+            {
+                StnCount = 3;
+            }
             break;
 
         default:
@@ -2827,12 +3086,34 @@ PlxPciPerformanceGetCounters(
             PERF_COUNTERS_PER_PORT * sizeof(U32)    // All 14 counters in structure
             );
 
+#if (defined(PLX_LINUX_DRIVER))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,16,0))
+	// Save current values to previous
+	// Copy All 14 counters in structure
+	pTmpPerfProps[i].Prev_IngressPostedHeader = pTmpPerfProps[i].IngressPostedHeader;
+	pTmpPerfProps[i].Prev_IngressPostedDW = pTmpPerfProps[i].IngressPostedDW;
+	pTmpPerfProps[i].Prev_IngressNonpostedHdr = pTmpPerfProps[i].IngressNonpostedHdr;
+	pTmpPerfProps[i].Prev_IngressNonpostedDW = pTmpPerfProps[i].IngressNonpostedDW;
+	pTmpPerfProps[i].Prev_IngressCplHeader = pTmpPerfProps[i].IngressCplHeader;
+	pTmpPerfProps[i].Prev_IngressCplDW = pTmpPerfProps[i].IngressCplDW;
+	pTmpPerfProps[i].Prev_IngressDllp = pTmpPerfProps[i].IngressDllp;
+	// Egress counters
+	pTmpPerfProps[i].Prev_EgressPostedHeader = pTmpPerfProps[i].EgressPostedHeader;
+	pTmpPerfProps[i].Prev_EgressPostedDW = pTmpPerfProps[i].EgressPostedDW;
+	pTmpPerfProps[i].Prev_EgressNonpostedHdr = pTmpPerfProps[i].EgressNonpostedHdr;
+	pTmpPerfProps[i].Prev_EgressNonpostedDW = pTmpPerfProps[i].EgressNonpostedDW;
+	pTmpPerfProps[i].Prev_EgressCplHeader = pTmpPerfProps[i].EgressCplHeader;
+	pTmpPerfProps[i].Prev_EgressCplDW = pTmpPerfProps[i].EgressCplDW;
+	pTmpPerfProps[i].Prev_EgressDllp = pTmpPerfProps[i].EgressDllp;
+#else
         // Save current values to previous
         RtlCopyMemory(
-            &(pTmpPerfProps[i].Prev_IngressPostedHeader),
-            &(pTmpPerfProps[i].IngressPostedHeader),
-            PERF_COUNTERS_PER_PORT * sizeof(U32)    // All 14 counters in structure
-            );
+            &(pTmpPerfProps[i].PrevCounters),
+            &(pTmpPerfProps[i].CurCounters),
+            PERF_COUNTERS_PER_PORT * sizeof(U32)   // All 14 counters in structure
+            );	
+#endif
+#endif
 
         // Calculate starting index for counters based on port in station
         IndexBase = pTmpPerfProps[i].Station * (NumCounters * RamStnPortCount);
@@ -2843,7 +3124,9 @@ PlxPciPerformanceGetCounters(
         // Get ingress counters (5 or 6 DW/port)
         pTmpPerfProps[i].IngressPostedHeader = pCounters[index++];  // 0
         pTmpPerfProps[i].IngressPostedDW     = pCounters[index++];  // 1
-        if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+        if ((pdx->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+            (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+            (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
         {
             // NP header added in Atlas
             pTmpPerfProps[i].IngressNonpostedHdr  = pCounters[index++];  // 2
@@ -2859,7 +3142,9 @@ PlxPciPerformanceGetCounters(
         // Get egress counters (5 or 6 DW/port)
         pTmpPerfProps[i].EgressPostedHeader = pCounters[index++];   // 0
         pTmpPerfProps[i].EgressPostedDW     = pCounters[index++];   // 1
-        if (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS)
+        if ((pdx->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+            (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+            (pdx->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
         {
             // NP header added in Atlas
             pTmpPerfProps[i].EgressNonpostedHdr  = pCounters[index++];  // 2

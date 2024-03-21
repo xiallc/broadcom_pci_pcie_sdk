@@ -2,7 +2,7 @@
 #define _MONITOR_H
 
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom, Inc
+ * Copyright 2013-2023 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -65,9 +65,9 @@
 /*************************************
  *          Definitions
  ************************************/
-#define MONITOR_VERSION_MAJOR       8       // Version information
-#define MONITOR_VERSION_MINOR       2
-#define MONITOR_VERSION_REVISION    3
+#define MONITOR_VERSION_MAJOR       9       // Version information
+#define MONITOR_VERSION_MINOR       8
+#define MONITOR_VERSION_REVISION    1
 
 #define MONITOR_PROMPT              ">"     // The monitor prompt string
 

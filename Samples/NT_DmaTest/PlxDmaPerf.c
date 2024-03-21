@@ -552,7 +552,8 @@ PerformDma_8000(
     Stat_TxTotalBytes = 0;
 
     // Get initial start time
-    ftime( &StartTime );
+    // Note start time
+	Plx_ftime_get( &StartTime );
 
     do
     {
@@ -560,7 +561,7 @@ PerformDma_8000(
         if ((LoopCount & 0x0000003F) == 0)
         {
             // Get end time
-            ftime( &EndTime );
+			Plx_ftime_get( &EndTime );
 
             // Calculate elapsed time in milliseconds
             ElapsedTime_ms = (((U32)EndTime.time * 1000) + EndTime.millitm) -
@@ -592,7 +593,7 @@ PerformDma_8000(
                 }
 
                 // Get new start time
-                ftime( &StartTime );
+		Plx_ftime_get( &StartTime );
             }
         }
 

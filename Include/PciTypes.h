@@ -356,6 +356,7 @@ typedef volatile U64          VU64;
 #define ECAM_PROBE_ADDR_DEFAULT_END     0xFC000000
 
 // Number of PCI registers to compare
+#define ECAM_PROBE_DEV_CMP_COUNT        6
 #define ECAM_PROBE_REG_CMP_COUNT        4
 
 // ECAM address offset

@@ -86,8 +86,10 @@ extern "C" {
 #define I2C_ADDR_MODE_DMA           3           // DMA & DMA RAM
 #define I2C_ADDR_MODE_ALUT          3           // ALUT
 
-#define I2C_PEX_BASE_ADDR_MASK      0xFF800000  // PEX region base address mask
-#define I2C_PEX_MAX_OFFSET_MASK     0x007FFFFF  // Max I2C addressing (23 bits)
+#define I2C_PEX_BASE_ADDR_MASK              0xFF800000  // PEX region base address mask
+#define I2C_PEX_MAX_OFFSET_MASK             0x007FFFFF  // Max I2C addressing (23 bits)
+#define I2C_PEX_BASE_ADDR_ATLAS2_MASK       0xFFC00000  // PEX region base address mask
+#define I2C_PEX_MAX_OFFSET_ATLAS2_MASK      0x003FFFFF  // Atlas2 supports Max 22 bit addressing
 
 
 
@@ -272,7 +274,11 @@ PlxI2c_ProbeSwitch(
     U16               *pNumMatched
     );
 
-
+U32
+PlxI2c_GenerateAtlas2Command(
+    U8                 I2cOperation,
+    U32                Address
+);
 
 #ifdef __cplusplus
 }

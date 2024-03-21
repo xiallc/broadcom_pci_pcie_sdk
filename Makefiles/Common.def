@@ -29,6 +29,13 @@ ifndef ARCH
     ifeq ($(shell uname -i),i386)
         ARCH := i386
     endif
+
+    #
+    # For Ubuntu VM, ARCH must be i386
+    #
+    ifeq ($(ARCH),x86)
+        ARCH := i386
+    endif
 endif
 
 ifeq ($(ARCH),$(filter $(ARCH), x86 i386 i686))

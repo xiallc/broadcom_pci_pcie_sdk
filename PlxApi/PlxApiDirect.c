@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2022 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -194,7 +194,9 @@ PlxDir_GetPortProperties(
      * In Atlas iSSW mode, management port does not report PCIe
      * capability, so fill in reasonable values
      *********************************************************/
-    if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+    if ( ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+          (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+          (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)) &&
          (pDevice->Key.PlxPort == PLX_FLAG_PORT_INT_MGMT) )
     {
         pPortProp->PortType            = PLX_PORT_UPSTREAM;
@@ -661,6 +663,8 @@ PlxDir_PerformanceInitializeProperties(
 
         case PLX_FAMILY_SIRIUS:
         case PLX_FAMILY_ATLAS:
+		case PLX_FAMILY_ATLAS_2:
+		case PLX_FAMILY_ATLAS2_LLC:
             StnPortCount = 16;
             break;
 
@@ -755,6 +759,8 @@ PlxDir_PerformanceMonitorControl(
             break;
 
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             pexBase        = ATLAS_PEX_REGS_BASE_OFFSET;
             Offset_Control = 0x3E0;
             break;
@@ -831,6 +837,8 @@ PlxDir_PerformanceMonitorControl(
         case PLX_FAMILY_CAPELLA_1:
         case PLX_FAMILY_CAPELLA_2:
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             // Set device configuration
             if (pDevice->Key.PlxFamily == PLX_FAMILY_CYGNUS)
             {
@@ -847,7 +855,9 @@ PlxDir_PerformanceMonitorControl(
             }
             else if ((pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_1) ||
                      (pDevice->Key.PlxFamily == PLX_FAMILY_CAPELLA_2) ||
-                     (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS))
+                     (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                     (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                     (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
             {
                 Bit_EgressEn    = 6;
                 StnCount        = 6;
@@ -861,12 +871,38 @@ PlxDir_PerformanceMonitorControl(
                     StnPortCount = 16;
                 }
 
+                // Override station and station port count for Atlas2
+                if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2)
+                {
+                    StnCount = 9;
+                    StnPortCount = 16;
+                }
+
+                // Override station and station port count for Atlas2LLC
+                if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+                {
+                    StnCount = 3;
+                    StnPortCount = 16;
+                }
                 // Disable probe mode (350h[8]=0)
                 if (command == PLX_PERF_CMD_START)
                 {
+                    pDevice->Key.ApiInternal[2] = PLX_8000_REG_READ(pDevice, pexBase + Offset_Control);
+                    if ((pDevice->Key.ApiInternal[2] & (1 << 31)) != 0)
+                    {
+                        return PLX_STATUS_OK;
+                    }			
                     regVal = PLX_8000_REG_READ( pDevice, pexBase + 0x350 );
                     PLX_8000_REG_WRITE( pDevice, pexBase + 0x350, regVal & ~((U32)1 << 8) );
                 }
+                else
+                {
+                    if ((pDevice->Key.ApiInternal[2] & (1 << 31)) != 0)
+                    {
+                        return PLX_STATUS_OK;
+                    }
+                }
+		
             }
 
             // For certain chips, set 3F0h[9:8]=3 to disable probe mode interval
@@ -881,6 +917,14 @@ PlxDir_PerformanceMonitorControl(
                 regVal = PLX_8000_REG_READ( pDevice, pexBase + 0x3F0 );
                 PLX_8000_REG_WRITE( pDevice, pexBase + 0x3F0, regVal | (3 << 8) );
             }
+
+	    if ((command == PLX_PERF_CMD_START) &&
+                ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)))
+            {
+                regVal = PLX_8000_REG_READ( pDevice, pexBase + 0x3F0 );
+                PLX_8000_REG_WRITE( pDevice, pexBase + 0x3F0, regVal | (7 << 0) );
+            }		    
 
             // Enable/Disable Performance Counter in each station (or ports if applicable)
             for (i = 0; i < (StnCount * StnPortCount); i++)
@@ -909,7 +953,9 @@ PlxDir_PerformanceMonitorControl(
                     regVal = PLX_8000_REG_READ( pDevice, offset + 0xF30 );
 
                     // On Atlas, F30h[21] is egress credit enable but always reads 0, so ensure remains set
-                    if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+                    if ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+                        (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+                        (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)) // TODO: Check if this is applicable to Atlas2 as well?
                     {
                         regVal |= ((U32)1 << 21);
                     }
@@ -989,6 +1035,8 @@ PlxDir_PerformanceResetCounters(
             break;
 
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             Offset_Control = ATLAS_PEX_REGS_BASE_OFFSET + 0x3E0;
             break;
 
@@ -1007,6 +1055,16 @@ PlxDir_PerformanceResetCounters(
     else if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
     {
         StnCount     = 6;
+        StnPortCount = 16;
+    }
+    else if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2)
+    {
+        StnCount     = 9;
+        StnPortCount = 16;
+    }
+    else if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+    {
+        StnCount     = 3;
         StnPortCount = 16;
     }
     else
@@ -1262,6 +1320,194 @@ PlxDir_PerformanceResetCounters(
  * 13C| PHY (always 0)  |
  *     -----------------
  *
+ *
+ *           Atlas2
+ *    -----------------------
+ *    14 counters/port
+ *    16 ports/station
+ *     9 stations (144 ports)
+ *
+ *   224 counters/station
+ * 2,016 counters (224 * 9)
+ *
+ *  off     Counter
+ *    -----------------
+ *   0| Port 0 IN PH    |
+ *   4| Port 0 IN PDW   |
+ *   8| Port 0 IN NPH   |
+ *   C| Port 0 IN NPDW  |
+ *  10| Port 0 IN CPLH  |
+ *  14| Port 0 IN CPLDW |
+ *    |-----------------|
+ *  18| Port 1 IN PH    |
+ *    |       :         |
+ *    |       :         |
+ *  2C| Port 1 IN CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ * 168| Port 15 IN PH   |
+ *    |       :         |
+ *    |       :         |
+ * 17C| Port 15 IN CPLDW|
+ *    |-----------------|
+ * 180| Port 0 EG PH    |
+ * 184| Port 0 EG PDW   |
+ * 188| Port 0 EG NPH   |
+ * 18C| Port 0 EG NPDW  |
+ * 190| Port 0 EG CPLH  |
+ * 194| Port 0 EG CPLDW |
+ *    |-----------------|
+ * 198| Port 1 EG PH    |
+ *    |       :         |
+ *    |       :         |
+ * 1AC| Port 1 EG CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |-----------------|
+ * 2E8| Port 15 EG PH   |
+ *    |       :         |
+ *    |       :         |
+ * 2FC| Port 15 EG CPLDW|
+ *    |-----------------|
+ * 300| Port 0 IN DLLP  |
+ * 304| Port 1 IN DLLP  |
+ * 308| Port 2 IN DLLP  |
+ * 30C| Port 3 IN DLLP  |
+ * 310| Port 4 IN DLLP  |
+ * 314| Port 5 IN DLLP  |
+ * 318| Port 6 IN DLLP  |
+ * 31C| Port 7 IN DLLP  |
+ * 320| Port 8 IN DLLP  |
+ * 324| Port 9 IN DLLP  |
+ * 328| Port 10 IN DLLP |
+ * 32C| Port 11 IN DLLP |
+ * 330| Port 12 IN DLLP |
+ * 334| Port 13 IN DLLP |
+ * 338| Port 14 IN DLLP |
+ * 33C| Port 15 IN DLLP |
+ *    |-----------------|
+ * 340| Port 0 EG DLLP  |
+ * 344| Port 1 EG DLLP  |
+ * 348| Port 2 EG DLLP  |
+ * 34C| Port 3 EG DLLP  |
+ * 350| Port 4 EG DLLP  |
+ * 354| Port 5 EG DLLP  |
+ * 358| Port 6 EG DLLP  |
+ * 35C| Port 7 EG DLLP  |
+ * 360| Port 8 EG DLLP  |
+ * 364| Port 9 EG DLLP  |
+ * 368| Port 10 EG DLLP |
+ * 36C| Port 11 EG DLLP |
+ * 370| Port 12 EG DLLP |
+ * 374| Port 13 EG DLLP |
+ * 378| Port 14 EG DLLP |
+ * 37C| Port 15 EG DLLP |
+ *    |__ __ __ __ __ __|
+ *
+  *
+ *           Atlas2LLC
+ *    -----------------------
+ *    14 counters/port
+ *    16 ports/station
+ *     3 stations (48 ports)
+ *
+ *   224 counters/station
+ *   672 counters (224 * 3)
+ *
+ *  off     Counter
+ *    -----------------
+ *   0| Port 0 IN PH    |
+ *   4| Port 0 IN PDW   |
+ *   8| Port 0 IN NPH   |
+ *   C| Port 0 IN NPDW  |
+ *  10| Port 0 IN CPLH  |
+ *  14| Port 0 IN CPLDW |
+ *    |-----------------|
+ *  18| Port 1 IN PH    |
+ *    |       :         |
+ *    |       :         |
+ *  2C| Port 1 IN CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ * 168| Port 15 IN PH   |
+ *    |       :         |
+ *    |       :         |
+ * 17C| Port 15 IN CPLDW|
+ *    |-----------------|
+ * 180| Port 0 EG PH    |
+ * 184| Port 0 EG PDW   |
+ * 188| Port 0 EG NPH   |
+ * 18C| Port 0 EG NPDW  |
+ * 190| Port 0 EG CPLH  |
+ * 194| Port 0 EG CPLDW |
+ *    |-----------------|
+ * 198| Port 1 EG PH    |
+ *    |       :         |
+ *    |       :         |
+ * 1AC| Port 1 EG CPLDW |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |       :         |
+ *    |/\/\/\/\/\/\/\/\/|
+ *    |-----------------|
+ * 2E8| Port 15 EG PH   |
+ *    |       :         |
+ *    |       :         |
+ * 2FC| Port 15 EG CPLDW|
+ *    |-----------------|
+ * 300| Port 0 IN DLLP  |
+ * 304| Port 1 IN DLLP  |
+ * 308| Port 2 IN DLLP  |
+ * 30C| Port 3 IN DLLP  |
+ * 310| Port 4 IN DLLP  |
+ * 314| Port 5 IN DLLP  |
+ * 318| Port 6 IN DLLP  |
+ * 31C| Port 7 IN DLLP  |
+ * 320| Port 8 IN DLLP  |
+ * 324| Port 9 IN DLLP  |
+ * 328| Port 10 IN DLLP |
+ * 32C| Port 11 IN DLLP |
+ * 330| Port 12 IN DLLP |
+ * 334| Port 13 IN DLLP |
+ * 338| Port 14 IN DLLP |
+ * 33C| Port 15 IN DLLP |
+ *    |-----------------|
+ * 340| Port 0 EG DLLP  |
+ * 344| Port 1 EG DLLP  |
+ * 348| Port 2 EG DLLP  |
+ * 34C| Port 3 EG DLLP  |
+ * 350| Port 4 EG DLLP  |
+ * 354| Port 5 EG DLLP  |
+ * 358| Port 6 EG DLLP  |
+ * 35C| Port 7 EG DLLP  |
+ * 360| Port 8 EG DLLP  |
+ * 364| Port 9 EG DLLP  |
+ * 368| Port 10 EG DLLP |
+ * 36C| Port 11 EG DLLP |
+ * 370| Port 12 EG DLLP |
+ * 374| Port 13 EG DLLP |
+ * 378| Port 14 EG DLLP |
+ * 37C| Port 15 EG DLLP |
+ *    |__ __ __ __ __ __|
+ *
  ******************************************************************************/
 PLX_STATUS
 PlxDir_PerformanceGetCounters(
@@ -1362,6 +1608,8 @@ PlxDir_PerformanceGetCounters(
             break;
 
         case PLX_FAMILY_ATLAS:
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
             Offset_RamCtrl   = ATLAS_PEX_REGS_BASE_OFFSET + 0x3F0;
             Offset_Fifo      = ATLAS_PEX_REGS_BASE_OFFSET + 0x3E4;
             NumCounters      = 14;
@@ -1369,6 +1617,18 @@ PlxDir_PerformanceGetCounters(
             StnPortCount     = 16;
             bStationBased    = TRUE;
             InEgPerPortCount = 6;    // Non-Posted header count added
+
+            // Atlas2 support 9 stations
+            if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2)
+            {
+                StnCount = 9;
+            }
+
+            // Atlas2LLC support 3 stations
+            if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)
+            {
+                StnCount = 3;
+            }
             break;
 
         default:
@@ -1491,7 +1751,9 @@ PlxDir_PerformanceGetCounters(
         // Get ingress counters (5 or 6 DW/port)
         pPerfProps[i].IngressPostedHeader = pCounters[index++];  // 0
         pPerfProps[i].IngressPostedDW     = pCounters[index++];  // 1
-        if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+        if ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+            (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+            (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
         {
             // NP header added in Atlas
             pPerfProps[i].IngressNonpostedHdr  = pCounters[index++];  // 2
@@ -1507,7 +1769,9 @@ PlxDir_PerformanceGetCounters(
         // Get egress counters (5 or 6 DW/port)
         pPerfProps[i].EgressPostedHeader = pCounters[index++];   // 0
         pPerfProps[i].EgressPostedDW     = pCounters[index++];   // 1
-        if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+        if ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+            (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+            (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
         {
             // NP header added in Atlas
             pPerfProps[i].EgressNonpostedHdr  = pCounters[index++];  // 2
@@ -1691,14 +1955,37 @@ PlxDir_PciFindCapability(
     while ((offset != 0) && (regVal != PCI_CFG_RD_ERR_VAL))
     {
         if ( (offset == 0xB0) &&
-             (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
-             (pDevice->Key.ApiMode != PLX_API_MODE_PCI) &&
-             ((pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT1) ||
-              (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT2) ||
-              (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT3)) )
+             ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) ||
+              (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) ||
+              (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC)) &&
+             (pDevice->Key.ApiMode != PLX_API_MODE_PCI) )
         {
-            // MPT1-3 break the capability list at B0h (VPD), so override
-            regVal = 0x0004803;
+            if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) && 
+                 ((pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT1) ||
+                  (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT2) ||
+                  (pDevice->Key.PlxPort == PLX_FLAG_PORT_MPT3)) )
+            {
+                // MPT1-3 break the capability list at B0h (VPD), so override
+                regVal = 0x0004803;
+            }
+            else if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+                       pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) && 
+                      ((pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT1) ||
+                       (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT2) ||
+                       (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT3) ||
+                       (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT4) ||
+                       (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT5) ||
+                       (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT6) ||
+                       (pDevice->Key.PlxPort == PLX_FLAG_PORT_ATLAS2_MPT7)) )
+            {
+                // Atlas2 MPT1-7 break the capability list at B0h (VPD), so override
+                regVal = 0x0004803;
+            }
+            else
+            {
+                // Get next capability
+                PLX_PCI_REG_READ(pDevice, offset, &regVal);
+            }
         }
         else
         {
@@ -2271,6 +2558,14 @@ _PlxChipAssignFamily:
             pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS;
             break;
 
+        case 0xC030:
+            pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS_2;
+            break;
+
+        case 0xC034:
+            pDevice->Key.PlxFamily = PLX_FAMILY_ATLAS2_LLC;
+            break;
+
         case 0:
             pDevice->Key.PlxFamily = PLX_FAMILY_NONE;
             break;
@@ -2379,6 +2674,16 @@ PlxDir_ChipFilterDisabledPorts(
             maxPorts = 128;
             break;
 
+        case PLX_FAMILY_ATLAS_2:
+        case PLX_FAMILY_ATLAS2_LLC:
+            offset = ATLAS_REG_PORT_CLOCK_EN_0;
+            if (pDevice->Key.ApiMode != PLX_API_MODE_PCI)
+            {
+                offset +=  ATLAS_REGS_AXI_BASE_ADDR;
+            }
+            maxPorts = 160;
+            break;
+
         default:
             ErrorPrintf(("ERROR - Disabled port filter not implemented (%04X)\n", pDevice->Key.PlxChip));
             return PLX_STATUS_UNSUPPORTED;
@@ -2410,6 +2715,13 @@ PlxDir_ChipFilterDisabledPorts(
 
         // Set offset to next block
         offset += sizeof(U32);
+
+        // For Atlas 2, port clock register for ports 128-143 are at offset 324h
+        if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 || 
+              pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) && (index == 3) )
+        {
+            offset = ATLAS_REGS_AXI_BASE_ADDR + ATLAS2_REG_PORT_CLOCK_EN_4;
+        }
     }
 
     return PLX_STATUS_OK;
@@ -2442,6 +2754,7 @@ PlxDir_ProbeSwitch(
     U32            offset;
     U32            devVenID;
     U32            regVal;
+    U32            atlasSwMode;
     BOOLEAN        bMatchId;
     BOOLEAN        bMatchLoc;
     PLX_STATUS     status;
@@ -2546,17 +2859,19 @@ PlxDir_ProbeSwitch(
                 switch (pDevice->Key.PlxFamily)
                 {
                     case PLX_FAMILY_ATLAS:
+                    case PLX_FAMILY_ATLAS_2:
+                    case PLX_FAMILY_ATLAS2_LLC:
 
                         // Determine switch mode (CCR B0h[1:0])
-                        regVal =
+                        atlasSwMode =
                             PlxDir_PlxMappedRegRead(
                                 pDevice,
                                 ATLAS_REG_CCR_PCIE_SW_MODE,
                                 NULL
                                 );
 
-                        regVal &= 0x3;
-                        if (regVal == 0)
+                        atlasSwMode &= 0x3;
+                        if (atlasSwMode == 0)
                         {
                             pDevice->Key.DeviceMode = PLX_CHIP_MODE_STANDARD;
 
@@ -2569,18 +2884,47 @@ PlxDir_ProbeSwitch(
                                     );
                             port_Upstream = (U8)((regVal >> 0) & 0xFF);
                         }
-                        else if (regVal == 1)
+                        else if (atlasSwMode == 1)
                         {
                             pDevice->Key.DeviceMode = PLX_CHIP_MODE_FABRIC;
 
-                            // Store management port number (CCR 170h[15:8])
+                            if (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS)
+                            {
+                                // Store management port number (CCR 170h[15:8])
+                                regVal =
+                                    PlxDir_PlxMappedRegRead(
+                                        pDevice,
+                                        ATLAS_REG_CCR_PCIE_CONFIG,
+                                        NULL
+                                        );
+                                port_Upstream = (U8)((regVal >> 8) & 0xFF);
+                            }
+                            else
+                            {
+                                // For Atlas2, store management port number (CCR 1A4h[0:7])
+                                regVal =
+                                    PlxDir_PlxMappedRegRead(
+                                        pDevice,
+                                        ATLAS2_REG_CCR_UPSTREAM_PORT,
+                                        NULL
+                                        );
+                                port_Upstream = (U8)(regVal & 0xFF);
+                            }
+                        }
+                        else if ((pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+                                  pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC) &&
+                                 (atlasSwMode == 2))
+                        {
+                            pDevice->Key.DeviceMode = PLX_CHIP_MODE_STANDARD;
+
+                            // Store upstream port number (360h[7:0])
                             regVal =
-                                PlxDir_PlxMappedRegRead(
+                                PlxDir_PlxRegRead(
                                     pDevice,
-                                    ATLAS_REG_CCR_PCIE_CONFIG,
+                                    ATLAS_REG_VS0_UPSTREAM,
                                     NULL
                                     );
-                            port_Upstream = (U8)((regVal >> 8) & 0xFF);
+                            port_Upstream = (U8)((regVal >> 0) & 0xFF);
                         }
                         else
                         {
@@ -2610,10 +2954,26 @@ PlxDir_ProbeSwitch(
                     PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_MPT1);
                     PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_MPT2 );
                     PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_MPT3 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT1 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT2 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT3 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT4 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT5 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT6 );
+                    PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT7 );
+
+                    // For Atlas 2, SW Mode 0 is pure base mode which does not
+                    // expose the MPT endpoint to the host.
+                    if (( pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+                          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC ) &&
+                        ( atlasSwMode == 0 ))
+                    {
+                        PEX_BITMASK_CLEAR( chipFeat.PortMask, PLX_FLAG_PORT_ATLAS2_MPT0 ); 
+                    }
                 }
 
                 DebugPrintf((
-                    "%s: Chip config: %d stn %d ports/stn StnMask=%02Xh\n",
+                    "%s: Chip config: %d stn %d ports/stn StnMask=%04Xh\n",
                     DbgGetApiModeStr( pDevice ), chipFeat.StnCount,
                     chipFeat.PortsPerStn, chipFeat.StnMask
                     ));
@@ -2715,7 +3075,15 @@ PlxDir_ProbeSwitch(
             else if ( (portNum == PLX_FLAG_PORT_MPT0) ||
                       (portNum == PLX_FLAG_PORT_MPT1) ||
                       (portNum == PLX_FLAG_PORT_MPT2) ||
-                      (portNum == PLX_FLAG_PORT_MPT3) )
+                      (portNum == PLX_FLAG_PORT_MPT3) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT0) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT1) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT2) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT3) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT4) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT5) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT6) ||
+                      (portNum == PLX_FLAG_PORT_ATLAS2_MPT7) )
             {
                 if (pDevice->Key.DeviceId == 0x00B2)
                 {
@@ -2779,6 +3147,7 @@ PlxDir_ProbeSwitch(
                       (portNum == PLX_FLAG_PORT_INT_DS_4)  ||
                       (portNum == PLX_FLAG_PORT_INT_DS_8)  ||
                       (portNum == PLX_FLAG_PORT_INT_DS_12) ||
+                      (portNum == PLX_FLAG_PORT_INT_DS_16) ||
                       (portNum == PLX_FLAG_PORT_GEP_DS) )
             {
                 pDevice->Key.bus = 0x2;
@@ -2786,7 +3155,8 @@ PlxDir_ProbeSwitch(
             else if ( (portNum == PLX_FLAG_PORT_INT_UP_0) ||
                       (portNum == PLX_FLAG_PORT_INT_UP_4) ||
                       (portNum == PLX_FLAG_PORT_INT_UP_8) ||
-                      (portNum == PLX_FLAG_PORT_INT_UP_12) )
+                      (portNum == PLX_FLAG_PORT_INT_UP_12) ||
+                      (portNum == PLX_FLAG_PORT_INT_UP_16) )
             {
                 // Lower fan out switches (10h,20h,30h..)
                 pDevice->Key.bus =
@@ -2811,12 +3181,25 @@ PlxDir_ProbeSwitch(
             {
                 pDevice->Key.bus = 0x78;
             }
-            else if ( (portNum == PLX_FLAG_PORT_MPT0) ||
-                      (portNum == PLX_FLAG_PORT_MPT1) ||
-                      (portNum == PLX_FLAG_PORT_MPT2) ||
-                      (portNum == PLX_FLAG_PORT_MPT3) )
+            else if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS) &&
+                      ((portNum == PLX_FLAG_PORT_MPT0) ||
+                       (portNum == PLX_FLAG_PORT_MPT1) ||
+                       (portNum == PLX_FLAG_PORT_MPT2) ||
+                       (portNum == PLX_FLAG_PORT_MPT3)) )
             {
                 pDevice->Key.bus = 0x79 + (U8)(portNum - PLX_FLAG_PORT_MPT0);
+            }
+            else if ( (pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2) &&
+                      ((portNum == PLX_FLAG_PORT_ATLAS2_MPT0) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT1) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT2) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT3) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT4) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT5) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT6) ||
+                       (portNum == PLX_FLAG_PORT_ATLAS2_MPT7)) )
+            {
+                pDevice->Key.bus = 0x79 + (U8)(portNum - PLX_FLAG_PORT_ATLAS2_MPT0);
             }
             else
             {
@@ -2832,7 +3215,8 @@ PlxDir_ProbeSwitch(
         if ( (portNum == PLX_FLAG_PORT_INT_DS_0)  ||
              (portNum == PLX_FLAG_PORT_INT_DS_4)  ||
              (portNum == PLX_FLAG_PORT_INT_DS_8)  ||
-             (portNum == PLX_FLAG_PORT_INT_DS_12) )
+             (portNum == PLX_FLAG_PORT_INT_DS_12) ||
+             (portNum == PLX_FLAG_PORT_INT_DS_16) )
         {
             // Internal primary DS
             pDevice->Key.slot =

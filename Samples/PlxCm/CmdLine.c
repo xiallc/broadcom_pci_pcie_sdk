@@ -666,7 +666,7 @@ CmdLine_CmdParse(
 {
     char         *pBuffer;
     char          strArg[MAX_ARG_LEN];
-    BOOLEAN       bOpOk;
+    BOOLEAN       bOpOk, bCheckFlag = FALSE;
     PLXCM_ARG    *pArg;
     PLXCM_ARG    *pOperand;
     PLXCM_VAR    *pVar;
@@ -683,7 +683,7 @@ CmdLine_CmdParse(
     	 (Plx_strcasecmp( pCmd->szCmd, "spisave" ) == 0) 
        )
     {
-        CmdLine_GetNextToken( &pBuffer, strArg, FALSE );
+       bCheckFlag = TRUE;
     }
 
     // Lookup the command & set function pointer
@@ -708,7 +708,15 @@ CmdLine_CmdParse(
     do
     {
         // Get next argument
-        CmdLine_GetNextToken( &pBuffer, strArg, pCmd->bAllowOps );
+        if (bCheckFlag)
+        {
+           bCheckFlag = FALSE;
+           CmdLine_GetNextToken( &pBuffer, strArg, FALSE );
+        }
+        else
+        {
+           CmdLine_GetNextToken( &pBuffer, strArg, pCmd->bAllowOps );
+        }
 
         // Reset variable from table
         pVar = NULL;

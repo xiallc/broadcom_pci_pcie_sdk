@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Avago Technologies
+ * Copyright 2013-2022 Avago Technologies
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -374,7 +374,7 @@ BOOLEAN Cmd_Screen( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAN
  *
  * Function   :  Cmd_Throttle
  *
- * Description:  Display or modify the currnet throttle toggle
+ * Description:  Display or modify the current throttle toggle
  *
  *********************************************************/
 BOOLEAN Cmd_Throttle( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND *pCmd )
@@ -731,7 +731,7 @@ BOOLEAN Cmd_SetChip( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMA
             "Usage: setchip <PlxChipType>\n"
             "\n"
             "       PlxChipType:\n"
-            "            0 = reset type & autodetect\n"
+            "            0 = reset type & auto detect\n"
             "            Valid PLX 9000, 6000, or 8000 series device\n"
             "            e.g. 9050, 9656, 8111, 6254, 8532, etc\n"
             "\n"
@@ -753,7 +753,7 @@ BOOLEAN Cmd_SetChip( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMA
         PlxPci_ChipTypeSet(
             pDevice,
             (U16)pArg->ArgIntHex,
-            -1          // Set revision to autodetect
+            -1          // Set revision to auto detect
             );
 
     if (status != PLX_STATUS_OK)
@@ -1126,7 +1126,7 @@ BOOLEAN Cmd_MdioConnect( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_C
         }
     }
 
-    // Reselect previously selected I2C device
+    // Re-select previously selected I2C device
     if (bReselect)
     {
         PlxPci_DeviceOpen( &Key, pDevice );
@@ -1261,7 +1261,7 @@ BOOLEAN Cmd_SdbConnect( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_CO
         PlxPci_DeviceClose( pDevice );
     }
 
-    Cons_printf("Scan for SDB devices on COM%d (ESC to halt)...\n", ModeProp.Sdb.Port);
+    Cons_printf("Scan for SDB devices on serial port %d (ESC to halt)...\n", ModeProp.Sdb.Port);
 
     // Build device list
     i = DeviceListCreate( PLX_API_MODE_SDB, &ModeProp );
@@ -4778,7 +4778,9 @@ BOOLEAN Cmd_SpiRW( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND
     }
 
     // Verify supported chip
-    if (pDevice->Key.PlxFamily != PLX_FAMILY_ATLAS)
+    if (!(pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS ||
+          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
     {
         Cons_printf(
             "Error: SPI access is not supported for %04X device\n",
@@ -4884,7 +4886,8 @@ BOOLEAN Cmd_SpiRW( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMAND
             "\n"
             "    offset     : Offset to read or write from/to. Must be 4B aligned.\n"
             "    data       : 32-bit value to write. Read operation if not supplied.\n"
-            "    /cs ChipSel: Specify the flash chip select. Default is 0.\n"
+            "    /cs ChipSel: Specify the flash chip select. ChipSel 0 is the only\n"
+            "                 supported value and is the default value.\n"
             "\n"
             "Examples: 'spirw 104 DEADBEEF' - Write 32b value to offset 104h\n"
             "          'spirw 2000+40'      - Read 32b from offset 2040h\n"
@@ -4965,7 +4968,9 @@ BOOLEAN Cmd_SpiErase( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMM
     }
 
     // Verify supported chip
-    if (pDevice->Key.PlxFamily != PLX_FAMILY_ATLAS)
+    if (!(pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS ||
+          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
     {
         Cons_printf(
             "Error: SPI access is not supported for %04X device\n",
@@ -4982,7 +4987,7 @@ BOOLEAN Cmd_SpiErase( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMM
     }
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     // Clear initial flag options
     nvFlags = PEX_NV_FLAG_NONE;
@@ -5128,6 +5133,7 @@ BOOLEAN Cmd_SpiErase( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMM
             "    /o offset  : Specify the starting offset to erase (default=0)\n"
             "    /s size    : Byte count to erase (entire sector will be erased)\n"
             "    /cs ChipSel: Specify the flash chip select (default=0)\n"
+            "                 ChipSel 0 is the only supported value\n"
             "    /nr        : Do not put embedded CPU in reset\n"
             "\n"
             "Examples: 'spierase /f'            - Erase entire flash\n"
@@ -5297,7 +5303,7 @@ BOOLEAN Cmd_SpiErase( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMM
     }
 
     // Calculate elapsed time
-    ftime( &end );
+    Plx_ftime_get( &end );
     Cons_printf(
         " -- Complete (%.2f sec) -- %15s\n\n",
         PLX_DIFF_TIMEB( end, start ), " "
@@ -5339,7 +5345,9 @@ BOOLEAN Cmd_SpiFile( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMA
     }
 
     // Verify supported chip
-    if (pDevice->Key.PlxFamily != PLX_FAMILY_ATLAS)
+    if (!(pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS ||
+          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS_2 ||
+          pDevice->Key.PlxFamily == PLX_FAMILY_ATLAS2_LLC))
     {
         Cons_printf(
             "Error: SPI access is not supported for %04X device\n",
@@ -5531,12 +5539,13 @@ BOOLEAN Cmd_SpiFile( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMA
                 "    FileName   : Name of the file to load\n"
                 "    /o offset  : Specify the starting offset to program (default=0)\n"
                 "    /cs ChipSel: Specify the flash chip select (default=0)\n"
+                "                 ChipSel 0 is the only supported value\n"
                 "    /b         : Skip data verification read-back\n"
                 "    /mmr       : Use mem-mapped reads for verify, if supported\n"
                 "    /nr        : Do not put embedded CPU in reset\n"
                 "\n"
                 "Examples: spiload C:\\MySbr.bin /o 400\n"
-                "          spiload C:\\SbrSp2.bin /o 0 /cs 1\n"
+                "          spiload C:\\SbrSp2.bin /o 0 /cs 0\n"
                 "\n"
                 );
         }
@@ -5551,11 +5560,12 @@ BOOLEAN Cmd_SpiFile( DEVICE_NODE *pNode, PLX_DEVICE_OBJECT *pDevice, PLXCM_COMMA
                 "    /o offset  : Specify the starting offset to program (default=0)\n"
                 "    /s size    : Number of bytes to read (must be multiple of 4)\n"
                 "    /cs ChipSel: Specify the flash chip select (default=0)\n"
+                "                 ChipSel 0 is the only supported value\n"
                 "    /mmr       : Use mem-mapped reads\n"
                 "    /nr        : Do not put embedded CPU in reset\n"
                 "\n"
                 "Examples: spisave C:\\MySbr.bin /o 400 /s 1000 /mmr\n"
-                "          spisave C:\\SbrSp2.bin /o 0 /s 2000 /cs 1\n"
+                "          spisave C:\\SbrSp2.bin /o 0 /s 2000 /cs 0\n"
                 "\n"
                 );
         }

@@ -2,7 +2,7 @@
 #define _PLX_SYSDEP_H_
 
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom Inc
+ * Copyright 2013-2023 Broadcom Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -88,8 +88,26 @@
     #define VM_RESERVED                 (VM_DONTEXPAND | VM_DONTDUMP)
 #endif
 
+/***********************************************************
+ * Below function was added starting with 6.3.0.
+ * Below is the modifier function for vm_flags to be used whenever
+ * flags are updated. This way we can better check and control correct
+ * locking behavior during these updates.
+ * static inline void vm_flags_set(struct vm_area_struct *vma,
+                vm_flags_t flags)
+{
+    vma_start_write(vma);
+    ACCESS_PRIVATE(vma, __vm_flags) |= flags;
+}
+ *********************************************************/
 
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
+    #define Plx_vm_flags_set(vma, flag) \
+            vm_flags_set(vma, (vm_flags_t)(flag));
+#else
+    #define Plx_vm_flags_set(vma, flag) \
+            (vma)->vm_flags |= flag;
+#endif
 
 /***********************************************************
  * INIT_WORK & INIT_DELAYED_WORK
@@ -148,12 +166,14 @@
 /***********************************************************
  * access_ok
  *
- * access_ok() removed type param in 5.0
+ * access_ok() removed type param in 5.0, but RedHat/CentOS
+ * removed in RHEL 8.1 onwards which is 4.18 based.
  **********************************************************/
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0))
-    #define Plx_access_ok                     access_ok
-#else
+#if ((defined(RHEL_MAJOR) && (RHEL_MAJOR >= 8) && (RHEL_MINOR >= 1)) || \
+     (LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)))
     #define Plx_access_ok(type,addr,size)     access_ok( (addr),(size) )
+#else
+    #define Plx_access_ok                     access_ok
 #endif
 
 
@@ -409,8 +429,13 @@
  * Parameters to this function changed as follows:
  *   4.6: Removed first two params (curr task & task's mem-manage struct)
  *   4.9: Replaced write & force params with a single gup_flags param
+ * SUSE back ported the changes from 4.9 kernel to SLES12 SP3
+ * which is based off 4.4.73 kernel.
+ *   6.5: From Kernel 6.5, get_user_page() takes only 4 args. vmas is removed
  **********************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0)
+#if (defined(CONFIG_SUSE_KERNEL) && (LINUX_VERSION_CODE == KERNEL_VERSION(4,4,73)))
+    #define Plx_get_user_pages          get_user_pages
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0)
     #define Plx_get_user_pages(start, nr_pages, gup_flags, pages, vmas) \
             (                                           \
                 get_user_pages(                         \
@@ -436,8 +461,28 @@
                     (vmas)                              \
                     )                                   \
             )
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6,5,0)
+    #define Plx_get_user_pages(start, nr_pages, gup_flags, pages, vmas) \
+            (                                           \
+                get_user_pages(                         \
+                    (start),                            \
+                    (nr_pages),                         \
+                    (gup_flags),                        \
+                    (pages),                            \
+                    (vmas)                              \
+                    )                                   \
+            )
 #else
-    #define Plx_get_user_pages          get_user_pages
+    //For Kernels >= 6.5.0
+    #define Plx_get_user_pages(start, nr_pages, gup_flags, pages, vmas) \
+            (                                           \
+                get_user_pages(                         \
+                    (start),                            \
+                    (nr_pages),                         \
+                    (gup_flags),                        \
+                    (pages)                             \
+                    )                                   \
+            )
 #endif
 
 
@@ -485,6 +530,40 @@
     #define PLX_DMA_BIT_MASK            DMA_BIT_MASK
 #endif
 
+/***********************************************************
+ *  down_read / mmap_read_lock 
+ *
+ * This function is used to provide mmap locking mechanism
+ * Prior to KERNEL VERSION < 5.8 , the function is down_read.
+ * It is now mmap_read_lock for KERNEL VERSION >= 5.8
+ **********************************************************/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,8,0)
+    #define Plx_mmap_lock( mm )                  \
+            (                                    \
+                down_read(                       \
+                     &mm->mmap_sem               \
+                    )                            \
+            )
 
+    #define Plx_mmap_unlock( mm )                \
+            (                                    \
+                up_read(                         \
+                     &mm->mmap_sem               \
+                    )                            \
+            )
+
+#else
+
+    #define Plx_mmap_lock(mm)                    \
+            (                                    \
+                mmap_read_lock( mm )             \
+            )
+
+    #define Plx_mmap_unlock(mm)                  \
+            (                                    \
+                mmap_read_unlock( mm )           \
+            )
+
+#endif
 
 #endif  // _PLX_SYSDEP_H_

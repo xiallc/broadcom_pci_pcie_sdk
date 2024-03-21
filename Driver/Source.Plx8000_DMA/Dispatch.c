@@ -272,12 +272,12 @@ Dispatch_mmap(
      **********************************************************/
 
     // Set the region as page-locked
-    vma->vm_flags |= VM_RESERVED;
+    Plx_vm_flags_set(vma, VM_RESERVED);
 
     if (bDeviceMem)
     {
         // Set flag for I/O resource
-        vma->vm_flags |= VM_IO;
+        Plx_vm_flags_set(vma, VM_IO);
 
         // Set caching based on BAR properties
         if (pdx->PciBar[offset].Properties.Flags & PLX_BAR_FLAG_PREFETCHABLE)

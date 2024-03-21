@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Broadcom, Inc
+ * Copyright 2013-2022 Broadcom, Inc
  * Copyright (c) 2009 to 2012 PLX Technology Inc.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -149,7 +149,7 @@ struct _PCI_CLASS_CODES
             {0x06, 0x80, 0x00, "Bridge device"},
 
         {0x07, 0xFF, 0xFF, "Simple communications controller"},
-            {0x07, 0x00, 0x00, "Generic XT-compatible serial ctrlr"},
+            {0x07, 0x00, 0x00, "Generic XT-compatible serial ctrl"},
             {0x07, 0x00, 0x01, "16450-compatible serial controller"},
             {0x07, 0x00, 0x02, "16550-compatible serial controller"},
             {0x07, 0x00, 0x03, "16650-compatible serial controller"},
@@ -175,8 +175,8 @@ struct _PCI_CLASS_CODES
             {0x08, 0x00, 0x00, "Generic 8259 PIC"},
             {0x08, 0x00, 0x01, "ISA PIC"},
             {0x08, 0x00, 0x02, "EISA PIC"},
-            {0x08, 0x00, 0x10, "I/O APIC interrupt contoller"},
-            {0x08, 0x00, 0x20, "I/O(x) APIC interrupt contoller"},
+            {0x08, 0x00, 0x10, "I/O APIC interrupt controller"},
+            {0x08, 0x00, 0x20, "I/O(x) APIC interrupt controller"},
             {0x08, 0x01, 0x00, "Generic 8237 DMA controller"},
             {0x08, 0x01, 0x01, "ISA DMA controller"},
             {0x08, 0x01, 0x02, "EISA DMA controller"},
@@ -227,12 +227,12 @@ struct _PCI_CLASS_CODES
             {0x0C, 0x03, 0x80, "USB controller (non-spec interface)"},
             {0x0C, 0x03, 0xFE, "USB device"},
             {0x0C, 0x04, 0x00, "Fibre Channel controller"},
-            {0x0C, 0x05, 0x00, "System Management Bus (SMBus) ctrlr"},
+            {0x0C, 0x05, 0x00, "System Management Bus (SMBus) ctrl"},
             {0x0C, 0x06, 0x00, "Legacy InfiniBand controller"},
             {0x0C, 0x07, 0x00, "IPMI SMIC interface controller"},
-            {0x0C, 0x07, 0x01, "IPMI Keyboard cntrlr style interface"},
+            {0x0C, 0x07, 0x01, "IPMI Keyboard ctrl style interface"},
             {0x0C, 0x07, 0x02, "IPMI Block transfer interface"},
-            {0x0C, 0x08, 0x00, "SERCOS Inerfact Standard (IEC 61491)"},
+            {0x0C, 0x08, 0x00, "SERCOS Interface Standard (IEC 61491)"},
             {0x0C, 0x09, 0x00, "CANbus controller"},
             {0x0C, 0x0A, 0x00, "MIPI I3C host controller interface"},
             {0x0C, 0x80, 0x00, "Serial Bus controller"},
@@ -268,19 +268,19 @@ struct _PCI_CLASS_CODES
 
         {0x11, 0xFF, 0xFF, "Signal processing controller (DSP)"},
             {0x11, 0x00, 0x00, "DPIO module"},
-            {0x11, 0x01, 0x00, "Perfomance counters"},
+            {0x11, 0x01, 0x00, "Performance counters"},
             {0x11, 0x10, 0x00, "Communication synchronizer"},
             {0x11, 0x20, 0x00, "Signal processing management"},
             {0x11, 0x80, 0x00, "Signal processing controller (DSP)"},
 
         {0x12, 0xFF, 0xFF, "Processing accelerator"},
             {0x12, 0x00, 0x00, "Processing accelerator"},
-            {0x12, 0x01, 0x00, "AI interface acelerator"},
+            {0x12, 0x01, 0x00, "AI interface accelerator"},
 
         {0x13, 0xFF, 0xFF, "Non-Essential Instrumentation"},
             {0x13, 0x00, 0x00, "Non-Essential Instr Fn (Vendor-spec)"},
 
-        {0x40, 0xFF, 0xFF, "Coprocessor"},
+        {0x40, 0xFF, 0xFF, "Co-processor"},
 
         {0xFF, 0xFF, 0xFF, "Unassigned device class"}
     };
@@ -558,7 +558,7 @@ DeviceListDisplay(
         return;
     }
 
-    // Traverse the list and diplay items
+    // Traverse the list and display items
     index = 0;
     pNode = pDeviceList;
 
@@ -1045,6 +1045,11 @@ Device_GetClassString(
     U16 CurrentScore;
     U32 PlxChip;
     U32 PciClass;
+    U32     RegValue;
+    U16     Offset_Cap;
+    U16     CapID;
+    PLX_DEVICE_OBJECT pDevice;
+    PLX_STATUS        status;
 
 
     // Get device class code
@@ -1142,13 +1147,72 @@ Device_GetClassString(
                 }
                 else
                 {
-                    if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                    status = PlxPci_DeviceOpen( &pNode->Key, &pDevice);
+                    if (status == PLX_STATUS_OK)
                     {
-                        strcpy( pClassText, "Broadcom PCIe internal UP" );
+                        // Get offset of first capability
+                        RegValue = PlxPci_PciRegisterReadFast( &pDevice, PCI_REG_CAP_PTR, NULL );
+                        // If link is down, PCI reg accesses will fail
+                        if ((RegValue == PCI_CFG_RD_ERR_VAL_32) || (RegValue == 0))
+                        {
+                            Cons_printf("  -- Device does not have PCI extended capabilities --\n");
+                            if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                            {
+                                strcpy( pClassText, "Broadcom PCIe internal UP" );
+                            }
+                            else
+                            {
+                                strcpy( pClassText, "Broadcom PCIe upstream port" );
+                            }
+                        }
+                        else
+                        {
+                            // Set first capability
+                            Offset_Cap = (U16)RegValue;
+                            while(1)
+                            {
+
+                                // Get next capability
+                                RegValue = PlxPci_PciRegisterReadFast( &pDevice, Offset_Cap, NULL );
+                                CapID  = (U16)(RegValue & 0xFF);
+                                if(CapID == PCI_CAP_ID_VENDOR_SPECIFIC)
+                                {
+                                    strcpy( pClassText, "OEM synthetic PCIe upstream " );
+                                    break;
+                                }
+
+                                Offset_Cap = (U16)((RegValue >> 8) & 0xFF);
+                                // Check if reached end of list
+                                if ((Offset_Cap == 0) || ((U8)Offset_Cap == 0xFF))
+                                {
+                                    break;
+                                }
+                            }
+                            if (CapID != PCI_CAP_ID_VENDOR_SPECIFIC)
+                            {
+                                if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                                {
+                                    strcpy( pClassText, "Broadcom PCIe internal UP" );
+                                }
+                                else
+                                {
+                                    strcpy( pClassText, "Broadcom PCIe upstream port" );
+                                }
+                            }
+                        }
+                        // Release the device
+                        PlxPci_DeviceClose( &pDevice );
                     }
                     else
                     {
-                        strcpy( pClassText, "Broadcom PCIe upstream port" );
+                        if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                        {
+                            strcpy( pClassText, "Broadcom PCIe internal UP" );
+                        }
+                        else
+                        {
+                            strcpy( pClassText, "Broadcom PCIe upstream port" );
+                        }
                     }
                 }
             }
@@ -1173,14 +1237,73 @@ Device_GetClassString(
                 }
                 else
                 {
-                    if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                    status = PlxPci_DeviceOpen( &pNode->Key, &pDevice);
+                    if (status == PLX_STATUS_OK)
                     {
-                        strcpy( pClassText, "Broadcom PCIe internal DS" );
+                        // Get offset of first capability
+                        RegValue = PlxPci_PciRegisterReadFast( &pDevice, PCI_REG_CAP_PTR, NULL );
+                        // If link is down, PCI reg accesses will fail
+                        if ((RegValue == PCI_CFG_RD_ERR_VAL_32) || (RegValue == 0))
+                        {
+                            Cons_printf("  -- Device does not have PCI extended capabilities --\n");
+                            if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                            {
+                                strcpy( pClassText, "Broadcom PCIe internal DS" );
+                            }
+                            else
+                            {
+                                strcpy( pClassText, "Broadcom PCIe downstream port" );
+                            }
+                        }
+                        else
+                        {
+                            // Set first capability
+                            Offset_Cap = (U16)RegValue;
+                            while(1)
+                            {
+
+                                // Get next capability
+                                RegValue = PlxPci_PciRegisterReadFast( &pDevice, Offset_Cap, NULL );
+                                CapID  = (U16)(RegValue & 0xFF);
+                                if(CapID == PCI_CAP_ID_VENDOR_SPECIFIC)
+                                {
+                                    strcpy( pClassText, "OEM synthetic PCIe downstream " );
+                                    break;
+                                }
+
+                                Offset_Cap = (U16)((RegValue >> 8) & 0xFF);
+                                // Check if reached end of list
+                                if ((Offset_Cap == 0) || ((U8)Offset_Cap == 0xFF))
+                                {
+                                    break;
+                                }
+                            }
+                            if (CapID != PCI_CAP_ID_VENDOR_SPECIFIC)
+                            {
+                                if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                                {
+                                    strcpy( pClassText, "Broadcom PCIe internal DS" );
+                                }
+                                else
+                                {
+                                    strcpy( pClassText, "Broadcom PCIe downstream port" );
+                                }
+                            }
+                        }
+                        // Release the device
+                        PlxPci_DeviceClose( &pDevice );
                     }
                     else
                     {
-                        strcpy( pClassText, "Broadcom PCIe downstream port" );
-                    }
+                        if (pNode->PortProp.PortNumber >= PEX_MAX_PORT)
+                        {
+                            strcpy( pClassText, "Broadcom PCIe internal DS" );
+                        }
+                        else
+                        {
+                            strcpy( pClassText, "Broadcom PCIe downstream port" );
+                        }
+                    }    
                 }
             }
             else if (pNode->PortProp.PortType == PLX_PORT_ENDPOINT)
@@ -1504,9 +1627,8 @@ Plx_EepromFileLoad(
     struct timeb  end;
     struct timeb  start;
 
-
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     Cons_printf("Load EEPROM file....... ");
     Cons_fflush( stdout );
@@ -1649,7 +1771,7 @@ Plx_EepromFileLoad(
     }
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n\n",
@@ -1687,7 +1809,7 @@ Plx_EepromFileSave(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     // Open the file to write
     pFile = fopen( pFileName, "wb" );
@@ -1777,7 +1899,7 @@ Plx_EepromFileSave(
     Cons_printf("Ok (%d B)\n", (int)EepSize);
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n\n",
@@ -1820,7 +1942,7 @@ Plx8000_EepromFileLoad(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     pBuffer   = NULL;
     EepHeader = 0;
@@ -1932,7 +2054,7 @@ Plx8000_EepromFileLoad(
         }
     }
 
-    // Write any remaing 16-bit unaligned value
+    // Write any remaining 16-bit unaligned value
     if (offset < FileSize)
     {
         // Get next value
@@ -1989,7 +2111,7 @@ _Exit_File_Load_8000:
     }
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n\n",
@@ -2026,9 +2148,8 @@ Plx8000_EepromFileSave(
     struct timeb  end;
     struct timeb  start;
 
-
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     Cons_printf("Get EEPROM data size.. ");
 
@@ -2149,7 +2270,7 @@ Plx8000_EepromFileSave(
     Cons_printf( "Ok (%s)\n", pFileName );
 
     // Note completion time
-    ftime( &end );
+    Plx_ftime_get( &end );
 
     Cons_printf(
         " -- Complete (%.2f sec) --\n\n",
@@ -2197,7 +2318,7 @@ Plx_SpiFileLoad(
 
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     Cons_printf("Load image file............ ");
     Cons_fflush( stdout );
@@ -2417,7 +2538,7 @@ Plx_SpiFileLoad(
     free( ptrBuffer );
 
     // Calculate elapsed time
-    ftime( &end );
+    Plx_ftime_get( &end );
     elapsed = PLX_DIFF_TIMEB( end, start );
 
     if (elapsed < 1)
@@ -2483,7 +2604,7 @@ Plx_SpiFileSave(
     }
 
     // Note start time
-    ftime( &start );
+    Plx_ftime_get( &start );
 
     // Round byte count up to next DW boundary
     ByteCount = (ByteCount + 3) & ~(U32)0x3;
@@ -2655,7 +2776,7 @@ Plx_SpiFileSave(
     }
 
     // Calculate elapsed time
-    ftime( &end );
+    Plx_ftime_get( &end );
     elapsed = PLX_DIFF_TIMEB( end, start );
 
     if (elapsed < 1)
